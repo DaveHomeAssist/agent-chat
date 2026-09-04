@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#0A0C11;color:#E8EBF3;font-family:'Instrument Sans',ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#7C9BFF;text-decoration:none}
+a:hover{color:#A78BFA}
+input,textarea,button{font-family:inherit}
+button{cursor:pointer;border:0;background:none;color:inherit}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.09);border-radius:9px}
+::-webkit-scrollbar-track{background:transparent}
+@keyframes ring{0%{box-shadow:0 0 0 0 currentColor;opacity:.9}70%{box-shadow:0 0 0 6px transparent;opacity:.55}100%{box-shadow:0 0 0 0 transparent;opacity:.9}}
+@keyframes blink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-2px)}}
+@keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(320%)}}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div style="display:flex;flex-direction:column;height:100vh;min-height:700px;min-width:1180px;background:
+radial-gradient(1200px 420px at 18% -8%,rgba(124,155,255,.10),transparent 70%),
+radial-gradient(900px 380px at 88% -6%,rgba(139,92,246,.10),transparent 70%),#0A0C11;font-size:13px">
+
+  <header style="flex:none;display:flex;align-items:center;gap:18px;height:58px;padding:0 16px 0 14px;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(16,19,26,.72);backdrop-filter:blur(8px)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:26px;height:26px;border-radius:8px;background:linear-gradient(140deg,#4C8CFF,#8B5CF6);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(76,140,255,.35)">
+        <div style="width:8px;height:8px;background:#0A0C11;transform:rotate(45deg);border-radius:1px"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1px">
+        <div style="font-size:13px;font-weight:600;letter-spacing:-.01em">Agent Chatroom</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5E6779">helios/api · feat/passkey-auth</div>
+      </div>
+    </div>
+
+    <div style="width:1px;height:26px;background:rgba(255,255,255,.08)"></div>
+
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:7px;height:26px;padding:0 10px 0 8px;border-radius:7px;border:1px solid {{ runRing }};background:{{ runTint }}">
+        <span style="width:6px;height:6px;border-radius:50%;background:{{ runColor }};color:{{ runColor }};animation:{{ runPulse }}"></span>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:500;letter-spacing:.06em;color:{{ runColor }}">{{ runLabel }}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#7E879B">
+        <span>12:41 elapsed</span>
+        <span>38.2k tok</span>
+        <span>$1.14</span>
+      </div>
+    </div>
+
+    <div style="flex:1"></div>
+
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onClick="{{ togglePause }}" style="display:flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:8px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.04);font-size:12px;font-weight:500;color:#C8CEDC">
+        <span style="width:7px;height:7px;border-radius:2px;background:{{ runColor }}"></span>{{ pauseLabel }}
+      </button>
+      <button style="height:30px;padding:0 12px;border-radius:8px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.04);font-size:12px;font-weight:500;color:#C8CEDC">Snapshot</button>
+      <button onClick="{{ toggleDetail }}" style="height:30px;padding:0 12px;border-radius:8px;border:1px solid {{ accentRing }};background:{{ accentTint }};font-size:12px;font-weight:600;color:{{ accent }}">{{ detailBtn }}</button>
+    </div>
+  </header>
+
+  <div style="flex:1;display:flex;min-height:0">
+
+    <aside style="flex:none;width:288px;display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,.07);background:#0D1016">
+      <div style="flex:none;display:flex;align-items:center;justify-content:space-between;padding:14px 14px 10px">
+        <div style="font-size:10.5px;font-weight:600;letter-spacing:.13em;color:#5E6779">ACTIVE AGENTS</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#5E6779">5</div>
+      </div>
+
+      <div style="flex:1;min-height:0;overflow-y:auto;padding:0 8px 8px;display:flex;flex-direction:column;gap:4px">
+        <sc-for list="{{ agents }}" as="a" hint-placeholder-count="5">
+          <button onClick="{{ a.select }}" style="position:relative;display:flex;flex-direction:column;gap:7px;width:100%;padding:10px 11px 10px 12px;border-radius:10px;text-align:left;border:1px solid {{ a.rowRing }};background:{{ a.rowBg }}" style-hover="background:rgba(255,255,255,.045)">
+            <div style="position:absolute;left:0;top:11px;bottom:11px;width:2px;border-radius:2px;background:{{ a.bar }}"></div>
+            <div style="display:flex;align-items:center;gap:9px">
+              <div style="flex:none;width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;letter-spacing:.02em;color:{{ a.color }};background:{{ a.tint }};border:1px solid {{ a.ring }}">{{ a.initials }}</div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span style="font-size:12.5px;font-weight:600;color:#E8EBF3">{{ a.name }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#5E6779">{{ a.model }}</span>
+                </div>
+                <div style="font-size:11px;color:#7E879B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.role }}</div>
+              </div>
+              <div style="flex:none;display:flex;align-items:center;gap:5px">
+                <span style="width:6px;height:6px;border-radius:50%;background:{{ a.statusColor }};color:{{ a.statusColor }};animation:{{ a.statusPulse }}"></span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:{{ a.statusColor }}">{{ a.statusLabel }}</span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px;padding-left:37px">
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6B7488;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.subtask }}</div>
+              <div style="position:relative;height:3px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden">
+                <div style="position:absolute;inset:0;width:{{ a.pctW }};border-radius:3px;background:{{ a.color }}"></div>
+              </div>
+            </div>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="flex:none;padding:12px 14px;border-top:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:9px">
+        <div style="font-size:10.5px;font-weight:600;letter-spacing:.13em;color:#5E6779">HUMAN OVERSIGHT</div>
+        <button onClick="{{ toggleGate }}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%">
+          <span style="font-size:12px;color:#C8CEDC">Approve before merge</span>
+          <span style="flex:none;width:30px;height:17px;border-radius:9px;padding:2px;background:{{ gateTrack }};display:flex;justify-content:{{ gateJustify }}">
+            <span style="width:13px;height:13px;border-radius:50%;background:#E8EBF3"></span>
+          </span>
+        </button>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <span style="font-size:12px;color:#C8CEDC">Auto-approve tool calls</span>
+          <span style="flex:none;width:30px;height:17px;border-radius:9px;padding:2px;background:rgba(255,255,255,.10);display:flex;justify-content:flex-start">
+            <span style="width:13px;height:13px;border-radius:50%;background:#5E6779"></span>
+          </span>
+        </div>
+        <div style="display:flex;gap:14px;padding-top:6px;border-top:1px solid rgba(255,255,255,.06);font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5E6779">
+          <span>128 msgs</span><span>41 tools</span><span>6 handoffs</span>
+        </div>
+      </div>
+    </aside>
+
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column;background:#0A0C11">
+      <div style="flex:none;display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid rgba(255,255,255,.07)">
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div style="font-size:13.5px;font-weight:600;letter-spacing:-.01em">#feature-passkey-auth</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5E6779">started 14:02 · 5 agents · 3 tool servers</div>
+        </div>
+        <div style="flex:1"></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <sc-for list="{{ filters }}" as="f" hint-placeholder-count="4">
+            <button onClick="{{ f.apply }}" style="display:flex;align-items:center;gap:6px;height:27px;padding:0 10px;border-radius:7px;border:1px solid {{ f.ring }};background:{{ f.bg }};font-size:11.5px;font-weight:500;color:{{ f.color }}">
+              {{ f.label }}<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;opacity:.6">{{ f.count }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div ref="{{ threadRef }}" style="flex:1;min-height:0;overflow-y:auto;padding:18px 22px 8px;display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ thread }}" as="m" hint-placeholder-count="6">
+          <div style="animation:fadein .18s ease both">
+
+            <sc-if value="{{ m.isDivider }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:12px;padding:16px 0 12px">
+                <div style="display:flex;align-items:center;gap:8px;padding:3px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03)">
+                  <span style="width:5px;height:5px;transform:rotate(45deg);background:#8B5CF6"></span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:#9BA4B8">{{ m.body }}</span>
+                </div>
+                <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(255,255,255,.10),transparent)"></div>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4C5568">{{ m.time }}</span>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ m.isMsg }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:11px;padding:9px 10px;border-radius:12px" style-hover="background:rgba(255,255,255,.022)">
+                <div style="flex:none;width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:{{ m.color }};background:{{ m.tint }};border:1px solid {{ m.ring }}">{{ m.initials }}</div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="padding:2px 7px;border-radius:6px;font-size:11px;font-weight:600;color:{{ m.color }};background:{{ m.tint }}">{{ m.name }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4C5568">{{ m.role }}</span>
+                    <span style="flex:1"></span>
+                    <sc-if value="{{ m.badge }}" hint-placeholder-val="{{ false }}">
+                      <span style="padding:2px 7px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:{{ m.badgeColor }};border:1px solid {{ m.badgeRing }}">{{ m.badge }}</span>
+                    </sc-if>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4C5568">{{ m.time }}</span>
+                  </div>
+                  <div style="font-size:13px;line-height:1.55;color:#C8CEDC;text-wrap:pretty;max-width:78ch">{{ m.body }}</div>
+                  <sc-if value="{{ m.hasChips }}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;padding-top:2px">
+                      <sc-for list="{{ m.chips }}" as="c" hint-placeholder-count="2">
+                        <span style="padding:3px 8px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8C95A9;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">{{ c }}</span>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ m.isTool }}" hint-placeholder-val="{{ false }}">
+              <div style="margin:4px 0 4px 51px;border-radius:11px;border:1px solid rgba(255,255,255,.08);background:#101319;overflow:hidden">
+                <button onClick="{{ m.toggle }}" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;text-align:left">
+                  <span style="width:5px;height:5px;border-radius:50%;background:{{ m.color }}"></span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;color:#C8CEDC">{{ m.tool }}</span>
+                  <span style="font-size:11.5px;color:#7E879B;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.body }}</span>
+                  <span style="flex:1"></span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4C5568">{{ m.dur }}</span>
+                  <span style="padding:2px 6px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:{{ m.statusColor }};background:{{ m.statusTint }}">{{ m.status }}</span>
+                  <span style="font-size:9px;color:#5E6779">{{ m.caret }}</span>
+                </button>
+                <sc-if value="{{ m.open }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:2px 12px 11px 27px;display:flex;flex-direction:column;gap:2px;border-top:1px solid rgba(255,255,255,.06);margin-top:1px;padding-top:10px">
+                    <sc-for list="{{ m.lines }}" as="l" hint-placeholder-count="3">
+                      <div style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;line-height:1.6;color:{{ l.color }}">{{ l.text }}</div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ m.isHandoff }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:9px;margin:6px 0 6px 51px;padding:7px 11px;border-radius:9px;border:1px dashed rgba(139,92,246,.35);background:rgba(139,92,246,.07);width:fit-content">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;color:#A78BFA">HANDOFF</span>
+                <span style="font-size:11.5px;color:#B9AEE8">{{ m.body }}</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#6B5F92">{{ m.time }}</span>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ m.isHuman }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:11px;padding:11px 12px;margin:8px 0;border-radius:12px;border:1px solid {{ accentRing }};background:{{ accentTint }}">
+                <div style="flex:none;width:30px;height:30px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#0A0C11;background:linear-gradient(140deg,#E8EBF3,#9BA4B8)">DK</div>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+                  <div style="display:flex;align-items:baseline;gap:8px">
+                    <span style="font-size:11.5px;font-weight:600;color:#E8EBF3">You</span>
+                    <span style="padding:2px 6px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:{{ accent }};border:1px solid {{ accentRing }}">HUMAN · BROADCAST</span>
+                    <span style="flex:1"></span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4C5568">{{ m.time }}</span>
+                  </div>
+                  <div style="font-size:13px;line-height:1.55;color:#E8EBF3;max-width:78ch">{{ m.body }}</div>
+                </div>
+              </div>
+            </sc-if>
+
+          </div>
+        </sc-for>
+
+        <sc-if value="{{ typing }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 10px 14px 51px">
+            <div style="display:flex;gap:4px">
+              <span style="width:5px;height:5px;border-radius:50%;background:#3ED8C4;animation:blink 1.1s infinite"></span>
+              <span style="width:5px;height:5px;border-radius:50%;background:#3ED8C4;animation:blink 1.1s .18s infinite"></span>
+              <span style="width:5px;height:5px;border-radius:50%;background:#3ED8C4;animation:blink 1.1s .36s infinite"></span>
+            </div>
+            <span style="font-size:11.5px;color:#6B7488">{{ typingLabel }}</span>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="flex:none;padding:10px 18px 14px;border-top:1px solid rgba(255,255,255,.07);background:#0D1016">
+        <div style="display:flex;align-items:center;gap:7px;padding-bottom:9px">
+          <sc-for list="{{ quick }}" as="q" hint-placeholder-count="3">
+            <button onClick="{{ q.apply }}" style="height:25px;padding:0 9px;border-radius:6px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03);font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8C95A9" style-hover="color:#E8EBF3;border-color:rgba(255,255,255,.18)">{{ q.label }}</button>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px 8px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.11);background:#141822;box-shadow:0 6px 22px rgba(0,0,0,.35)">
+          <button onClick="{{ cycleTarget }}" style="display:flex;align-items:center;gap:7px;flex:none;height:26px;padding:0 9px;border-radius:7px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04)">
+            <span style="width:5px;height:5px;transform:rotate(45deg);background:{{ targetColor }}"></span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#C8CEDC">{{ targetLabel }}</span>
+            <span style="font-size:8px;color:#5E6779">▾</span>
+          </button>
+          <input value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onKey }}" placeholder="Message the room, or /assign forge migration…" style="flex:1;min-width:0;height:30px;border:0;outline:none;background:transparent;font-size:13px;color:#E8EBF3">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4C5568">⏎ send</span>
+          <button onClick="{{ send }}" style="flex:none;height:30px;padding:0 15px;border-radius:8px;font-size:12.5px;font-weight:600;color:#0A0C11;background:{{ accent }}">Send</button>
+        </div>
+      </div>
+    </main>
+
+    <sc-if value="{{ detailOpen }}" hint-placeholder-val="{{ true }}">
+      <aside style="flex:none;width:404px;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.07);background:#0D1016">
+
+        <div style="flex:none;display:flex;flex-direction:column;min-height:0;border-bottom:1px solid rgba(255,255,255,.07);height:{{ trackerH }}">
+          <div style="flex:none;display:flex;align-items:center;gap:10px;padding:13px 14px 10px">
+            <div style="font-size:10.5px;font-weight:600;letter-spacing:.13em;color:#5E6779">PIPELINE</div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#4C5568">PR #482</span>
+            <div style="flex:1"></div>
+            <div style="display:flex;padding:2px;border-radius:7px;background:rgba(255,255,255,.05)">
+              <button onClick="{{ setBoard }}" style="height:21px;padding:0 9px;border-radius:5px;font-size:10.5px;font-weight:600;color:{{ boardColor }};background:{{ boardBg }}">Board</button>
+              <button onClick="{{ setSteps }}" style="height:21px;padding:0 9px;border-radius:5px;font-size:10.5px;font-weight:600;color:{{ stepsColor }};background:{{ stepsBg }}">Steps</button>
+            </div>
+          </div>
+
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:2px 12px 14px">
+            <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ lanes }}" as="ln" hint-placeholder-count="5">
+                  <div style="border-radius:11px;border:1px solid {{ ln.ring }};background:{{ ln.bg }};padding:9px 10px;display:flex;flex-direction:column;gap:7px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="width:6px;height:6px;border-radius:50%;background:{{ ln.color }}"></span>
+                      <span style="font-size:11.5px;font-weight:600;color:#D8DDE9">{{ ln.name }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5E6779">{{ ln.count }}</span>
+                      <div style="flex:1"></div>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.06em;color:{{ ln.color }}">{{ ln.state }}</span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:5px">
+                      <sc-for list="{{ ln.tasks }}" as="t" hint-placeholder-count="1">
+                        <button onClick="{{ t.select }}" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;border-radius:8px;text-align:left;border:1px solid rgba(255,255,255,.07);background:#111520" style-hover="border-color:rgba(255,255,255,.16)">
+                          <span style="flex:none;width:18px;height:18px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;color:{{ t.color }};background:{{ t.tint }}">{{ t.owner }}</span>
+                          <span style="flex:1;min-width:0;font-size:11.5px;color:#C8CEDC;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.title }}</span>
+                          <span style="flex:none;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:{{ t.metaColor }}">{{ t.meta }}</span>
+                        </button>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ isSteps }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;padding:4px 2px">
+                <sc-for list="{{ steps }}" as="s" hint-placeholder-count="6">
+                  <div style="display:flex;gap:12px">
+                    <div style="flex:none;display:flex;flex-direction:column;align-items:center;width:18px">
+                      <div style="width:16px;height:16px;border-radius:50%;border:1.5px solid {{ s.ring }};background:{{ s.dotBg }};display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;color:{{ s.markColor }}">{{ s.mark }}</div>
+                      <div style="flex:1;width:1.5px;background:{{ s.line }};min-height:{{ s.lineH }}"></div>
+                    </div>
+                    <div style="flex:1;min-width:0;padding-bottom:14px;display:flex;flex-direction:column;gap:4px">
+                      <div style="display:flex;align-items:baseline;gap:8px">
+                        <span style="font-size:12px;font-weight:600;color:{{ s.titleColor }}">{{ s.title }}</span>
+                        <span style="flex:1"></span>
+                        <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:{{ s.metaColor }}">{{ s.meta }}</span>
+                      </div>
+                      <div style="font-size:11px;color:#6B7488">{{ s.detail }}</div>
+                      <sc-if value="{{ s.showBar }}" hint-placeholder-val="{{ false }}">
+                        <div style="position:relative;height:3px;border-radius:3px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:2px">
+                          <div style="position:absolute;inset:0;width:{{ s.pctW }};border-radius:3px;background:{{ s.barColor }}"></div>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+          <div style="flex:none;display:flex;align-items:center;gap:10px;padding:12px 14px 10px">
+            <div style="width:26px;height:26px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:{{ sel.color }};background:{{ sel.tint }};border:1px solid {{ sel.ring }}">{{ sel.initials }}</div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+              <div style="font-size:12.5px;font-weight:600">{{ sel.name }}</div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#5E6779">{{ sel.role }} · {{ sel.statusLabel }}</div>
+            </div>
+            <button onClick="{{ collapseDetail }}" style="width:24px;height:24px;border-radius:7px;border:1px solid rgba(255,255,255,.09);color:#7E879B;font-size:10px">✕</button>
+          </div>
+
+          <div style="flex:none;display:flex;gap:2px;padding:0 12px 8px">
+            <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+              <button onClick="{{ t.apply }}" style="height:26px;padding:0 11px;border-radius:7px;font-size:11.5px;font-weight:600;color:{{ t.color }};background:{{ t.bg }};border:1px solid {{ t.ring }}">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:2px 14px 14px">
+            <sc-if value="{{ tabSubtask }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-direction:column;gap:11px">
+                <div style="border-radius:11px;border:1px solid rgba(255,255,255,.08);background:#111520;padding:11px 12px;display:flex;flex-direction:column;gap:9px">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;color:#5E6779">CURRENT SUBTASK</div>
+                  <div style="font-size:13px;font-weight:600;line-height:1.4;color:#E8EBF3;text-wrap:pretty">{{ sel.subtaskTitle }}</div>
+                  <div style="display:flex;align-items:center;gap:9px">
+                    <div style="flex:1;position:relative;height:5px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden">
+                      <div style="position:absolute;inset:0;width:{{ sel.pctW }};border-radius:4px;background:{{ sel.color }}"></div>
+                      <div style="position:absolute;top:0;bottom:0;width:28px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.32),transparent);animation:{{ sweepAnim }}"></div>
+                    </div>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:{{ sel.color }}">{{ sel.pct }}%</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5E6779">{{ sel.eta }}</span>
+                  </div>
+                  <div style="display:flex;flex-wrap:wrap;gap:5px">
+                    <sc-for list="{{ sel.io }}" as="c" hint-placeholder-count="3">
+                      <span style="padding:3px 7px;border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#8C95A9;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)">{{ c }}</span>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="display:flex;gap:6px">
+                  <button style="flex:1;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.04);font-size:11.5px;font-weight:600;color:#C8CEDC" style-hover="border-color:rgba(255,255,255,.2)">Interrupt</button>
+                  <button style="flex:1;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.04);font-size:11.5px;font-weight:600;color:#C8CEDC" style-hover="border-color:rgba(255,255,255,.2)">Reassign</button>
+                  <button onClick="{{ dmSelected }}" style="flex:1;height:30px;border-radius:8px;border:1px solid {{ accentRing }};background:{{ accentTint }};font-size:11.5px;font-weight:600;color:{{ accent }}">Message</button>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:7px;padding-top:4px">
+                  <div style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.1em;color:#5E6779">QUEUE · {{ sel.queueCount }}</div>
+                  <sc-for list="{{ sel.queue }}" as="q" hint-placeholder-count="2">
+                    <div style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:8px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.05)">
+                      <span style="width:4px;height:4px;border-radius:50%;background:#5E6779"></span>
+                      <span style="flex:1;font-size:11.5px;color:#8C95A9">{{ q.title }}</span>
+                      <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#4C5568">{{ q.meta }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ tabOutput }}" hint-placeholder-val="{{ false }}">
+              <div style="border-radius:11px;border:1px solid rgba(255,255,255,.08);background:#0A0C11;padding:10px 11px;display:flex;flex-direction:column;gap:3px">
+                <sc-for list="{{ sel.log }}" as="l" hint-placeholder-count="8">
+                  <div style="display:flex;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;line-height:1.65">
+                    <span style="flex:none;color:#3F485A">{{ l.t }}</span>
+                    <span style="flex:none;width:34px;color:{{ l.levelColor }}">{{ l.level }}</span>
+                    <span style="flex:1;color:#8C95A9;word-break:break-word">{{ l.msg }}</span>
+                  </div>
+                </sc-for>
+                <div style="display:flex;align-items:center;gap:8px;padding-top:5px">
+                  <span style="width:5px;height:11px;background:{{ sel.color }};animation:{{ blinkAnim }}"></span>
+                  <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#4C5568">streaming</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ tabTools }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <sc-for list="{{ sel.tools }}" as="tc" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;border:1px solid rgba(255,255,255,.07);background:#111520">
+                    <span style="width:5px;height:5px;border-radius:50%;background:{{ tc.color }}"></span>
+                    <span style="flex:none;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#D8DDE9">{{ tc.name }}</span>
+                    <span style="flex:1;min-width:0;font-size:11px;color:#6B7488;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ tc.arg }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:#4C5568">{{ tc.dur }}</span>
+                    <span style="padding:2px 6px;border-radius:5px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:{{ tc.color }};background:{{ tc.tint }}">{{ tc.status }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </aside>
+    </sc-if>
+
+    <sc-if value="{{ detailClosed }}" hint-placeholder-val="{{ false }}">
+      <aside style="flex:none;width:46px;display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 0;border-left:1px solid rgba(255,255,255,.07);background:#0D1016">
+        <button onClick="{{ toggleDetail }}" style="width:28px;height:28px;border-radius:8px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);color:#9BA4B8;font-size:11px">‹</button>
+        <div style="writing-mode:vertical-rl;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;color:#5E6779">PIPELINE · AGENT DETAIL</div>
+      </aside>
+    </sc-if>
+
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#4C8CFF&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#4C8CFF&quot;,&quot;#8B5CF6&quot;,&quot;#3ED8C4&quot;,&quot;#F472B6&quot;],&quot;section&quot;:&quot;Look&quot;},&quot;trackerMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;board&quot;,&quot;options&quot;:[&quot;board&quot;,&quot;steps&quot;],&quot;tsType&quot;:&quot;'board' | 'steps'&quot;,&quot;section&quot;:&quot;Panels&quot;},&quot;liveMotion&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Panels&quot;},&quot;approvalGate&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behavior&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.threadRef = React.createRef();
+    this.state = {
+      sel: 'forge', tab: 'subtask', filter: 'all', detail: true,
+      tracker: props.trackerMode || 'board', paused: false, target: 'all',
+      draft: '', open: {}, thread: null, typing: true, gate: null
+    };
+  }
+
+  componentDidMount() { this.scroll(); }
+  componentDidUpdate() { this.scroll(); }
+  scroll() { const el = this.threadRef.current; if (el) el.scrollTop = el.scrollHeight; }
+
+  // ---- data ----
+  agentData() {
+    return [
+      { id:'atlas', name:'Atlas', initials:'AT', role:'Orchestrator · lead', model:'opus', color:'#7C9BFF', status:'working', pct:44,
+        subtask:'coordinating 5 subtasks · merge gate held',
+        subtaskTitle:'Keep the run on plan: sequence build → test → review, hold merge until the human gate clears',
+        eta:'~9 min', queueCount:2,
+        io:['plan/run-04.yaml','5 subtasks','2 blockers'],
+        queue:[{title:'Recompute critical path after patch',meta:'queued'},{title:'Draft run summary for PR body',meta:'queued'}],
+        log:[['14:38:02','INFO','subtask forge/register → 72%'],['14:38:04','INFO','merge gate = HELD (human)'],['14:38:11','WARN','probe/e2e failing 2/24 — waiting on patch'],['14:38:30','INFO','re-sequenced review after test'],['14:38:52','INFO','broadcast to #feature-passkey-auth']],
+        tools:[['run.plan','run-04 · 5 subtasks','0.4s','ok'],['agent.assign','forge ← migration','0.2s','ok'],['gate.hold','merge · human','0.1s','ok'],['run.summarize','pending','—','queued']] },
+      { id:'vector', name:'Vector', initials:'VC', role:'Spec & design', model:'sonnet', color:'#A78BFA', status:'idle', pct:100,
+        subtask:'spec complete · ADR-0142 merged',
+        subtaskTitle:'Write the WebAuthn L2 spec and threat model, land it as ADR-0142',
+        eta:'done', queueCount:1,
+        io:['ADR-0142.md','threat-model.md','3 decisions'],
+        queue:[{title:'Update spec if bytea change lands',meta:'watching'}],
+        log:[['14:09:41','INFO','resident keys required, no SMS fallback'],['14:11:07','INFO','wrote ADR-0142-passkey-auth.md'],['14:11:09','INFO','handoff → forge'],['14:12:02','INFO','idle · watching for spec deltas']],
+        tools:[['docs.write','ADR-0142-passkey-auth.md','1.2s','ok'],['repo.read','schema.prisma','0.3s','ok'],['web.fetch','w3c webauthn L2','2.1s','ok']] },
+      { id:'forge', name:'Forge', initials:'FG', role:'Implementation', model:'sonnet', color:'#3ED8C4', status:'working', pct:72,
+        subtask:'POST /webauthn/register · migration 0043',
+        subtaskTitle:'POST /webauthn/register + credentials table migration behind auth.passkeys flag',
+        eta:'~3 min', queueCount:2,
+        io:['ADR-0142','7 files','+318 −24','migration 0043'],
+        queue:[{title:'Credential store rollback path',meta:'next'},{title:'Rate-limit register endpoint',meta:'queued'}],
+        log:[['14:31:02','INFO','patch applied · 7 files'],['14:31:04','INFO','running pnpm typecheck'],['14:31:19','WARN','unused import in webauthn/verify.ts'],['14:31:41','INFO','typecheck passed · 0 errors'],['14:32:03','INFO','writing 0043_credentials.sql'],['14:33:18','INFO','fixed off-by-one in sign_count guard'],['14:34:02','INFO','pushed 4f9c1ad to feat/passkey-auth'],['14:35:10','INFO','awaiting probe/e2e re-run']],
+        tools:[['repo.patch','7 files · +318 −24','4.1s','ok'],['shell.run','pnpm typecheck','22.8s','ok'],['db.migrate','0043_credentials','1.9s','ok'],['repo.push','4f9c1ad','0.8s','ok']] },
+      { id:'probe', name:'Probe', initials:'PB', role:'QA & tests', model:'haiku', color:'#F2B457', status:'thinking', pct:58,
+        subtask:'e2e suite 18/24 · isolating 2 failures',
+        subtaskTitle:'Register/login e2e across Chrome, Safari, Windows Hello — isolate the 2 replay-guard failures',
+        eta:'~5 min', queueCount:2,
+        io:['e2e/passkey.spec.ts','24 cases','2 failing'],
+        queue:[{title:'Add sign_count replay fixture',meta:'next'},{title:'Coverage report for #482',meta:'queued'}],
+        log:[['14:29:55','INFO','suite start · 24 cases'],['14:30:40','FAIL','register.reregister → 400 replay'],['14:30:44','FAIL','login.windowsHello → cred_id mismatch'],['14:31:10','INFO','bisecting to sign_count guard'],['14:33:20','INFO','forge patch detected · re-queue suite'],['14:35:02','INFO','waiting for build 4f9c1ad']],
+        tools:[['shell.run','pnpm e2e --grep passkey','118.4s','ok'],['repo.read','webauthn/verify.ts','0.3s','ok'],['artifact.get','trace-0041.zip','1.1s','ok'],['shell.run','re-run suite','—','queued']] },
+      { id:'sentry', name:'Sentry', initials:'SY', role:'Review & security', model:'opus', color:'#F472B6', status:'blocked', pct:20,
+        subtask:'blocked · waiting on green suite',
+        subtaskTitle:'Diff review of #482 with a security pass on credential storage and replay protection',
+        eta:'blocked', queueCount:2,
+        io:['PR #482','412 LOC','1 blocking note'],
+        queue:[{title:'Blocking comment: cred_id → bytea',meta:'drafting'},{title:'Threat-model diff vs ADR-0142',meta:'queued'}],
+        log:[['14:36:12','INFO','pre-read diff · 412 LOC'],['14:36:40','RISK','cred_id stored as text — base64 round-trip'],['14:37:02','INFO','drafting blocking comment on #482'],['14:37:30','INFO','review blocked until suite green']],
+        tools:[['repo.diff','#482 · 412 LOC','0.9s','ok'],['sec.scan','deps + secrets','7.4s','ok'],['pr.comment','blocking · cred_id','—','drafting']] }
+    ].map(a => ({
+      id:a.id, name:a.name, initials:a.initials, role:a.role, model:a.model, color:a.color, status:a.status, pct:a.pct,
+      subtask:a.subtask, subtaskTitle:a.subtaskTitle, eta:a.eta, io:a.io, queueCount:a.queueCount, queue:a.queue,
+      log:a.log.map(l => ({ t:l[0], level:l[1], msg:l[2], levelColor:this.levelColor(l[1]) })),
+      tools:a.tools.map(t => { const c = this.toolColor(t[3]); return { name:t[0], arg:t[1], dur:t[2], status:t[3], color:c, tint:this.tint(c,.14) }; })
+    }));
+  }
+
+  levelColor(l) { return l === 'FAIL' ? '#F472B6' : l === 'WARN' ? '#F2B457' : l === 'RISK' ? '#F472B6' : '#5E6779'; }
+  toolColor(s) { return s === 'ok' ? '#3ED8C4' : s === 'queued' ? '#5E6779' : s === 'drafting' ? '#F2B457' : '#F472B6'; }
+  tint(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return 'rgba(' + [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(',') + ',' + a + ')';
+  }
+  statusMeta(s, live) {
+    const m = { working:['#3ED8C4','WORKING'], thinking:['#A78BFA','THINKING'], idle:['#5E6779','IDLE'], blocked:['#F2B457','BLOCKED'] }[s];
+    const pulsing = live && (s === 'working' || s === 'thinking');
+    return { color:m[0], label:m[1], pulse: pulsing ? 'ring 1.8s ease-out infinite' : 'none' };
+  }
+
+  baseThread() {
+    return [
+      { k:'divider', body:'PHASE 1 · SPEC', time:'14:02' },
+      { k:'msg', who:'atlas', badge:'PLAN', body:'Run started. Goal: ship passkey sign-in behind the auth.passkeys flag. Split into 5 subtasks, owners assigned. Gate: human approval before merge.', time:'14:02', chips:['plan/run-04.yaml','5 subtasks','gate: human'] },
+      { k:'msg', who:'vector', body:'Spec locked — WebAuthn L2, resident keys required, no SMS fallback. Both open questions from the threat model are answered; writing them into ADR-0142.', time:'14:09' },
+      { k:'tool', who:'vector', tool:'docs.write', body:'ADR-0142-passkey-auth.md', dur:'1.2s', status:'ok',
+        lines:[['# ADR-0142 — Passkey sign-in','#8C95A9'],['+ resident keys REQUIRED (no roaming-only)','#3ED8C4'],['+ attestation: none · origin pinned to helios.app','#3ED8C4'],['- fallback: SMS OTP (rejected — see threat model §3)','#F472B6']] },
+      { k:'handoff', body:'Vector → Forge · ADR-0142 accepted', time:'14:11' },
+      { k:'divider', body:'PHASE 2 · BUILD', time:'14:12' },
+      { k:'msg', who:'forge', body:'Implementing POST /webauthn/register. Credential store needs a migration: new credentials table with user_id, unique cred_id, sign_count.', time:'14:14', chips:['migration 0043','7 files'] },
+      { k:'tool', who:'forge', tool:'repo.patch', body:'7 files · +318 −24', dur:'4.1s', status:'ok',
+        lines:[['services/auth/webauthn/register.ts   +96','#3ED8C4'],['services/auth/webauthn/verify.ts    +54','#3ED8C4'],['db/migrations/0043_credentials.sql  +38','#3ED8C4'],['services/auth/legacy/otp.ts         −24','#F472B6']] },
+      { k:'msg', who:'probe', badge:'18/24', body:'Picked up the e2e suite. 18 of 24 passing. Two failures look like the sign_count replay guard rejecting a valid re-registration.', time:'14:30' },
+      { k:'msg', who:'forge', body:'@Probe that one is mine — off-by-one in the counter comparison. Patching now, then push 4f9c1ad for a re-run.', time:'14:33' },
+      { k:'divider', body:'PHASE 3 · TEST', time:'14:34' },
+      { k:'msg', who:'sentry', badge:'RISK', body:'Flagging before review: cred_id is stored as text. The base64 round-trip will bite us on Windows Hello — it should be bytea. Blocking unless someone disagrees.', time:'14:36' },
+      { k:'human', body:'Hold the merge until Probe is green. Sentry — write the bytea concern up as a blocking comment on #482, do not just leave it in chat.', time:'14:37' },
+      { k:'msg', who:'atlas', badge:'ACK', body:'Ack. Merge gate held. Sentry is drafting the blocking comment; Probe re-runs the suite as soon as Forge pushes.', time:'14:37', chips:['gate: HELD','next: probe/e2e'] }
+    ];
+  }
+
+  // ---- actions ----
+  setSel = (id) => this.setState({ sel:id, detail:true });
+  send = () => {
+    const d = this.state.draft.trim();
+    if (!d) return;
+    const t = this.state.thread || this.baseThread();
+    const tgt = this.state.target;
+    this.setState({ thread:[...t, { k:'human', body:d, time:'14:41' }], draft:'', typing:true });
+    setTimeout(() => {
+      const cur = this.state.thread || [];
+      const reply = tgt === 'all'
+        ? 'Ack — relayed to the room. Forge and Probe are re-prioritising; I will report back the moment the suite is green.'
+        : 'Ack, taken directly. Adding it to the front of my queue and reporting back in this thread.';
+      const who = tgt === 'all' ? 'atlas' : tgt;
+      this.setState({ thread:[...cur, { k:'msg', who, badge:'ACK', body:reply, time:'14:41' }], typing:false });
+      setTimeout(() => this.setState({ typing:true }), 2600);
+    }, 1150);
+  };
+
+  renderVals() {
+    const accent = this.props.accent || '#4C8CFF';
+    const live = this.props.liveMotion !== false;
+    const st = this.state;
+    const gate = st.gate === null ? this.props.approvalGate !== false : st.gate;
+    const agents = this.agentData();
+    const byId = {}; agents.forEach(a => byId[a.id] = a);
+    const selA = byId[st.sel] || agents[0];
+    const thread = st.thread || this.baseThread();
+
+    const filterMap = { all:() => true, decisions:m => m.k === 'divider' || m.k === 'human' || (m.badge && m.badge !== '18/24'), tools:m => m.k === 'tool', handoffs:m => m.k === 'handoff' || m.k === 'divider' };
+    const shown = thread.filter(filterMap[st.filter]);
+
+    const runColor = st.paused ? '#F2B457' : '#3ED8C4';
+    const sm = this.statusMeta(selA.status, live);
+
+    const lanes = [
+      { name:'Spec', color:'#A78BFA', state:'DONE', tasks:[['Auth flow spec + ADR','vector','done'],['Threat model §1–4','vector','done']] },
+      { name:'Build', color:'#3ED8C4', state:'2 ACTIVE', tasks:[['POST /webauthn/register','forge','72%'],['Credentials migration 0043','forge','queued']] },
+      { name:'Test', color:'#F2B457', state:'RUNNING', tasks:[['Register / login e2e','probe','18/24']] },
+      { name:'Review', color:'#7C9BFF', state:'QUEUED', tasks:[['Diff review · 412 LOC','sentry','blocked']] },
+      { name:'Ship', color:'#5E6779', state: gate ? 'NEEDS YOU' : 'AUTO', tasks:[[gate ? 'Canary 5% · awaiting approval' : 'Canary 5% · auto-release','atlas', gate ? 'gated' : 'auto']] }
+    ].map(l => ({
+      name:l.name, color:l.color, state:l.state, count:l.tasks.length,
+      ring: l.state === 'NEEDS YOU' ? 'rgba(242,180,87,.30)' : 'rgba(255,255,255,.07)',
+      bg: l.state === 'NEEDS YOU' ? 'rgba(242,180,87,.06)' : 'rgba(255,255,255,.018)',
+      tasks:l.tasks.map(t => {
+        const o = byId[t[1]];
+        const done = t[2] === 'done';
+        return { title:t[0], owner:o.initials, color:o.color, tint:this.tint(o.color,.16), meta:t[2],
+          metaColor: done ? '#3ED8C4' : t[2] === 'blocked' ? '#F2B457' : t[2] === 'gated' ? '#F2B457' : '#5E6779',
+          select:() => this.setSel(t[1]) };
+      })
+    }));
+
+    const stepsRaw = [
+      ['Spec + ADR-0142','done','Vector · 3 decisions recorded','14:11',0],
+      ['Threat model signed off','done','Vector · 4 sections, 1 rejection','14:11',0],
+      ['Implement register + verify','active','Forge · 7 files, migration 0043','72%',72],
+      ['e2e suite green','active','Probe · 18/24, 2 replay failures','58%',58],
+      ['Security + diff review','wait','Sentry · blocked on suite','queued',0],
+      [gate ? 'Human approval to merge' : 'Auto-merge on green','wait', gate ? 'You · gate is held' : 'Atlas · gate disabled','—',0],
+      ['Canary 5% → 100%','wait','Atlas · not started','—',0]
+    ];
+    const steps = stepsRaw.map((s, i) => {
+      const done = s[1] === 'done', act = s[1] === 'active';
+      const c = done ? '#3ED8C4' : act ? accent : '#5E6779';
+      return { title:s[0], detail:s[2], meta:s[3], pctW:s[4] + '%', showBar:act,
+        mark: done ? '✓' : act ? '' : '', markColor:'#0A0C11',
+        ring: done ? '#3ED8C4' : act ? accent : 'rgba(255,255,255,.14)',
+        dotBg: done ? '#3ED8C4' : act ? this.tint(accent,.35) : 'transparent',
+        titleColor: done ? '#8C95A9' : '#E8EBF3', metaColor:c, barColor:c,
+        line: i === stepsRaw.length - 1 ? 'transparent' : done ? 'rgba(62,216,196,.28)' : 'rgba(255,255,255,.08)',
+        lineH: i === stepsRaw.length - 1 ? '0px' : '18px' };
+    });
+
+    const tabLabel = { subtask:'Subtask', output:'Output log', tools:'Tool calls' };
+    const tabs = ['subtask','output','tools'].map(k => ({
+      label:tabLabel[k], apply:() => this.setState({ tab:k }),
+      color: st.tab === k ? accent : '#7E879B',
+      bg: st.tab === k ? this.tint(accent,.12) : 'transparent',
+      ring: st.tab === k ? this.tint(accent,.30) : 'rgba(255,255,255,.07)'
+    }));
+
+    const fdefs = [['all','All','128'],['decisions','Decisions','9'],['tools','Tool calls','41'],['handoffs','Handoffs','6']];
+    const filters = fdefs.map(f => ({
+      label:f[1], count:f[2], apply:() => this.setState({ filter:f[0] }),
+      color: st.filter === f[0] ? accent : '#8C95A9',
+      bg: st.filter === f[0] ? this.tint(accent,.12) : 'rgba(255,255,255,.03)',
+      ring: st.filter === f[0] ? this.tint(accent,.30) : 'rgba(255,255,255,.08)'
+    }));
+
+    const quick = [
+      ['/approve merge #482','Approve merge and release the gate — Sentry, close your blocking comment first.'],
+      ['/assign probe re-run','Probe, re-run the full suite on 4f9c1ad and post the failing traces.'],
+      ['/rollback build','Roll back to 3a1e77f and hold all build subtasks until I say otherwise.']
+    ].map(q => ({ label:q[0], apply:() => this.setState({ draft:q[1] }) }));
+
+    const targets = ['all', ...agents.map(a => a.id)];
+
+    return {
+      accent, accentTint:this.tint(accent,.10), accentRing:this.tint(accent,.32),
+      sweepAnim: live ? 'sweep 2.4s ease-in-out infinite' : 'none',
+      blinkAnim: live ? 'blink 1.1s steps(1) infinite' : 'none',
+
+      runLabel: st.paused ? 'RUN 04 · PAUSED' : 'RUN 04 · LIVE',
+      runColor, runTint:this.tint(runColor,.10), runRing:this.tint(runColor,.30),
+      runPulse: live && !st.paused ? 'ring 2s ease-out infinite' : 'none',
+      pauseLabel: st.paused ? 'Resume run' : 'Pause run',
+      togglePause:() => this.setState({ paused:!st.paused }),
+
+      detailOpen:st.detail, detailClosed:!st.detail,
+      detailBtn: st.detail ? 'Hide detail' : 'Agent detail',
+      toggleDetail:() => this.setState({ detail:!st.detail }),
+      collapseDetail:() => this.setState({ detail:false }),
+      trackerH: st.tracker === 'board' ? '52%' : '54%',
+
+      gateTrack: gate ? this.tint(accent,.55) : 'rgba(255,255,255,.10)',
+      gateJustify: gate ? 'flex-end' : 'flex-start',
+      toggleGate:() => this.setState({ gate:!gate }),
+
+      agents: agents.map(a => {
+        const s = this.statusMeta(a.status, live);
+        const on = st.sel === a.id;
+        return { ...a, statusColor:s.color, statusLabel:s.label, statusPulse:s.pulse,
+          tint:this.tint(a.color,.14), ring:this.tint(a.color,.28), pctW:a.pct + '%',
+          rowBg: on ? this.tint(a.color,.09) : 'transparent',
+          rowRing: on ? this.tint(a.color,.26) : 'rgba(255,255,255,.05)',
+          bar: on ? a.color : 'transparent',
+          select:() => this.setSel(a.id) };
+      }),
+
+      filters, quick,
+      thread: shown.map((m, i) => {
+        const a = byId[m.who] || {};
+        const bc = m.badge === 'RISK' ? '#F472B6' : m.badge === 'PLAN' ? '#A78BFA' : m.badge === '18/24' ? '#F2B457' : '#7E879B';
+        const id = 'm' + i + '-' + (m.time || '') + (m.tool || '');
+        return {
+          isDivider:m.k === 'divider', isMsg:m.k === 'msg', isTool:m.k === 'tool', isHandoff:m.k === 'handoff', isHuman:m.k === 'human',
+          body:m.body, time:m.time, name:a.name, role:a.role, initials:a.initials, color:a.color,
+          tint:this.tint(a.color || '#7C9BFF',.14), ring:this.tint(a.color || '#7C9BFF',.28),
+          badge:m.badge || '', badgeColor:bc, badgeRing:this.tint(bc,.30),
+          chips:m.chips || [], hasChips:!!(m.chips && m.chips.length),
+          tool:m.tool, dur:m.dur, status:m.status,
+          statusColor:this.toolColor(m.status || 'ok'), statusTint:this.tint(this.toolColor(m.status || 'ok'),.14),
+          lines:(m.lines || []).map(l => ({ text:l[0], color:l[1] })),
+          open:!!st.open[id], caret: st.open[id] ? '▾' : '▸',
+          toggle:() => this.setState({ open:{ ...st.open, [id]:!st.open[id] } })
+        };
+      }),
+      typing: st.typing && !st.paused,
+      typingLabel: 'Forge is writing a patch · Probe is bisecting 2 failures',
+
+      threadRef:this.threadRef,
+      draft:st.draft,
+      onDraft:e => this.setState({ draft:e.target.value }),
+      onKey:e => { if (e.key === 'Enter') { e.preventDefault(); this.send(); } },
+      send:this.send,
+      targetLabel: st.target === 'all' ? 'Broadcast → all agents' : 'Direct → ' + byId[st.target].name,
+      targetColor: st.target === 'all' ? accent : byId[st.target].color,
+      cycleTarget:() => this.setState({ target: targets[(targets.indexOf(st.target) + 1) % targets.length] }),
+      dmSelected:() => this.setState({ target:selA.id, draft:'@' + selA.name + ' ' }),
+
+      isBoard:st.tracker === 'board', isSteps:st.tracker === 'steps',
+      setBoard:() => this.setState({ tracker:'board' }), setSteps:() => this.setState({ tracker:'steps' }),
+      boardColor: st.tracker === 'board' ? '#0A0C11' : '#8C95A9', boardBg: st.tracker === 'board' ? accent : 'transparent',
+      stepsColor: st.tracker === 'steps' ? '#0A0C11' : '#8C95A9', stepsBg: st.tracker === 'steps' ? accent : 'transparent',
+      lanes, steps,
+
+      tabs, tabSubtask:st.tab === 'subtask', tabOutput:st.tab === 'output', tabTools:st.tab === 'tools',
+      sel:{ ...selA, statusLabel:sm.label, tint:this.tint(selA.color,.14), ring:this.tint(selA.color,.28), pctW:selA.pct + '%' }
+    };
+  }
+}
+
+</script>
+</body>
+</html>
