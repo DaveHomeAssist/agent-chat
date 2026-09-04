@@ -1,17 +1,49 @@
 import type { CSSVars } from '../lib/css'
 import { COLOR, tint } from '../lib/theme'
+import type { RunInfo, RunStats, RunStatus } from '../types'
 
 interface Props {
   accent: string
-  paused: boolean
+  run: RunInfo | null
+  stats: RunStats | null
   live: boolean
   detailOpen: boolean
-  onTogglePause: () => void
+  /** The primary control: start / pause / resume / approve, depending on the run status. */
+  onRunAction: () => void
   onToggleDetail: () => void
 }
 
-export function RunHeader({ accent, paused, live, detailOpen, onTogglePause, onToggleDetail }: Props) {
-  const runColor = paused ? COLOR.amber : COLOR.teal
+const STATUS_META: Record<RunStatus, { label: string; color: string; pulse: boolean }> = {
+  idle: { label: 'IDLE', color: COLOR.slate, pulse: false },
+  live: { label: 'LIVE', color: COLOR.teal, pulse: true },
+  paused: { label: 'PAUSED', color: COLOR.amber, pulse: false },
+  needs_approval: { label: 'NEEDS YOU', color: COLOR.amber, pulse: true },
+  done: { label: 'DONE', color: COLOR.slate, pulse: false },
+  failed: { label: 'FAILED', color: COLOR.pink, pulse: false },
+}
+
+const ACTION_LABEL: Record<RunStatus, string> = {
+  idle: 'Start run',
+  live: 'Pause run',
+  paused: 'Resume run',
+  needs_approval: 'Approve merge',
+  done: 'Restart run',
+  failed: 'Restart run',
+}
+
+export function formatElapsed(sec: number): string {
+  const s = Math.max(0, Math.floor(sec))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+export function formatTokens(n: number): string {
+  return `${(n / 1000).toFixed(1)}k tok`
+}
+
+export function RunHeader({ accent, run, stats, live, detailOpen, onRunAction, onToggleDetail }: Props) {
+  const status: RunStatus = run?.status ?? 'idle'
+  const meta = STATUS_META[status]
+  const runColor = meta.color
 
   const pill: CSSVars = {
     '--ring': tint(runColor, 0.3),
@@ -24,6 +56,8 @@ export function RunHeader({ accent, paused, live, detailOpen, onTogglePause, onT
     '--accent': accent,
   }
 
+  const tokens = stats ? stats.inputTokens + stats.outputTokens : 0
+
   return (
     <header className="ac-header">
       <div className="ac-brand">
@@ -32,7 +66,7 @@ export function RunHeader({ accent, paused, live, detailOpen, onTogglePause, onT
         </div>
         <div className="ac-brand-text">
           <div className="ac-brand-title">Agent Chatroom</div>
-          <div className="ac-brand-sub">helios/api · feat/passkey-auth</div>
+          <div className="ac-brand-sub">{run ? `${run.repo} · ${run.branch}` : ''}</div>
         </div>
       </div>
 
@@ -42,23 +76,23 @@ export function RunHeader({ accent, paused, live, detailOpen, onTogglePause, onT
         <div className="ac-run-pill" style={pill}>
           <span
             className="ac-dot ac-dot--6"
-            style={{ animation: live && !paused ? 'ring 2s ease-out infinite' : 'none' }}
+            style={{ animation: live && meta.pulse ? 'ring 2s ease-out infinite' : 'none' }}
           />
-          <span className="ac-run-label">{paused ? 'RUN 04 · PAUSED' : 'RUN 04 · LIVE'}</span>
+          <span className="ac-run-label">{run ? `${run.label} · ${meta.label}` : meta.label}</span>
         </div>
         <div className="ac-run-stats">
-          <span>12:41 elapsed</span>
-          <span>38.2k tok</span>
-          <span>$1.14</span>
+          <span>{formatElapsed(stats?.elapsedSec ?? 0)} elapsed</span>
+          <span>{formatTokens(tokens)}</span>
+          <span>${(stats?.costUsd ?? 0).toFixed(2)}</span>
         </div>
       </div>
 
       <div className="ac-spacer" />
 
       <div className="ac-actions">
-        <button className="ac-btn ac-btn--pause" onClick={onTogglePause}>
+        <button className="ac-btn ac-btn--pause" onClick={onRunAction}>
           <span className="ac-btn-swatch" style={{ '--c': runColor } as CSSVars} />
-          {paused ? 'Resume run' : 'Pause run'}
+          {ACTION_LABEL[status]}
         </button>
         <button className="ac-btn">Snapshot</button>
         <button className="ac-btn ac-btn--accent" style={accentBtn} onClick={onToggleDetail}>

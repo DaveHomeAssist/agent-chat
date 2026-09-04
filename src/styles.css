@@ -1447,3 +1447,32 @@ button {
   letter-spacing: 0.14em;
   color: var(--ink-8);
 }
+
+/* --- connection / run banner -------------------------------------- */
+
+.ac-banner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  text-align: left;
+  color: var(--c);
+  background: var(--tint);
+}
+.ac-banner--warn {
+  --c: #f2b457;
+  --tint: rgba(242, 180, 87, 0.08);
+}
+.ac-banner--error {
+  --c: #f472b6;
+  --tint: rgba(244, 114, 182, 0.08);
+}
+.ac-banner--info {
+  --c: var(--ink-5);
+  --tint: rgba(94, 103, 121, 0.12);
+}

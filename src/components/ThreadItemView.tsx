@@ -99,8 +99,8 @@ export function ThreadItemView({ item, agents, accent, open, onToggle }: Props) 
             </button>
             {open ? (
               <div className="ac-tool-lines">
-                {item.lines.map((l) => (
-                  <div className="ac-tool-line" key={l.text} style={{ '--c': l.color } as CSSVars}>
+                {item.lines.map((l, i) => (
+                  <div className="ac-tool-line" key={`${i}:${l.text}`} style={{ '--c': l.color } as CSSVars}>
                     {l.text}
                   </div>
                 ))}
@@ -133,7 +133,7 @@ export function ThreadItemView({ item, agents, accent, open, onToggle }: Props) 
                   className="ac-badge ac-badge--human"
                   style={{ '--c': accent, '--ring': tint(accent, 0.32) } as CSSVars}
                 >
-                  HUMAN · BROADCAST
+                  {item.target === 'all' ? 'HUMAN · BROADCAST' : 'HUMAN · DIRECT'}
                 </span>
                 <span className="ac-spacer" />
                 <span className="ac-msg-time">{item.time}</span>

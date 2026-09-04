@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { CSSVars } from '../lib/css'
 import { tint } from '../lib/theme'
-import { FILTERS, QUICK_COMMANDS } from '../data/thread'
+import { FILTER_DEFS, QUICK_COMMANDS } from '../constants'
 import type { Agent, AgentId, ThreadFilter, ThreadItem } from '../types'
 import { ThreadItemView } from './ThreadItemView'
 
@@ -9,11 +9,16 @@ interface Props {
   thread: ThreadItem[]
   agents: Record<AgentId, Agent>
   accent: string
+  channelName: string
+  channelMeta: string
   filter: ThreadFilter
+  /** Live counts over the unfiltered thread, per filter. */
+  counts: Record<ThreadFilter, number>
   onFilter: (f: ThreadFilter) => void
   openTools: Record<string, boolean>
   onToggleTool: (id: string) => void
-  typing: boolean
+  /** Empty when nobody is mid-model-call; hides the indicator. */
+  typingLabel: string
   draft: string
   onDraft: (v: string) => void
   onSend: () => void
@@ -26,11 +31,14 @@ export function ChatPanel({
   thread,
   agents,
   accent,
+  channelName,
+  channelMeta,
   filter,
+  counts,
   onFilter,
   openTools,
   onToggleTool,
-  typing,
+  typingLabel,
   draft,
   onDraft,
   onSend,
@@ -50,12 +58,12 @@ export function ChatPanel({
     <main className="ac-main">
       <div className="ac-thread-head">
         <div className="ac-channel">
-          <div className="ac-channel-name">#feature-passkey-auth</div>
-          <div className="ac-channel-meta">started 14:02 · 5 agents · 3 tool servers</div>
+          <div className="ac-channel-name">{channelName}</div>
+          <div className="ac-channel-meta">{channelMeta}</div>
         </div>
         <div className="ac-spacer" />
         <div className="ac-filters">
-          {FILTERS.map((f) => {
+          {FILTER_DEFS.map((f) => {
             const on = filter === f.key
             return (
               <button
@@ -71,7 +79,7 @@ export function ChatPanel({
                 onClick={() => onFilter(f.key)}
               >
                 {f.label}
-                <span className="ac-filter-count">{f.count}</span>
+                <span className="ac-filter-count">{counts[f.key]}</span>
               </button>
             )
           })}
@@ -90,16 +98,14 @@ export function ChatPanel({
           />
         ))}
 
-        {typing ? (
+        {typingLabel ? (
           <div className="ac-typing">
             <div className="ac-typing-dots">
               <i />
               <i />
               <i />
             </div>
-            <span className="ac-typing-label">
-              Forge is writing a patch · Probe is bisecting 2 failures
-            </span>
+            <span className="ac-typing-label">{typingLabel}</span>
           </div>
         ) : null}
       </div>

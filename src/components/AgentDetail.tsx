@@ -18,9 +18,10 @@ interface Props {
   live: boolean
   onClose: () => void
   onMessage: () => void
+  onInterrupt: () => void
 }
 
-export function AgentDetail({ agent, tab, onTab, accent, live, onClose, onMessage }: Props) {
+export function AgentDetail({ agent, tab, onTab, accent, live, onClose, onMessage, onInterrupt }: Props) {
   const status = statusMeta(agent.status, live)
   const identity: CSSVars = {
     '--c': agent.color,
@@ -69,7 +70,13 @@ export function AgentDetail({ agent, tab, onTab, accent, live, onClose, onMessag
 
       <div className="ac-tabbody">
         {tab === 'subtask' ? (
-          <SubtaskTab agent={agent} accent={accent} live={live} onMessage={onMessage} />
+          <SubtaskTab
+            agent={agent}
+            accent={accent}
+            live={live}
+            onMessage={onMessage}
+            onInterrupt={onInterrupt}
+          />
         ) : null}
         {tab === 'output' ? <OutputTab agent={agent} live={live} /> : null}
         {tab === 'tools' ? <ToolsTab agent={agent} /> : null}
@@ -83,11 +90,13 @@ function SubtaskTab({
   accent,
   live,
   onMessage,
+  onInterrupt,
 }: {
   agent: Agent
   accent: string
   live: boolean
   onMessage: () => void
+  onInterrupt: () => void
 }) {
   return (
     <div className="ac-subtask">
@@ -117,7 +126,9 @@ function SubtaskTab({
       </div>
 
       <div className="ac-detail-actions">
-        <button className="ac-action">Interrupt</button>
+        <button className="ac-action" onClick={onInterrupt}>
+          Interrupt
+        </button>
         <button className="ac-action">Reassign</button>
         <button
           className="ac-action ac-action--accent"
@@ -132,8 +143,8 @@ function SubtaskTab({
 
       <div className="ac-queue">
         <div className="ac-card-eyebrow">QUEUE · {agent.queueCount}</div>
-        {agent.queue.map((q) => (
-          <div className="ac-queue-item" key={q.title}>
+        {agent.queue.map((q, i) => (
+          <div className="ac-queue-item" key={`${i}:${q.title}`}>
             <span className="ac-dot ac-dot--4" style={{ '--c': '#5E6779' } as CSSVars} />
             <span className="ac-queue-title">{q.title}</span>
             <span className="ac-queue-meta">{q.meta}</span>
@@ -147,8 +158,8 @@ function SubtaskTab({
 function OutputTab({ agent, live }: { agent: Agent; live: boolean }) {
   return (
     <div className="ac-log">
-      {agent.log.map((l) => (
-        <div className="ac-log-line" key={l.t + l.msg}>
+      {agent.log.map((l, i) => (
+        <div className="ac-log-line" key={`${i}:${l.t}:${l.msg}`}>
           <span className="ac-log-t">{l.t}</span>
           <span className="ac-log-level" style={{ '--c': levelColor(l.level) } as CSSVars}>
             {l.level}
@@ -180,7 +191,7 @@ function ToolsTab({ agent }: { agent: Agent }) {
         return (
           <div
             className="ac-toolcall"
-            key={t.name + t.arg}
+            key={t.id}
             style={{ '--c': c, '--tint': tint(c, 0.14) } as CSSVars}
           >
             <span className="ac-dot ac-dot--5" />

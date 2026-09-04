@@ -47,6 +47,6 @@ export function levelColor(level: LogLevel): string {
 export function toolColor(status: ToolStatus): string {
   if (status === 'ok') return COLOR.teal
   if (status === 'queued') return COLOR.slate
-  if (status === 'drafting') return COLOR.amber
+  if (status === 'drafting' || status === 'running') return COLOR.amber
   return COLOR.pink
 }

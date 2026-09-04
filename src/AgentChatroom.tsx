@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useRun } from './api/useRun'
+import type { ConnectionStatus } from './api/client'
 import { AgentDetail } from './components/AgentDetail'
 import { AgentSidebar } from './components/AgentSidebar'
 import { ChatPanel } from './components/ChatPanel'
 import { PipelinePanel } from './components/PipelinePanel'
 import { RunHeader } from './components/RunHeader'
-import { AGENTS, AGENTS_BY_ID } from './data/agents'
-import { BASE_THREAD } from './data/thread'
 import type {
+  Agent,
   AgentId,
   DetailTab,
   MessageTarget,
+  Pipeline,
+  RunInfo,
   ThreadFilter,
   ThreadItem,
   TrackerMode,
@@ -22,11 +25,7 @@ export interface AgentChatroomProps {
   trackerMode?: TrackerMode
   /** Status pulses, the progress sweep and the log cursor. */
   liveMotion?: boolean
-  /** Whether the run holds the merge for a human. */
-  approvalGate?: boolean
 }
-
-const TARGETS: MessageTarget[] = ['all', ...AGENTS.map((a) => a.id)]
 
 const FILTERS: Record<ThreadFilter, (m: ThreadItem) => boolean> = {
   all: () => true,
@@ -38,37 +37,73 @@ const FILTERS: Record<ThreadFilter, (m: ThreadItem) => boolean> = {
   handoffs: (m) => m.kind === 'handoff' || m.kind === 'divider',
 }
 
-/** Delay before the addressed agent acknowledges a human message. */
-const ACK_DELAY_MS = 1150
-/** How long the room stays quiet before the agents start working again. */
-const RESUME_TYPING_MS = 2600
+const FILTER_KEYS = Object.keys(FILTERS) as ThreadFilter[]
+
+const EMPTY_PIPELINE: Pipeline = { phase: 'spec', lanes: [], steps: [], pr: '' }
+
+/** "isolating 2 failures" → as is; "POST /webauthn/register · migration 0043" → "working on POST /webauthn/register". */
+function typingVerb(agent: Agent): string {
+  const head = agent.subtask.split('·')[0].trim()
+  if (!head || /^[—–-]$/.test(head)) return 'thinking'
+  // Lower-case a leading capital only when it starts a word, never an acronym like POST or ADR-0142.
+  const phrase = /^[A-Z][a-z]/.test(head) ? head.charAt(0).toLowerCase() + head.slice(1) : head
+  return /^\S+ing\b/i.test(phrase) ? phrase : `working on ${phrase}`
+}
+
+interface Banner {
+  tone: 'warn' | 'error' | 'info'
+  text: string
+}
+
+function bannerFor(
+  connection: ConnectionStatus,
+  run: RunInfo | null,
+  lastError: string | null,
+  model: string,
+): Banner | null {
+  if (connection === 'connecting') return { tone: 'warn', text: '● connecting to run server…' }
+  if (connection === 'reconnecting') return { tone: 'warn', text: '● reconnecting to run server…' }
+  if (lastError) return { tone: 'error', text: `● ${lastError}` }
+  if (run?.status === 'failed') return { tone: 'error', text: `● run failed — ${run.error || 'unknown error'}` }
+  if (!run || run.status === 'idle') return { tone: 'info', text: `● Start run to begin — using ${model}` }
+  return null
+}
 
 export function AgentChatroom({
   accent = '#4C8CFF',
   trackerMode = 'board',
   liveMotion = true,
-  approvalGate = true,
 }: AgentChatroomProps) {
-  const [selected, setSelected] = useState<AgentId>('forge')
+  const { snapshot, connection, lastError, actions } = useRun()
+
+  const [selectedId, setSelectedId] = useState<AgentId>('forge')
   const [tab, setTab] = useState<DetailTab>('subtask')
   const [filter, setFilter] = useState<ThreadFilter>('all')
   const [detailOpen, setDetailOpen] = useState(true)
   const [tracker, setTracker] = useState<TrackerMode>(trackerMode)
-  const [paused, setPaused] = useState(false)
   const [target, setTarget] = useState<MessageTarget>('all')
   const [draft, setDraft] = useState('')
   const [openTools, setOpenTools] = useState<Record<string, boolean>>({})
-  const [thread, setThread] = useState<ThreadItem[]>(BASE_THREAD)
-  const [typing, setTyping] = useState(true)
-  const [gate, setGate] = useState(approvalGate)
 
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
-  useEffect(() => () => timers.current.forEach(clearTimeout), [])
+  const run = snapshot?.run ?? null
+  const stats = snapshot?.stats ?? null
+  const agents = useMemo(() => snapshot?.agents ?? [], [snapshot])
+  const thread = useMemo(() => snapshot?.thread ?? [], [snapshot])
+  const pipeline = snapshot?.pipeline ?? EMPTY_PIPELINE
+  const typing = snapshot?.typing ?? []
 
-  const sentCount = useRef(0)
+  const agentsById = useMemo(
+    () => Object.fromEntries(agents.map((a) => [a.id, a])) as Record<AgentId, Agent>,
+    [agents],
+  )
+  const targets = useMemo<MessageTarget[]>(() => ['all', ...agents.map((a) => a.id)], [agents])
+
+  const selectedAgent: Agent | undefined = agentsById[selectedId] ?? agents[0]
+  const gate = run?.approvalGate ?? true
+  const paused = run?.status === 'paused'
 
   const selectAgent = useCallback((id: AgentId) => {
-    setSelected(id)
+    setSelectedId(id)
     setDetailOpen(true)
   }, [])
 
@@ -76,87 +111,101 @@ export function AgentChatroom({
     setOpenTools((prev) => ({ ...prev, [id]: !prev[id] }))
   }, [])
 
-  const send = useCallback(() => {
+  const send = useCallback(async () => {
     const body = draft.trim()
     if (!body) return
+    if (await actions.send(body, target)) setDraft('')
+  }, [draft, target, actions])
 
-    const seq = ++sentCount.current
-    const to = target
+  const runAction = useCallback(() => {
+    switch (run?.status ?? 'idle') {
+      case 'live':
+        return actions.pause()
+      case 'paused':
+        return actions.resume()
+      case 'needs_approval':
+        return actions.approve()
+      default:
+        return actions.start()
+    }
+  }, [run?.status, actions])
 
-    setThread((prev) => [...prev, { id: `u${seq}`, kind: 'human', body, time: '14:41' }])
-    setDraft('')
-    setTyping(true)
+  // Items whose author is not in the roster cannot be drawn; the server never emits them.
+  const known = useCallback(
+    (m: ThreadItem) => !('who' in m) || m.who in agentsById,
+    [agentsById],
+  )
+  const shown = useMemo(() => thread.filter(known).filter(FILTERS[filter]), [thread, known, filter])
+  const counts = useMemo(
+    () =>
+      Object.fromEntries(
+        FILTER_KEYS.map((k) => [k, thread.filter(FILTERS[k]).length]),
+      ) as Record<ThreadFilter, number>,
+    [thread],
+  )
 
-    timers.current.push(
-      setTimeout(() => {
-        const reply =
-          to === 'all'
-            ? 'Ack — relayed to the room. Forge and Probe are re-prioritising; I will report back the moment the suite is green.'
-            : 'Ack, taken directly. Adding it to the front of my queue and reporting back in this thread.'
+  const typingLabel =
+    paused
+      ? ''
+      : typing
+          .map((id) => agentsById[id])
+          .filter((a): a is Agent => !!a)
+          .map((a) => `${a.name} is ${typingVerb(a)}`)
+          .join(' · ')
 
-        setThread((prev) => [
-          ...prev,
-          {
-            id: `a${seq}`,
-            kind: 'message',
-            who: to === 'all' ? 'atlas' : to,
-            badge: 'ACK',
-            body: reply,
-            time: '14:41',
-          },
-        ])
-        setTyping(false)
-        timers.current.push(setTimeout(() => setTyping(true), RESUME_TYPING_MS))
-      }, ACK_DELAY_MS),
-    )
-  }, [draft, target])
+  const targetAgent = target === 'all' ? undefined : agentsById[target]
+  const targetLabel = targetAgent ? `Direct → ${targetAgent.name}` : 'Broadcast → all agents'
+  const targetColor = targetAgent ? targetAgent.color : accent
 
-  const shown = useMemo(() => thread.filter(FILTERS[filter]), [thread, filter])
-
-  const selectedAgent = AGENTS_BY_ID[selected]
-
-  const targetLabel =
-    target === 'all' ? 'Broadcast → all agents' : `Direct → ${AGENTS_BY_ID[target].name}`
-  const targetColor = target === 'all' ? accent : AGENTS_BY_ID[target].color
+  const model =
+    run?.llm === 'mock' ? 'the scripted mock' : (agentsById.atlas?.model ?? 'claude-opus-5')
+  const banner = bannerFor(connection, run, lastError, model)
 
   return (
     <div className="ac-app">
       <RunHeader
         accent={accent}
-        paused={paused}
+        run={run}
+        stats={stats}
         live={liveMotion}
         detailOpen={detailOpen}
-        onTogglePause={() => setPaused((p) => !p)}
+        onRunAction={runAction}
         onToggleDetail={() => setDetailOpen((d) => !d)}
       />
 
+      {banner ? <div className={`ac-banner ac-banner--${banner.tone}`}>{banner.text}</div> : null}
+
       <div className="ac-body">
         <AgentSidebar
-          agents={AGENTS}
-          selected={selected}
+          agents={agents}
+          selected={selectedAgent?.id ?? null}
           live={liveMotion}
           accent={accent}
           gate={gate}
+          stats={stats}
           onSelect={selectAgent}
-          onToggleGate={() => setGate((g) => !g)}
+          onToggleGate={() => actions.setGate(!gate)}
         />
 
         <ChatPanel
           thread={shown}
-          agents={AGENTS_BY_ID}
+          agents={agentsById}
           accent={accent}
+          channelName={run?.channel ?? ''}
+          channelMeta={run ? `started ${run.startedAt} · ${agents.length} agents · ${run.toolServers} tool servers` : ''}
           filter={filter}
+          counts={counts}
           onFilter={setFilter}
           openTools={openTools}
           onToggleTool={toggleTool}
-          typing={typing && !paused}
+          typingLabel={typingLabel}
           draft={draft}
           onDraft={setDraft}
           onSend={send}
           targetLabel={targetLabel}
           targetColor={targetColor}
           onCycleTarget={() =>
-            setTarget((t) => TARGETS[(TARGETS.indexOf(t) + 1) % TARGETS.length])
+            setTarget((t) => targets[(targets.indexOf(t) + 1) % targets.length])
           }
         />
 
@@ -165,23 +214,28 @@ export function AgentChatroom({
             <PipelinePanel
               mode={tracker}
               onMode={setTracker}
-              gate={gate}
+              pipeline={pipeline}
               accent={accent}
-              agents={AGENTS_BY_ID}
+              agents={agentsById}
               onSelectAgent={selectAgent}
             />
-            <AgentDetail
-              agent={selectedAgent}
-              tab={tab}
-              onTab={setTab}
-              accent={accent}
-              live={liveMotion}
-              onClose={() => setDetailOpen(false)}
-              onMessage={() => {
-                setTarget(selectedAgent.id)
-                setDraft(`@${selectedAgent.name} `)
-              }}
-            />
+            {selectedAgent ? (
+              <AgentDetail
+                agent={selectedAgent}
+                tab={tab}
+                onTab={setTab}
+                accent={accent}
+                live={liveMotion}
+                onClose={() => setDetailOpen(false)}
+                onMessage={() => {
+                  setTarget(selectedAgent.id)
+                  setDraft(`@${selectedAgent.name} `)
+                }}
+                onInterrupt={() => actions.interrupt(selectedAgent.id)}
+              />
+            ) : (
+              <div className="ac-agentpane" />
+            )}
           </aside>
         ) : (
           <aside className="ac-rail">

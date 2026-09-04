@@ -1,18 +1,19 @@
 import type { CSSVars } from '../lib/css'
 import { statusMeta, tint } from '../lib/theme'
-import type { Agent, AgentId } from '../types'
+import type { Agent, AgentId, RunStats } from '../types'
 
 interface Props {
   agents: Agent[]
-  selected: AgentId
+  selected: AgentId | null
   live: boolean
   accent: string
   gate: boolean
+  stats: RunStats | null
   onSelect: (id: AgentId) => void
   onToggleGate: () => void
 }
 
-export function AgentSidebar({ agents, selected, live, accent, gate, onSelect, onToggleGate }: Props) {
+export function AgentSidebar({ agents, selected, live, accent, gate, stats, onSelect, onToggleGate }: Props) {
   return (
     <aside className="ac-sidebar">
       <div className="ac-sidebar-head">
@@ -68,9 +69,9 @@ export function AgentSidebar({ agents, selected, live, accent, gate, onSelect, o
         </div>
 
         <div className="ac-oversight-stats">
-          <span>128 msgs</span>
-          <span>41 tools</span>
-          <span>6 handoffs</span>
+          <span>{stats?.messages ?? 0} msgs</span>
+          <span>{stats?.toolCalls ?? 0} tools</span>
+          <span>{stats?.handoffs ?? 0} handoffs</span>
         </div>
       </div>
     </aside>

@@ -1,12 +1,11 @@
-import { lanes as buildLanes, steps as buildSteps } from '../data/pipeline'
 import type { CSSVars } from '../lib/css'
 import { COLOR, tint } from '../lib/theme'
-import type { Agent, AgentId, TrackerMode } from '../types'
+import type { Agent, AgentId, Lane, Pipeline, Step, TrackerMode } from '../types'
 
 interface Props {
   mode: TrackerMode
   onMode: (m: TrackerMode) => void
-  gate: boolean
+  pipeline: Pipeline
   accent: string
   agents: Record<AgentId, Agent>
   onSelectAgent: (id: AgentId) => void
@@ -19,14 +18,14 @@ function taskMetaColor(meta: string): string {
   return COLOR.slate
 }
 
-export function PipelinePanel({ mode, onMode, gate, accent, agents, onSelectAgent }: Props) {
+export function PipelinePanel({ mode, onMode, pipeline, accent, agents, onSelectAgent }: Props) {
   const isBoard = mode === 'board'
 
   return (
     <div className="ac-pipeline" style={{ '--h': isBoard ? '52%' : '54%' } as CSSVars}>
       <div className="ac-pipeline-head">
         <div className="ac-eyebrow">PIPELINE</div>
-        <span className="ac-pipeline-pr">PR #482</span>
+        <span className="ac-pipeline-pr">{pipeline.pr}</span>
         <div className="ac-spacer" />
         <div className="ac-seg">
           <button
@@ -58,9 +57,9 @@ export function PipelinePanel({ mode, onMode, gate, accent, agents, onSelectAgen
 
       <div className="ac-pipeline-body">
         {isBoard ? (
-          <Board gate={gate} agents={agents} onSelectAgent={onSelectAgent} />
+          <Board lanes={pipeline.lanes} agents={agents} onSelectAgent={onSelectAgent} />
         ) : (
-          <Steps gate={gate} accent={accent} />
+          <Steps steps={pipeline.steps} accent={accent} />
         )}
       </div>
     </div>
@@ -68,17 +67,17 @@ export function PipelinePanel({ mode, onMode, gate, accent, agents, onSelectAgen
 }
 
 function Board({
-  gate,
+  lanes,
   agents,
   onSelectAgent,
 }: {
-  gate: boolean
+  lanes: Lane[]
   agents: Record<AgentId, Agent>
   onSelectAgent: (id: AgentId) => void
 }) {
   return (
     <div className="ac-lanes">
-      {buildLanes(gate).map((lane) => {
+      {lanes.map((lane) => {
         const needsYou = lane.state === 'NEEDS YOU'
         return (
           <div
@@ -100,11 +99,11 @@ function Board({
             </div>
 
             <div className="ac-lane-tasks">
-              {lane.tasks.map((t) => {
+              {lane.tasks.map((t, i) => {
                 const owner = agents[t.owner]
                 return (
                   <button
-                    key={t.title}
+                    key={`${i}:${t.title}`}
                     className="ac-task"
                     onClick={() => onSelectAgent(t.owner)}
                   >
@@ -137,9 +136,7 @@ function Board({
   )
 }
 
-function Steps({ gate, accent }: { gate: boolean; accent: string }) {
-  const steps = buildSteps(gate)
-
+function Steps({ steps, accent }: { steps: Step[]; accent: string }) {
   return (
     <div className="ac-steps">
       {steps.map((s, i) => {
@@ -149,7 +146,7 @@ function Steps({ gate, accent }: { gate: boolean; accent: string }) {
         const last = i === steps.length - 1
 
         return (
-          <div className="ac-step" key={s.title}>
+          <div className="ac-step" key={`${i}:${s.title}`}>
             <div className="ac-step-rail">
               <div
                 className="ac-step-dot"
