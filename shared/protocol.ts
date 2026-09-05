@@ -169,6 +169,9 @@ export interface RunStats {
   cacheReadTokens: number
   cacheWriteTokens: number
   costUsd: number
+  /** Calls whose final usage was not reported; spend is a lower bound. */
+  unreportedRequests: number
+  lifetimeUnreportedRequests: number
   /** Hard ceiling from RUN_BUDGET_USD; the run stops when reached. */
   budgetUsd: number
   messages: number
@@ -193,7 +196,7 @@ export interface RunInfo {
   /** Number of tool servers the agents have access to. */
   toolServers: number
   /** "mock" when the scripted LLM is driving the run. */
-  llm: 'anthropic' | 'mock'
+  llm: 'anthropic' | 'openai' | 'mock'
   /** Non-empty when status is `failed`. */
   error?: string
 }

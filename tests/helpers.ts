@@ -13,7 +13,7 @@ export const usage = (inputTokens = 0): LLMUsage => ({ model: 'claude-opus-5', i
 let toolId = 0
 export const tool = (name: string, input: Record<string, unknown> = {}) => ({ type: 'tool_use' as const, id: `test_${++toolId}`, name, input })
 export function reply(toolUses: ReturnType<typeof tool>[] = [], tokens = 0, text = ''): LLMResult {
-  return { content: [...(text ? [{ type: 'text' as const, text, citations: null }] : []), ...toolUses], toolUses, text, stopReason: toolUses.length ? 'tool_use' : 'end_turn', usage: usage(tokens) }
+  return { content: [...(text ? [{ type: 'text' as const, text }] : []), ...toolUses], toolUses, text, stopReason: toolUses.length ? 'tool_use' : 'end_turn', usage: usage(tokens) }
 }
 export function deferred<T>() {
   let resolve!: (value: T) => void

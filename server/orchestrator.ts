@@ -7,7 +7,6 @@
  * restarted or disposed run never writes into the new one.
  */
 
-import type Anthropic from '@anthropic-ai/sdk'
 import type { AgentId, AgentStatus, MessageTarget, Phase, RunInfo, ThreadItem, ToolCall } from '../shared/protocol.js'
 import { AGENT_IDS, PHASES } from '../shared/protocol.js'
 import { LLMRequestError, toolNamesFor } from './contracts.js'
@@ -15,6 +14,9 @@ import type {
   Config,
   LLM,
   LLMResult,
+  LLMMessage,
+  LLMToolCall,
+  LLMToolResult,
   Orchestrator,
   Persona,
   RunStore,
@@ -64,7 +66,7 @@ interface Runner {
   id: AgentId
   persona: Persona
   inbox: Wake[]
-  history: Anthropic.Beta.BetaMessageParam[]
+  history: LLMMessage[]
   lastSeenSeq: number
   abort: AbortController | null
   turns: number
@@ -392,11 +394,11 @@ export function createOrchestrator(deps: Deps): Orchestrator {
           break
         }
         if (outcome.stopReason === 'max_tokens') store.agentLog(r.id, 'WARN', `response truncated at ${MAX_TOKENS} output tokens`)
-        r.history.push({ role: 'assistant', content: outcome.content })
+        r.history.push({ role: 'assistant', content: outcome.content, continuation: outcome.continuation })
         if (!outcome.toolUses.length) break
 
         store.setAgent(r.id, { status: 'working' })
-        const results: Anthropic.Beta.BetaToolResultBlockParam[] = []
+        const results: LLMToolResult[] = []
         for (const tu of outcome.toolUses) {
           if (pauseGate) await awaitPause(ac.signal)
           if (!fresh(g)) return
@@ -435,7 +437,8 @@ export function createOrchestrator(deps: Deps): Orchestrator {
       })
       // Reported cost survives interruption, termination and restart. Old run usage
       // goes to the lifetime ledger without touching the new run's tasks or spend.
-      store.addUsage(result.usage, usageRunId)
+      if (result.usage) store.addUsage(result.usage, usageRunId)
+      else store.markUsageUnknown(usageRunId)
       if (fresh(g) && store.stats().costUsd >= config.budgetUsd) {
         failRun(`Run budget of $${config.budgetUsd} reached`)
       }
@@ -449,6 +452,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
       return result
     } catch (e) {
       if (e instanceof LLMRequestError && e.usage) store.addUsage(e.usage, usageRunId)
+      else if (llm.kind !== 'mock') store.markUsageUnknown(usageRunId)
       if (fresh(g) && store.stats().costUsd >= config.budgetUsd) failRun(`Run budget of $${config.budgetUsd} reached`)
       const partial = stream.finish(null)
       if (!fresh(g)) return 'aborted'
@@ -545,13 +549,13 @@ export function createOrchestrator(deps: Deps): Orchestrator {
 
   async function execTool(
     r: Runner,
-    tu: Anthropic.Beta.BetaToolUseBlock,
+    tu: LLMToolCall,
     signal: AbortSignal,
     ctx: TurnCtx,
     g: number,
     revision: number,
-  ): Promise<Anthropic.Beta.BetaToolResultBlockParam> {
-    const reject = (reason: string): Anthropic.Beta.BetaToolResultBlockParam =>
+  ): Promise<LLMToolResult> {
+    const reject = (reason: string): LLMToolResult =>
       ({ type: 'tool_result', tool_use_id: tu.id, content: `error: ${reason}`, is_error: true })
     if (!fresh(g) || signal.aborted) return reject('turn is no longer active')
     const spec = tools.byApiName(tu.name)

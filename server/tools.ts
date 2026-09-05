@@ -12,10 +12,9 @@
  * is_error tool result instead of crashing the agent's turn.
  */
 
-import type Anthropic from '@anthropic-ai/sdk'
 import type { AgentId, LogLevel, Phase, ToolOutputLine } from '../shared/protocol.js'
 import { TOOL_CATALOGUE, toolNamesFor } from './contracts.js'
-import type { DiffStat, ToolContext, ToolEffect, ToolOutcome, ToolRegistry, ToolSpec } from './contracts.js'
+import type { LLMTool, ToolInputSchema, DiffStat, ToolContext, ToolEffect, ToolOutcome, ToolRegistry, ToolSpec } from './contracts.js'
 import type { TestSummary, WorkspaceWithHistory } from './workspace.js'
 
 const TEAL = '#3ED8C4'
@@ -605,7 +604,7 @@ export function createToolRegistry(): ToolRegistry {
   const specs = new Map<string, ToolSpec>(Object.keys(TOOL_CATALOGUE).map((name) => [name, buildSpec(name)]))
   const byApi = new Map<string, ToolSpec>([...specs.values()].map((s) => [s.apiName, s]))
   const perAgent = new Map<AgentId, ToolSpec[]>()
-  const definitions = new Map<AgentId, Anthropic.Beta.BetaTool[]>()
+  const definitions = new Map<AgentId, LLMTool[]>()
 
   function forAgent(agent: AgentId): ToolSpec[] {
     let list = perAgent.get(agent)
@@ -624,7 +623,7 @@ export function createToolRegistry(): ToolRegistry {
         defs = forAgent(agent).map((s) => ({
           name: s.apiName,
           description: s.description,
-          input_schema: strictSchema(s.inputSchema) as Anthropic.Beta.BetaTool['input_schema'],
+          input_schema: strictSchema(s.inputSchema) as ToolInputSchema,
           strict: true,
         }))
         definitions.set(agent, defs)

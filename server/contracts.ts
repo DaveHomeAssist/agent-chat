@@ -6,14 +6,13 @@
  *
  *   workspace.ts   — Workspace          the virtual `helios/api` repo the agents act on
  *   tools.ts       — ToolRegistry       executes TOOL_CATALOGUE entries against a Workspace
- *   llm/           — LLM                Anthropic-backed, or the scripted mock
+ *   llm/           — LLM                Anthropic, OpenAI, or the scripted mock
  *   run.ts         — RunStore           state + event log the UI subscribes to
  *   orchestrator.ts — Orchestrator      agent runners, wake queue, gate, budget
  *
  * Nothing here is runtime code except the tool catalogue and a few constants.
  */
 
-import type Anthropic from '@anthropic-ai/sdk'
 import type {
   Agent,
   AgentId,
@@ -35,13 +34,15 @@ import type {
 // Config
 // ---------------------------------------------------------------------------
 
-export type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export type Provider = 'anthropic' | 'openai' | 'mock'
+
+export type Effort = 'none' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 export interface Config {
   port: number
-  /** `mock` when MOCK_LLM=1 — the scripted driver, no API key needed. */
-  llm: 'anthropic' | 'mock'
-  /** Per-agent model id. Default every agent to `claude-opus-5`; env AGENT_MODEL_<ID> overrides. */
+  /** Startup provider; MOCK_LLM=1 always selects the scripted driver. */
+  llm: Provider
+  /** Per-agent model id; provider defaults with AGENT_MODEL_<ID> overrides. */
   models: Record<AgentId, string>
   effort: Effort
   /** RUN_BUDGET_USD — the run stops (status `failed`, error set) when cost reaches this. */
@@ -232,7 +233,7 @@ export interface ToolRegistry {
   /** Specs for the names an agent is allowed to call, in catalogue order. */
   forAgent(agent: AgentId): ToolSpec[]
   /** API-shaped definitions (strict) for the same set. */
-  definitionsFor(agent: AgentId): Anthropic.Beta.BetaTool[]
+  definitionsFor(agent: AgentId): LLMTool[]
   byApiName(apiName: string): ToolSpec | undefined
 }
 
@@ -585,8 +586,29 @@ export const ALLOWED_COMMANDS = ['pnpm typecheck', 'pnpm lint', 'pnpm test', 'pn
 // LLM
 // ---------------------------------------------------------------------------
 
+/** Application-owned messages. SDK payloads stay inside the adapters. */
+export interface LLMTool {
+  name: string
+  description: string
+  input_schema: ToolInputSchema
+  strict: boolean
+}
+export interface LLMText { type: 'text'; text: string }
+export interface LLMToolCall { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+export interface LLMToolResult { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
+export type LLMContent = LLMText | LLMToolCall | LLMToolResult
+/** Opaque adapter output; server memory only, never part of RunSnapshot or chat text. */
+export interface LLMContinuation { provider: Exclude<Provider, 'mock'>; items: unknown[] }
+export interface LLMMessage {
+  role: 'user' | 'assistant'
+  content: string | LLMContent[]
+  continuation?: LLMContinuation
+}
+
 export interface LLMUsage {
   model: string
+  provider?: Provider
+  /** Ordinary input only; cache reads/writes are disjoint categories. */
   inputTokens: number
   outputTokens: number
   cacheReadTokens: number
@@ -597,8 +619,8 @@ export interface LLMRequest {
   agent: AgentId
   model: string
   system: string
-  tools: Anthropic.Beta.BetaTool[]
-  messages: Anthropic.Beta.BetaMessageParam[]
+  tools: LLMTool[]
+  messages: LLMMessage[]
   maxTokens: number
   effort: Effort
   signal: AbortSignal
@@ -607,19 +629,20 @@ export interface LLMRequest {
 }
 
 export interface LLMResult {
-  /** The full assistant turn, to append to `messages` verbatim. */
-  content: Anthropic.Beta.BetaContentBlock[]
-  toolUses: Anthropic.Beta.BetaToolUseBlock[]
+  /** Application content; attach continuation alongside it in server history. */
+  content: LLMContent[]
+  toolUses: LLMToolCall[]
   /** Concatenated text blocks. */
   text: string
-  stopReason: Anthropic.Beta.BetaStopReason | null
-  usage: LLMUsage
+  stopReason: 'end_turn' | 'tool_use' | 'max_tokens' | 'refusal' | 'pause_turn' | 'stop_sequence' | 'compaction' | 'model_context_window_exceeded' | null
+  usage?: LLMUsage
+  continuation?: LLMContinuation
   /** Set when `stopReason === 'refusal'`. */
   refusal?: { category: string | null; explanation: string | null }
 }
 
 export interface LLM {
-  readonly kind: 'anthropic' | 'mock'
+  readonly kind: Provider
   /** One model call. Throws `LLMAbortedError` when `signal` fires. */
   complete(req: LLMRequest): Promise<LLMResult>
   /** Cheap reachability/credential check at boot; resolves with a human-readable problem or null. */
@@ -678,6 +701,7 @@ export interface RunStore {
 
   /** Late usage from an old run counts toward lifetime spend only. */
   addUsage(u: LLMUsage, runId?: string): void
+  markUsageUnknown(runId?: string): void
   lifetimeCostUsd(): number
   stats(): RunStats
   /** Recompute elapsed and emit `stats`. Called on a 1s ticker while live. */

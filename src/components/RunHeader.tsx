@@ -56,7 +56,7 @@ export function RunHeader({ accent, run, stats, live, detailOpen, onRunAction, o
     '--accent': accent,
   }
 
-  const tokens = stats ? stats.inputTokens + stats.outputTokens : 0
+  const tokens = stats ? stats.inputTokens + stats.outputTokens + stats.cacheReadTokens + stats.cacheWriteTokens : 0
 
   return (
     <header className="ac-header">
@@ -66,7 +66,7 @@ export function RunHeader({ accent, run, stats, live, detailOpen, onRunAction, o
         </div>
         <div className="ac-brand-text">
           <div className="ac-brand-title">Agent Chatroom</div>
-          <div className="ac-brand-sub">{run ? `${run.repo} · ${run.branch}` : ''}</div>
+          <div className="ac-brand-sub">{run ? `${run.repo} · ${run.branch} · ${run.llm}` : ''}</div>
         </div>
       </div>
 
@@ -83,7 +83,7 @@ export function RunHeader({ accent, run, stats, live, detailOpen, onRunAction, o
         <div className="ac-run-stats">
           <span>{formatElapsed(stats?.elapsedSec ?? 0)} elapsed</span>
           <span>{formatTokens(tokens)}</span>
-          <span>${(stats?.costUsd ?? 0).toFixed(2)}</span>
+          <span title={stats?.lifetimeUnreportedRequests ? 'Some requests have unreported usage; shown spend is a lower bound. Lifetime budget uses reported spend only.' : 'Reported spend'}>{stats?.unreportedRequests ? '≥' : ''}${(stats?.costUsd ?? 0).toFixed(2)}{stats?.lifetimeUnreportedRequests ? ' · usage unknown' : ''}</span>
         </div>
       </div>
 

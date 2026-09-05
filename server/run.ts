@@ -91,6 +91,8 @@ export function createRunStore(personas: Persona[], models: Record<AgentId, stri
   let budgetUsd = 0
   let tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 }
   let lifetimeCost = 0
+  let unreportedRequests = 0
+  let lifetimeUnreportedRequests = 0
   let agents: Agent[] = []
   let thread: ThreadItem[] = []
   let threadSeq = new Map<string, number>()
@@ -132,6 +134,8 @@ export function createRunStore(personas: Persona[], models: Record<AgentId, stri
       cacheReadTokens: tokens.cacheRead,
       cacheWriteTokens: tokens.cacheWrite,
       costUsd: tokens.cost,
+      unreportedRequests,
+      lifetimeUnreportedRequests,
       budgetUsd,
       messages,
       toolCalls,
@@ -157,6 +161,7 @@ export function createRunStore(personas: Persona[], models: Record<AgentId, stri
     if (patch.error) run.error = patch.error
     startedAtMs = Date.now()
     endedAtMs = null
+    unreportedRequests = 0
     tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 }
     agents = personas.map((p) => agentFrom(p, models[p.id]))
     thread = []
@@ -263,6 +268,12 @@ export function createRunStore(personas: Persona[], models: Record<AgentId, stri
       tokens.cacheWrite += u.cacheWriteTokens
       tokens.cost += cost
       publish({ type: 'stats', seq: s, stats: stats() })
+    },
+
+    markUsageUnknown(usageRunId = run.id) {
+      lifetimeUnreportedRequests++
+      if (usageRunId === run.id) unreportedRequests++
+      publish({ type: 'stats', seq: ++seq, stats: stats() })
     },
 
     stats,
