@@ -42,3 +42,26 @@ test('Anthropic stream failure retains the last known usage', async () => {
     return true
   })
 })
+
+test('Anthropic opaque thinking and tool calls survive the internal conversation boundary', async () => {
+  const payloads: Record<string, unknown>[] = []
+  const client = new Anthropic({ apiKey: 'test-only', maxRetries: 0, fetch: async (_url, init) => {
+    payloads.push(JSON.parse(String(init?.body)))
+    const events = [start,
+      { type: 'content_block_start', index: 0, content_block: { type: 'redacted_thinking', data: 'opaque-anthropic-fixture' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'tool_a', name: 'run_read_status', input: {} } },
+      { type: 'content_block_stop', index: 1 },
+      { type: 'message_delta', delta: { stop_reason: 'tool_use', stop_sequence: null }, usage: { output_tokens: 4 } },
+      { type: 'message_stop' }]
+    return new Response(events.map(encode).join(''), { headers: { 'Content-Type': 'text/event-stream' } })
+  } })
+  const llm = createAnthropicLLM(config, client)
+  const result = await llm.complete(request)
+  assert.equal(result.toolUses[0].id, 'tool_a')
+  assert.ok(!JSON.stringify(result.content).includes('opaque-anthropic-fixture'))
+  await llm.complete({ ...request, messages: [...request.messages, { role: 'assistant', content: result.content, continuation: result.continuation }, { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tool_a', content: 'status' }] }] })
+  assert.deepEqual((payloads[1].messages as { content: unknown }[])[1].content, result.continuation?.items)
+  await assert.rejects(llm.complete({ ...request, messages: [{ role: 'assistant', content: [], continuation: { provider: 'openai', items: [] } }] }), /mix provider/)
+  assert.equal(payloads.length, 2)
+})

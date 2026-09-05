@@ -2,7 +2,8 @@ import { existsSync, statSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AGENT_IDS, type AgentId } from '../shared/protocol.js'
-import type { Config, Effort } from './contracts.js'
+import type { Config, Effort, Provider } from './contracts.js'
+import { OPENAI_MODEL, validateOpenAIProfile } from './llm/openai-profile.js'
 
 export const DEFAULT_MODEL = 'claude-opus-5'
 
@@ -35,15 +36,22 @@ export function repoRoot(): string {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
-  const llm = flag('MOCK_LLM', env) === true ? 'mock' : 'anthropic'
+  const llm = provider(env)
+  const selectedModels = models(env, llm)
+  const selectedEffort = effort(env, llm)
+  if (llm === 'openai') {
+    for (const [id, model] of Object.entries(selectedModels)) {
+      validateOpenAIProfile(model, selectedEffort, `AGENT_MODEL_${id.toUpperCase()} / OPENAI_MODEL`)
+    }
+  }
   const autoStartFlag = flag('AUTO_START', env)
   const budgetUsd = number('RUN_BUDGET_USD', env, 5, { minExclusive: 0 })
   return {
     port: integer('PORT', env, 8787, { min: 1, max: 65535 }),
     host: raw('HOST', env) ?? '127.0.0.1',
     llm,
-    models: models(env),
-    effort: effort(env),
+    models: selectedModels,
+    effort: selectedEffort,
     budgetUsd,
     lifetimeBudgetUsd: number('LIFETIME_BUDGET_USD', env, budgetUsd * 4, { minExclusive: 0 }),
     maxIterationsPerTurn: integer('MAX_ITERATIONS_PER_TURN', env, 24, { min: 1 }),
@@ -93,22 +101,23 @@ function integer(name: string, env: NodeJS.ProcessEnv, fallback: number, bounds:
   return n
 }
 
-function models(env: NodeJS.ProcessEnv): Record<AgentId, string> {
+function models(env: NodeJS.ProcessEnv, llm: Provider): Record<AgentId, string> {
   const out = {} as Record<AgentId, string>
   for (const id of AGENT_IDS) {
     const name = `AGENT_MODEL_${id.toUpperCase()}`
-    const v = raw(name, env) ?? DEFAULT_MODEL
+    const v = raw(name, env) ?? (llm === 'openai' ? raw('OPENAI_MODEL', env) ?? OPENAI_MODEL : DEFAULT_MODEL)
     if (!/^[A-Za-z0-9._:-]+$/.test(v)) throw new Error(`${name} is not a valid model id: "${v}"`)
     out[id] = v
   }
   return out
 }
 
-function effort(env: NodeJS.ProcessEnv): Effort {
+function effort(env: NodeJS.ProcessEnv, llm: Provider): Effort {
   const v = raw('EFFORT', env)
   if (v === undefined) return 'high'
   const lower = v.toLowerCase() as Effort
-  if (!EFFORTS.includes(lower)) throw new Error(`EFFORT must be one of ${EFFORTS.join(', ')}, got "${v}"`)
+  const allowed = llm === 'openai' ? ['none', ...EFFORTS] : EFFORTS
+  if (!allowed.includes(lower)) throw new Error(`EFFORT must be one of ${allowed.join(', ')} for ${llm}, got "${v}"`)
   return lower
 }
 
@@ -129,4 +138,11 @@ function isDir(path: string): boolean {
   } catch {
     return false
   }
+}
+
+function provider(env: NodeJS.ProcessEnv): Provider {
+  if (flag('MOCK_LLM', env) === true) return 'mock'
+  const value = raw('LLM_PROVIDER', env) ?? 'anthropic'
+  if (value === 'anthropic' || value === 'openai' || value === 'mock') return value
+  throw new Error('LLM_PROVIDER must be anthropic, openai or mock')
 }

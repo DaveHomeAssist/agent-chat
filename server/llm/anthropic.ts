@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { Config, LLM, LLMRequest, LLMResult, LLMUsage } from '../contracts.js'
+import type { Config, LLM, LLMRequest, LLMMessage, LLMContent, LLMResult, LLMUsage } from '../contracts.js'
 import { LLMAbortedError, LLMRequestError } from '../contracts.js'
 
 const CREDENTIALS_MESSAGE = 'Anthropic credentials rejected — set ANTHROPIC_API_KEY or run `ant auth login`'
@@ -20,6 +20,7 @@ export function createAnthropicLLM(_config: Config, client = new Anthropic({ max
     kind: 'anthropic',
 
     async complete(req: LLMRequest): Promise<LLMResult> {
+      if (req.effort === 'none') throw new LLMRequestError('Anthropic EFFORT must be low, medium, high, xhigh or max')
       if (req.signal.aborted) throw new LLMAbortedError()
 
       const stream = client.beta.messages.stream(
@@ -34,8 +35,8 @@ export function createAnthropicLLM(_config: Config, client = new Anthropic({ max
           // breakpoint also moves along the growing conversation (last tool_result / text block).
           cache_control: { type: 'ephemeral' },
           system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
-          tools: req.tools,
-          messages: req.messages,
+          tools: req.tools.map((tool) => ({ ...tool, input_schema: { ...tool.input_schema } })),
+          messages: req.messages.map(toMessage),
         },
         { signal: req.signal },
       )
@@ -78,8 +79,9 @@ function toResult(msg: Anthropic.Beta.BetaMessage, requestedModel: string): LLMR
     .map((b) => b.text)
     .join('')
   const result: LLMResult = {
-    content: msg.content,
-    toolUses,
+    content: msg.content.filter((b): b is Anthropic.Beta.BetaTextBlock | Anthropic.Beta.BetaToolUseBlock => b.type === 'text' || b.type === 'tool_use').map(toContent),
+    continuation: { provider: 'anthropic', items: msg.content },
+    toolUses: toolUses.map((b) => ({ type: b.type, id: b.id, name: b.name, input: b.input as Record<string, unknown> })),
     text,
     stopReason: msg.stop_reason,
     usage: toUsage(msg, requestedModel),
@@ -115,4 +117,17 @@ function translateError(err: unknown, signal: AbortSignal): Error {
     return new Error(`Anthropic API error${err.status ? ` ${err.status}` : ''}: ${err.message}`)
   }
   return err instanceof Error ? err : new Error(String(err))
+}
+
+function toContent(block: Anthropic.Beta.BetaTextBlock | Anthropic.Beta.BetaToolUseBlock): LLMContent {
+  return block.type === 'text' ? { type: 'text', text: block.text }
+    : { type: 'tool_use', id: block.id, name: block.name, input: block.input as Record<string, unknown> }
+}
+
+function toMessage(message: LLMMessage): Anthropic.Beta.BetaMessageParam {
+  if (message.continuation) {
+    if (message.continuation.provider !== 'anthropic') throw new LLMRequestError('Cannot mix provider conversation state')
+    return { role: message.role, content: message.continuation.items as Anthropic.Beta.BetaContentBlockParam[] }
+  }
+  return { role: message.role, content: message.content }
 }

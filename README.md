@@ -1,6 +1,6 @@
 # Agent Chatroom
 
-A multi-agent run console: five Claude-backed agents ship a feature together while a human
+A multi-agent run console: five model-driven agents ship a feature together while a human
 operator watches the room, messages agents, holds the merge gate, and pauses the run.
 
 Built with Vite + React + TypeScript on the client and a dependency-free Node server. The UI is
@@ -31,9 +31,41 @@ export ANTHROPIC_API_KEY=sk-ant-...   # or `ant auth login`, or ANTHROPIC_AUTH_T
 npm run dev                            # server on :8787, Vite on :5173 (proxies /api)
 ```
 
-On boot the server checks that the Atlas model is reachable with your credentials. If it is
+On boot the server checks that the configured provider and Atlas model are reachable with your credentials. If it is
 not, the run is marked `failed` with the reason and the dashboard shows it in a banner — the
-server keeps serving so you can fix the key and restart the run.
+server keeps serving so you can fix the server credentials and restart the process.
+
+### With OpenAI
+
+Use the same console and simulated tools with the OpenAI Responses API:
+
+```bash
+export LLM_PROVIDER=openai
+export OPENAI_API_KEY=your-server-key
+npm run dev
+```
+
+All five agents default to `gpt-5.6-sol`. `OPENAI_MODEL` sets the OpenAI default and
+`AGENT_MODEL_ATLAS` through `AGENT_MODEL_SENTRY` override individual agents. This increment
+supports only `gpt-5.6-sol`; other OpenAI models are rejected with a configuration error.
+Effort supports `none`, `low`, `medium`, `high`, `xhigh`, and `max` (default `high`).
+Real-provider auto-start is off by default. Provider selection is fixed at process startup.
+`MOCK_LLM=1` takes precedence over `LLM_PROVIDER`, so `npm run demo` remains offline.
+
+The official `openai` SDK streams text and complete function calls. Tools execute only after
+a completed response; incomplete, refused, malformed, duplicate-call, and failed responses
+execute no tools and fail the run. Call IDs and opaque reasoning items are carried in server
+memory across turns with `store: false` and `reasoning.encrypted_content`. They are never
+published as chat text or snapshot data. State resets with the run and is not persisted.
+`store: false` controls response storage; it is not a zero data retention claim.
+See [Responses function calling](https://developers.openai.com/api/docs/guides/function-calling)
+and [reasoning state](https://developers.openai.com/api/docs/guides/reasoning).
+
+Keys stay on the server. Production uses the official API endpoint; `OPENAI_BASE_URL` is not
+supported. Tests inject the SDK transport directly. There are no automatic OpenAI retries or
+provider/model fallbacks, since an ambiguous failure may already have incurred usage.
+Startup checks retrieve model metadata; they do not generate a paid response. Starting a real
+run makes billable requests. Account access and a live OpenAI run still need separate acceptance.
 
 ### The demo
 
@@ -58,12 +90,15 @@ npm start          # one process: serves dist/ and the API on PORT
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
+| `LLM_PROVIDER` | `anthropic` | `anthropic`, `openai`, or `mock`, selected at startup. |
+| `OPENAI_API_KEY` | — | Server-only OpenAI credentials. |
+| `OPENAI_MODEL` | `gpt-5.6-sol` | Default model only when OpenAI is selected; the sole supported OpenAI profile. |
 | `ANTHROPIC_API_KEY` | — | Credentials. `ANTHROPIC_AUTH_TOKEN` and an `ant auth login` profile also work. |
 | `MOCK_LLM` | off | `1`/`true` drives the run with the scripted mock instead of a model. |
 | `RUN_BUDGET_USD` | `5` | Reported-usage limit per run, must be > 0. The run stops (`failed`) when reached; in-flight requests may overshoot. |
 | `LIFETIME_BUDGET_USD` | 4 × `RUN_BUDGET_USD` | Cumulative ceiling across every run of the process, must be > 0. `POST /api/run/start` is refused (403) once reached. |
-| `AGENT_MODEL_ATLAS` … `_SENTRY` | `claude-opus-5` | Per-agent model id. |
-| `EFFORT` | `high` | Reasoning effort for every agent: `low` `medium` `high` `xhigh` `max`. |
+| `AGENT_MODEL_ATLAS` … `_SENTRY` | provider default | Per-agent model id; Anthropic/mock default to `claude-opus-5`. |
+| `EFFORT` | `high` | Reasoning effort: `low` `medium` `high` `xhigh` `max`; OpenAI also supports `none`. |
 | `MAX_ITERATIONS_PER_TURN` | `24` | Model calls one agent may make per wake. |
 | `MAX_TURNS_PER_AGENT` | `60` | Wakes one agent may take per run. |
 | `MOCK_SPEED` | `1` | Multiplier on the mock's pacing; `0` is instant. |
@@ -77,7 +112,7 @@ Invalid values fail the boot with a message naming the variable.
 
 ## What the agents can do
 
-Every agent is a Claude model with a fixed persona, woken by the orchestrator with a task and
+Every agent uses the selected provider model with a fixed persona, woken by the orchestrator with a task and
 a set of tools. **The repository and toolchain they act on are an in-memory simulation** — a
 virtual `helios/api` on branch `feat/passkey-auth` seeded from `server/seed/`. Nothing touches
 your filesystem, shell, network or git; `pnpm test` is a deterministic function of the virtual
@@ -139,7 +174,7 @@ All repository, test, review and merge operations described here remain simulate
 
 ## Cost
 
-Every agent defaults to Opus 5 at high effort. Spend is metered from the API's usage numbers
+With Anthropic, every agent defaults to Opus 5 at high effort. Spend is metered from the API's usage numbers
 (input, output, cache read at 0.1×, cache write at 1.25× — `server/llm/pricing.ts`) and shown
 in the header; when it reaches `RUN_BUDGET_USD` the run stops with status `failed`. That
 reported-usage limit resets with every **Start run**, so `LIFETIME_BUDGET_USD` (default 4× the per-run
@@ -152,9 +187,20 @@ Usage is checked immediately after every response, including text-only responses
 may already have incurred cost before cancellation arrives. Known usage from completed or
 partially reported requests is retained even after interruption or termination. Usage arriving
 from an older run counts toward the lifetime ledger without charging the new run. Unreported
-usage cannot be metered locally. Requests use `fallbacks: 'default'` to enable provider-side
+usage cannot be metered locally. The console marks missing usage as **usage unknown** and the
+reported cost as a lower bound; this uncertainty remains visible across run resets in the
+lifetime counter. Budgets cannot enforce unreported spend. Anthropic requests use `fallbacks: 'default'` to enable provider-side
 fallback for refusals or capacity problems. An unrecoverable provider failure after fallback
 and retries fails the run explicitly.
+
+OpenAI pricing is separate from the Claude fallback. The supported profile is $4 per million
+ordinary input tokens, $0.40 cached input, $5 cache-write input, and $20 output, including
+reasoning tokens. Above 272,000 total input tokens, the whole request uses 2× input rates
+(including caches) and 1.5× output. Cache categories are subtracted from API input totals so
+they are charged once; reasoning tokens are already in output. These promotional model rates
+were verified on 2026-09-05 and are documented through at least 2026-11-21; recheck before
+later paid acceptance. Sources: [model pricing](https://developers.openai.com/api/docs/models/gpt-5.6-sol)
+and [cache accounting](https://developers.openai.com/api/docs/guides/prompt-caching).
 
 ## HTTP / SSE API
 
@@ -184,7 +230,9 @@ coupling between client and server.
 `npm test` uses Node's test runner with the existing TypeScript loader; no paid calls are made.
 The tests cover tool permissions, revision evidence, approval, completion, cancellation races,
 restart isolation, provider failures, interruption, configured effort, reported budgets and
-HTTP protections. The Anthropic adapter tests use the installed SDK with a fake transport.
+HTTP protections. Both provider adapters use the installed official SDKs with injected offline transports.
+OpenAI tests include the complete simulated story, human gate, pause/resume, failure,
+interruption, restart isolation, continuation, usage, and pricing boundaries.
 
 ```bash
 npm ci
@@ -201,7 +249,19 @@ wait for Approve merge, and confirm DONE with no active agents. Use a separate m
 with `RUN_BUDGET_USD=0.000001` to check the FAILED banner. Interrupt an active agent from its
 Subtask panel and confirm the output log says “interrupted by human” without failing the run.
 
-OpenAI/Codex integration and real repository execution remain a separate next increment.
+For an OpenAI-identity browser smoke check with no API access, after building run:
+
+```bash
+npm run smoke:openai
+# open http://127.0.0.1:8791
+```
+
+This test-only entry point drives the real OpenAI SDK/adapter with the scripted story and
+injected responses. It cannot contact OpenAI, reads no `.env` file or API key, and is excluded
+from the production server build. `SMOKE_FAIL=1` produces an offline failure; `MOCK_SPEED=0`
+makes the story instant. Offline fixtures verify application behavior, not real model quality
+or account access. A paid OpenAI acceptance run and real Codex repository execution remain
+separate follow-ups. All workspace, shell, Git, test and PR tools remain simulated.
 
 ## Architecture
 
@@ -219,7 +279,7 @@ server/
   tools.ts             executes catalogue entries against a Workspace
   workspace.ts         the in-memory helios/api repo and simulated toolchain
   seed/                the repo's starting files and the e2e fixtures
-  llm/                 anthropic.ts (streaming, fallbacks) · mock.ts (scripted) · pricing.ts
+  llm/                 anthropic.ts · openai.ts (Responses) · mock.ts (scripted) · pricing.ts
 src/
   AgentChatroom.tsx    the console, driven by the SSE feed
   components/          RunHeader · AgentSidebar · ChatPanel · ThreadItemView

@@ -76,7 +76,7 @@ async function main(): Promise<void> {
   console.log(banner(config))
 
   let healthy = true
-  if (config.llm === 'anthropic') {
+  if (config.llm !== 'mock') {
     const problem = await llm.healthcheck(config.models.atlas)
     if (problem) {
       healthy = false

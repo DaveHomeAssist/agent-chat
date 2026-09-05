@@ -14,9 +14,8 @@
  * gets a one-line, in-character reply so the run never stalls.
  */
 
-import type Anthropic from '@anthropic-ai/sdk'
 import type { AgentId } from '../../shared/protocol.js'
-import type { Config, LLM, LLMRequest, LLMResult, LLMUsage } from '../contracts.js'
+import type { Config, LLM, LLMRequest, LLMResult, LLMUsage, LLMContent, LLMMessage, LLMText, LLMToolCall } from '../contracts.js'
 import { LLMAbortedError } from '../contracts.js'
 
 // ---------------------------------------------------------------------------
@@ -772,23 +771,17 @@ function byteaEdit(c: Ctx): { find: string; replace: string } {
 // Wake-message parsing
 // ---------------------------------------------------------------------------
 
-type Block = Anthropic.Beta.BetaContentBlockParam | Anthropic.Beta.BetaContentBlock
+type Block = LLMContent
 
-function blocksOf(m: Anthropic.Beta.BetaMessageParam): Block[] {
-  return typeof m.content === 'string' ? [{ type: 'text', text: m.content }] : (m.content as Block[])
+function blocksOf(m: LLMMessage): Block[] {
+  return typeof m.content === 'string' ? [{ type: 'text', text: m.content }] : m.content
 }
 
-function textOf(m: Anthropic.Beta.BetaMessageParam): string {
+function textOf(m: LLMMessage): string {
   return blocksOf(m)
-    .filter((b): b is Anthropic.Beta.BetaTextBlockParam => b.type === 'text')
+    .filter((b): b is LLMText => b.type === 'text')
     .map((b) => b.text)
     .join('\n')
-}
-
-function resultText(content: Anthropic.Beta.BetaToolResultBlockParam['content']): string {
-  if (!content) return ''
-  if (typeof content === 'string') return content
-  return content.map((b) => (b.type === 'text' ? b.text : '')).join('\n')
 }
 
 const TAG_RE = /^\[([A-Z_]+)([^\]]*)\]/
@@ -829,7 +822,7 @@ function buildCtx(req: LLMRequest): Ctx {
   for (const m of msgs) {
     if (m.role !== 'user') continue
     for (const b of blocksOf(m)) {
-      if (b.type === 'tool_result') results.set(b.tool_use_id, resultText(b.content))
+      if (b.type === 'tool_result') results.set(b.tool_use_id, b.content)
     }
   }
 
@@ -919,15 +912,15 @@ export function createMockLLM(config: Config): LLM {
       const thinkMs = 300 + (hash(`${req.agent}:${ctx.totalTurns}`) % 601)
       await sleep(thinkMs * speed, req.signal)
 
-      const content: Anthropic.Beta.BetaContentBlock[] = []
+      const content: LLMContent[] = []
       if (turn.text) {
         for (let i = 0; i < turn.text.length; i += CHUNK_CHARS) {
           if (i > 0) await sleep(CHUNK_DELAY_MS * speed, req.signal)
           req.onText?.(turn.text.slice(i, i + CHUNK_CHARS))
         }
-        content.push({ type: 'text', text: turn.text, citations: null })
+        content.push({ type: 'text', text: turn.text })
       }
-      const toolUses: Anthropic.Beta.BetaToolUseBlock[] = turn.tools.map((t) => ({
+      const toolUses: LLMToolCall[] = turn.tools.map((t) => ({
         type: 'tool_use',
         id: `toolu_${++toolSeq}`,
         name: t.name,
