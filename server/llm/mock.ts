@@ -79,6 +79,8 @@ const last = (list: Call[], name: string): Call | undefined => [...list].reverse
 
 const isTag = (c: Ctx, ...tags: string[]): boolean => tags.includes(c.tag)
 const wakeHas = (c: Ctx, re: RegExp): boolean => re.test(c.wake)
+/** Tests only the tag line (the handoff note or assignment title), not the [ROOM] replay beneath it. */
+const noteHas = (c: Ctx, re: RegExp): boolean => re.test(c.wake.split('\n')[0])
 const report = (c: Ctx, from: AgentId, kind: 'done' | 'blocked'): boolean =>
   c.tag === 'REPORT' && c.attrs.from === from && c.attrs.kind === kind
 
@@ -267,16 +269,9 @@ const ATLAS: Scene[] = [
     name: 'Vector done → build phase, Forge + Probe assigned',
     when: (c) => report(c, 'vector', 'done'),
     turns: [
-      call('run_handoff', { from: 'vector', to: 'forge', note: 'ADR-0142 accepted' }),
       call('run_set_phase', { phase: 'build' }),
-      call('run_assign', {
-        agent: 'forge',
-        phase: 'build',
-        title: 'POST /webauthn/register',
-        subtask:
-          'Implement the register and verify endpoints plus the credentials migration 0043, all behind the auth.passkeys flag. Done when typecheck passes and the branch is pushed.',
-        eta: '~8 min',
-      }),
+      // Probe is assigned first so it is standing by before Forge's push can land;
+      // the assignment precedes the handoff so Forge's task is active, not queued, while it builds.
       call('run_assign', {
         agent: 'probe',
         phase: 'test',
@@ -285,6 +280,15 @@ const ATLAS: Scene[] = [
           "Wait for Forge's push, then run the passkey e2e suite and isolate any failures down to the responsible change.",
         eta: '~5 min',
       }),
+      call('run_assign', {
+        agent: 'forge',
+        phase: 'build',
+        title: 'POST /webauthn/register',
+        subtask:
+          'Implement the register and verify endpoints plus the credentials migration 0043, all behind the auth.passkeys flag. Done when typecheck passes and the branch is pushed.',
+        eta: '~8 min',
+      }),
+      call('run_handoff', { from: 'vector', to: 'forge', note: 'ADR-0142 accepted' }),
       say("Build is on. Probe, hold for Forge's first push."),
     ],
   },
@@ -317,11 +321,15 @@ const ATLAS: Scene[] = [
     ],
   },
   {
-    name: 'Forge done → Probe re-runs',
+    // Every push Forge reports done is routed to Probe here — a formal handoff is
+    // the only thing that wakes an agent; a "@Probe" in prose does not.
+    name: 'Forge done → Probe runs the suite',
     when: (c) => report(c, 'forge', 'done'),
     turns: [
-      call('run_handoff', { from: 'forge', to: 'probe', note: 're-run on latest push' }),
-      say('Probe re-runs on the latest push.'),
+      (c) => ({
+        tools: [tool('run_handoff', { from: 'forge', to: 'probe', note: probeRanBefore(c) ? 're-run on latest push' : 'first push · run the suite' })],
+      }),
+      (c) => ({ text: probeRanBefore(c) ? 'Probe re-runs on the latest push.' : "Forge's first cut is on the branch. Probe, the suite is yours.", tools: [] }),
     ],
   },
   {
@@ -416,7 +424,7 @@ const VECTOR: Scene[] = [
 const FORGE: Scene[] = [
   {
     name: 'assignment → register/verify endpoints, migration 0043, push',
-    when: (c) => (isTag(c, 'ASSIGNMENT') || (isTag(c, 'HANDOFF') && wakeHas(c, /ADR-0142/))) && !did(c.prior, 'repo_push'),
+    when: (c) => (isTag(c, 'ASSIGNMENT') || (isTag(c, 'HANDOFF') && noteHas(c, /ADR-0142/))) && !did(c.prior, 'repo_push'),
     turns: [
       call('docs_read', { name: 'ADR-0142-passkey-auth.md' }),
       say(
@@ -437,16 +445,21 @@ const FORGE: Scene[] = [
         }),
         tool('repo_push', { message: 'feat(auth): webauthn register + credentials migration' }),
       ),
-      say('Pushed. @Probe the suite is yours.', tool('agent_queue', { title: 'Credential store rollback path', meta: 'next' })),
+      // agent_done is what reaches Atlas, who hands the push to Probe; the room text alone wakes nobody.
+      say(
+        'Pushed. First cut of register/verify and migration 0043 is on the branch — Probe, the suite is yours.',
+        tool('agent_queue', { title: 'Credential store rollback path', meta: 'next' }),
+        tool('agent_done', { summary: 'register/verify + migration 0043 pushed (first cut)', io: ['7 files', '+318 −24', 'migration 0043'] }),
+      ),
       say("Holding for Probe's run; the rollback path is next in my queue."),
     ],
   },
   {
     name: 'handoff: sign_count guard → strict comparison, push',
-    when: (c) => isTag(c, 'HANDOFF') && wakeHas(c, /guard|off-by-one|sign_count/i) && !guardFixed(c),
+    when: (c) => isTag(c, 'HANDOFF') && noteHas(c, /guard|off-by-one|sign_count/i) && !guardFixed(c),
     turns: [
       say(
-        '@Probe that one is mine — off-by-one in the counter comparison. Patching now, then push for a re-run.',
+        'That one is mine — off-by-one in the counter comparison. Patching now, then push for a re-run.',
         tool('repo_patch', {
           path: 'services/auth/webauthn/verify.ts',
           edits: [{ find: 'signCount >= stored', replace: 'signCount > stored' }],
@@ -465,7 +478,7 @@ const FORGE: Scene[] = [
   },
   {
     name: 'handoff: cred_id → bytea, push, done',
-    when: (c) => isTag(c, 'HANDOFF') && wakeHas(c, /bytea|cred_id/i) && !did(c.prior, 'agent_done'),
+    when: (c) => isTag(c, 'HANDOFF') && noteHas(c, /bytea|cred_id/i) && !byteaFixed(c),
     turns: [
       call('repo_read', { path: 'db/migrations/0043_credentials.sql' }),
       (c) => ({ tools: [tool('repo_patch', { path: 'db/migrations/0043_credentials.sql', edits: [byteaEdit(c)] })] }),
@@ -649,6 +662,15 @@ function assignedSentry(c: Ctx): boolean {
 
 function guardFixed(c: Ctx): boolean {
   return c.prior.some((k) => k.name === 'repo_patch' && JSON.stringify(k.input).includes('signCount > stored'))
+}
+
+function byteaFixed(c: Ctx): boolean {
+  return c.prior.some((k) => k.name === 'repo_patch' && /BYTEA/i.test(JSON.stringify(k.input)))
+}
+
+/** Whether Atlas has already routed a push to Probe (so this one is a re-run). */
+function probeRanBefore(c: Ctx): boolean {
+  return c.prior.some((k) => k.name === 'run_handoff' && k.input.to === 'probe')
 }
 
 /** Forge's "Pushed…" line in a [ROOM] section, or a repo.push card. */

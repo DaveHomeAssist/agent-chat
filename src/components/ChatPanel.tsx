@@ -47,12 +47,24 @@ export function ChatPanel({
   onCycleTarget,
 }: Props) {
   const threadRef = useRef<HTMLDivElement>(null)
+  // True while the user sits at the bottom; scrolling up releases the pin.
+  const pinnedRef = useRef(true)
 
-  // The room always sits pinned to the newest message, like a live console.
+  const last = thread[thread.length - 1]
+  const lastId = last?.id ?? ''
+  const lastBodyLength = last?.body.length ?? 0
+
+  // The room follows the newest message like a live console — but only while pinned,
+  // and only when the thread itself changes (the server ticks a stats event every second).
   useEffect(() => {
     const el = threadRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  })
+    if (el && pinnedRef.current) el.scrollTop = el.scrollHeight
+  }, [thread.length, lastId, lastBodyLength, typingLabel])
+
+  const onThreadScroll = () => {
+    const el = threadRef.current
+    if (el) pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+  }
 
   return (
     <main className="ac-main">
@@ -86,7 +98,7 @@ export function ChatPanel({
         </div>
       </div>
 
-      <div className="ac-thread" ref={threadRef}>
+      <div className="ac-thread" ref={threadRef} onScroll={onThreadScroll}>
         {thread.map((item) => (
           <ThreadItemView
             key={item.id}

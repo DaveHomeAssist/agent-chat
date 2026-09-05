@@ -27,12 +27,15 @@ export interface AgentChatroomProps {
   liveMotion?: boolean
 }
 
+/** Status badges are not decisions: test ratios like "22/24", and BLOCKED. PLAN / RISK / ACK are. */
+const isDecisionBadge = (badge: string) => badge !== 'BLOCKED' && !/^\d+\/\d+$/.test(badge)
+
 const FILTERS: Record<ThreadFilter, (m: ThreadItem) => boolean> = {
   all: () => true,
   decisions: (m) =>
     m.kind === 'divider' ||
     m.kind === 'human' ||
-    (m.kind === 'message' && !!m.badge && m.badge !== '18/24'),
+    (m.kind === 'message' && !!m.badge && isDecisionBadge(m.badge)),
   tools: (m) => m.kind === 'tool',
   handoffs: (m) => m.kind === 'handoff' || m.kind === 'divider',
 }

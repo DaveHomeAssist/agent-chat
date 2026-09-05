@@ -93,6 +93,7 @@ export interface PrState {
   branch: string
   comments: PrComment[]
   review: 'none' | 'approved' | 'changes_requested'
+  reviewRevision: number | null
   merged: boolean
   /** Commit shas pushed to the branch, oldest first. */
   commits: string[]
@@ -114,6 +115,8 @@ export interface SecFinding {
 export interface Workspace {
   readonly repo: string
   readonly branch: string
+  /** Changes on edits, pushes and rollback; evidence must match this revision. */
+  revision(): number
 
   list(): string[]
   read(path: string): string | null
@@ -146,6 +149,7 @@ export interface Workspace {
     comment(author: AgentId, body: string, blocking: boolean): PrComment
     resolve(id: string): boolean
     review(author: AgentId, verdict: 'approve' | 'request_changes', summary: string): void
+    checkMerge(): { ok: boolean; reason?: string }
     merge(): { ok: boolean; reason?: string }
   }
   /** Simulated dependency + secret scan over the working tree. */
@@ -173,6 +177,8 @@ export interface ToolInputSchema {
 
 export interface ToolContext {
   agent: AgentId
+  /** Revision observed when the request producing this tool call began. */
+  revision?: number
   workspace: Workspace
   run: RunStore
   /** Aborted when the human interrupts the agent. */
@@ -566,6 +572,7 @@ export const WORKER_IDS: readonly AgentId[] = ['vector', 'forge', 'probe', 'sent
 
 /** Resolve the catalogue's access shorthand for one agent. */
 export function toolNamesFor(agent: AgentId): string[] {
+  if (agent !== 'atlas' && !WORKER_IDS.includes(agent)) return []
   return Object.entries(TOOL_CATALOGUE)
     .filter(([, t]) => t.agents === 'all' || (t.agents === 'workers' ? agent !== 'atlas' : t.agents.includes(agent)))
     .map(([name]) => name)
@@ -619,9 +626,16 @@ export interface LLM {
   healthcheck(model: string): Promise<string | null>
 }
 
-export class LLMAbortedError extends Error {
-  constructor() {
-    super('model call aborted')
+export class LLMRequestError extends Error {
+  constructor(message: string, public readonly usage?: LLMUsage) {
+    super(message)
+    this.name = 'LLMRequestError'
+  }
+}
+
+export class LLMAbortedError extends LLMRequestError {
+  constructor(usage?: LLMUsage) {
+    super('model call aborted', usage)
     this.name = 'LLMAbortedError'
   }
 }
@@ -662,7 +676,9 @@ export interface RunStore {
   setPipeline(p: Pipeline): void
   setTyping(ids: AgentId[]): void
 
-  addUsage(u: LLMUsage): void
+  /** Late usage from an old run counts toward lifetime spend only. */
+  addUsage(u: LLMUsage, runId?: string): void
+  lifetimeCostUsd(): number
   stats(): RunStats
   /** Recompute elapsed and emit `stats`. Called on a 1s ticker while live. */
   tick(): void

@@ -6,6 +6,14 @@ import type { Config, Effort } from './contracts.js'
 
 export const DEFAULT_MODEL = 'claude-opus-5'
 
+/** `Config` plus the knobs only the composition root and the HTTP layer read. */
+export interface ServerConfig extends Config {
+  /** HOST — interface to listen on. Default loopback; `0.0.0.0` is an explicit opt-in to the LAN. */
+  host: string
+  /** LIFETIME_BUDGET_USD — cumulative spend across every run of this process; `/api/run/start` is refused once reached. */
+  lifetimeBudgetUsd: number
+}
+
 const EFFORTS: readonly Effort[] = ['low', 'medium', 'high', 'xhigh', 'max']
 
 const TRUE = new Set(['1', 'true', 'yes', 'on'])
@@ -26,15 +34,18 @@ export function repoRoot(): string {
   }
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const llm = flag('MOCK_LLM', env) === true ? 'mock' : 'anthropic'
   const autoStartFlag = flag('AUTO_START', env)
+  const budgetUsd = number('RUN_BUDGET_USD', env, 5, { minExclusive: 0 })
   return {
     port: integer('PORT', env, 8787, { min: 1, max: 65535 }),
+    host: raw('HOST', env) ?? '127.0.0.1',
     llm,
     models: models(env),
     effort: effort(env),
-    budgetUsd: number('RUN_BUDGET_USD', env, 5, { minExclusive: 0 }),
+    budgetUsd,
+    lifetimeBudgetUsd: number('LIFETIME_BUDGET_USD', env, budgetUsd * 4, { minExclusive: 0 }),
     maxIterationsPerTurn: integer('MAX_ITERATIONS_PER_TURN', env, 24, { min: 1 }),
     maxTurnsPerAgent: integer('MAX_TURNS_PER_AGENT', env, 60, { min: 1 }),
     mockSpeed: number('MOCK_SPEED', env, 1, { min: 0 }),
