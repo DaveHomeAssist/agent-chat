@@ -31,6 +31,9 @@ export function createAnthropicLLM(_config: Config): LLM {
           fallbacks: 'default',
           thinking: { type: 'adaptive' },
           output_config: { effort: req.effort },
+          // Explicit marker on the frozen system prefix, plus top-level automatic caching so the
+          // breakpoint also moves along the growing conversation (last tool_result / text block).
+          cache_control: { type: 'ephemeral' },
           system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
           tools: req.tools,
           messages: req.messages,

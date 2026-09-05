@@ -38,6 +38,16 @@ interface Wake {
   body?: string
   /** Append the workspace tree. */
   tree?: boolean
+  /** HUMAN only: the operator's messages coalesced into this wake, in arrival order. */
+  texts?: string[]
+  /** ASSIGNMENT only: the task to make current when the wake is dequeued. */
+  assign?: Assignment
+}
+
+interface Assignment {
+  id: string
+  subtask: string
+  eta: string
 }
 
 /** What happened during one wake, for the badge on the agent's message. */
@@ -48,8 +58,6 @@ interface TurnCtx {
   tests: string | null
   blocked: boolean
   messageIds: string[]
-  /** Agents @-mentioned in this turn's messages, with the line that named them. */
-  mentions: Map<AgentId, string>
 }
 
 interface Runner {
@@ -86,13 +94,24 @@ const STREAM_THROTTLE_MS = 60
 const ROOM_MAX_LINES = 40
 const ROOM_LINE_MAX = 240
 const ACTIVE_STATUSES: readonly RunInfo['status'][] = ['live', 'paused', 'needs_approval']
-const MENTION = /@([A-Za-z]+)/g
+const ENDED_STATUSES: readonly RunInfo['status'][] = ['done', 'failed']
 
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 const slug = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
 const isRatio = (s: string): boolean => /^\d+\/\d+$/.test(s)
 const fmtDur = (ms: number): string => (ms < 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms / 1000)}s`)
 const clip = (s: string, max: number): string => (s.length <= max ? s : `${s.slice(0, max - 1)}…`)
+/**
+ * Wake messages are parsed by their bracketed tag lines, so no dynamic text may
+ * start a line with '['. Inline fragments (tag line, room lines) lose their
+ * newlines; multi-line bodies are indented so every line starts with a space.
+ */
+const oneLine = (s: string): string => s.replace(/[ \t]*\r?\n[ \t]*/g, ' ⏎ ')
+const indent = (s: string): string =>
+  s
+    .split(/\r?\n/)
+    .map((l) => `  ${l}`)
+    .join('\n')
 
 export function createOrchestrator(deps: Deps): Orchestrator {
   const { store, llm, workspace, tools, config } = deps
@@ -105,6 +124,8 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   let ticker: NodeJS.Timeout | null = null
   const inFlight = new Set<AgentId>()
   let approvedEarly = false
+  /** Human pause, tracked apart from `run.status` — a merge request or the end of the run may overwrite that. */
+  let paused = false
   let pauseGate: Promise<void> | null = null
   let releasePause: (() => void) | null = null
 
@@ -117,6 +138,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   const post = (item: ThreadDraft): ThreadItem => store.appendThread(item as Parameters<RunStore['appendThread']>[0])
   const runInfo = (): RunInfo => store.snapshot().run
   const runActive = (): boolean => ACTIVE_STATUSES.includes(runInfo().status)
+  const runEnded = (): boolean => ENDED_STATUSES.includes(runInfo().status)
   const agentState = (id: AgentId) => store.snapshot().agents.find((a) => a.id === id)!
 
   function recompute(phase?: Phase): void {
@@ -172,9 +194,24 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   }
 
   function release(): void {
+    paused = false
     releasePause?.()
     releasePause = null
     pauseGate = null
+  }
+
+  /** Resolves when the pause lifts or the turn is aborted, whichever comes first. */
+  function awaitPause(signal: AbortSignal): Promise<void> {
+    const gate = pauseGate
+    if (!gate || signal.aborted) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const wake = (): void => {
+        signal.removeEventListener('abort', wake)
+        resolve()
+      }
+      signal.addEventListener('abort', wake, { once: true })
+      void gate.then(wake)
+    })
   }
 
   function startTicker(): void {
@@ -187,23 +224,52 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     ticker = null
   }
 
+  /** Ends the run as failed. Idempotent: a run that has already ended keeps its outcome. */
   function failRun(error: string): void {
+    if (runEnded()) return
     gen++
     abortAll()
     release()
     stopTicker()
     store.setRun({ status: 'failed', error })
+    // Nothing in flight will report back (gen moved on), so close out what it left mid-way.
+    for (const r of runners.values()) {
+      const a = agentState(r.id)
+      if (a.status !== 'idle' && a.status !== 'blocked') store.setAgent(r.id, { status: 'idle' })
+      for (const t of a.tools) if (t.status === 'running') store.agentTool(r.id, { ...t, dur: '—', status: 'error' })
+    }
+    for (const item of store.snapshot().thread) {
+      if (item.kind === 'message' && item.streaming) store.patchThread(item.id, { streaming: false })
+      else if (item.kind === 'tool' && item.status === 'running') store.patchThread(item.id, { dur: '—', status: 'error' })
+    }
     store.setTyping([])
     recompute()
   }
 
+  /** Ends the run as done. Releases anyone parked on a pause so they are not stranded. */
+  function markDone(): void {
+    release()
+    stopTicker()
+    store.setRun({ status: 'done' })
+    store.setTyping([])
+    recompute('done')
+  }
+
   // ---- wake queue -----------------------------------------------------------
 
+  /** `front` puts human-originated wakes ahead of agent traffic, behind earlier ones so arrival order holds. */
   function enqueue(id: AgentId, wake: Wake, front = false): void {
     const r = runners.get(id)
-    if (!r || !runActive()) return
-    if (front) r.inbox.unshift(wake)
-    else r.inbox.push(wake)
+    if (!r) return
+    if (!runActive()) {
+      if (runEnded()) store.agentLog(id, 'INFO', `run ${runInfo().status} · ${wake.tag} wake dropped`)
+      return
+    }
+    if (front) {
+      let at = 0
+      while (at < r.inbox.length && (r.inbox[at].tag === 'HUMAN' || r.inbox[at].tag === 'GATE_APPROVED')) at++
+      r.inbox.splice(at, 0, wake)
+    } else r.inbox.push(wake)
     void pump(r, gen)
   }
 
@@ -213,6 +279,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     try {
       while (fresh(g) && r.inbox.length) {
         if (!runActive()) {
+          if (runEnded()) store.agentLog(r.id, 'INFO', `run ${runInfo().status} · ${r.inbox.length} pending wake${r.inbox.length === 1 ? '' : 's'} dropped`)
           r.inbox.length = 0
           break
         }
@@ -238,21 +305,23 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   function roomLine(item: ThreadItem): string | null {
     switch (item.kind) {
       case 'message':
-        return `${item.time} ${nameOf(item.who)}: ${clip(item.body, ROOM_LINE_MAX)}`
+        return `${item.time} ${nameOf(item.who)}: ${clip(oneLine(item.body), ROOM_LINE_MAX)}`
       case 'tool':
-        return `${item.time} ${nameOf(item.who)} → ${item.tool} ${clip(item.body, 80)}`
+        return `${item.time} ${nameOf(item.who)} → ${item.tool} ${clip(oneLine(item.body), 80)}`
       case 'human':
-        return `${item.time} Human(${item.target === 'all' ? 'all' : nameOf(item.target)}): ${clip(item.body, ROOM_LINE_MAX)}`
+        return `${item.time} Human(${item.target === 'all' ? 'all' : nameOf(item.target)}): ${clip(oneLine(item.body), ROOM_LINE_MAX)}`
       case 'handoff':
-        return `${item.time} handoff: ${item.body}`
+        return `${item.time} handoff: ${oneLine(item.body)}`
       case 'divider':
-        return `${item.time} — ${item.body}`
+        return `${item.time} — ${oneLine(item.body)}`
     }
   }
 
   function wakeText(r: Runner, wake: Wake): string {
-    const head = `[${wake.tag}${wake.attrs ?? ''}]${wake.inline ? ` ${wake.inline}` : ''}`
-    const parts = [wake.body ? `${head}\n${wake.body}` : head]
+    const head = `[${wake.tag}${wake.attrs ?? ''}]${wake.inline ? ` ${oneLine(wake.inline)}` : ''}`
+    // Body lines are label-prefixed or indented already; stripping a leading '[' is the last line of defence.
+    const body = wake.body?.replace(/^\[/gm, '')
+    const parts = [body ? `${head}\n${body}` : head]
     const { items, seq } = store.threadSince(r.lastSeenSeq)
     r.lastSeenSeq = seq
     const lines = items
@@ -268,55 +337,79 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   // ---- the turn -------------------------------------------------------------
 
   async function runTurn(r: Runner, wake: Wake, g: number): Promise<void> {
-    const ctx: TurnCtx = { human: wake.tag === 'HUMAN', plan: false, risk: false, tests: null, blocked: false, messageIds: [], mentions: new Map() }
-    r.history.push({ role: 'user', content: wakeText(r, wake) })
-    r.turns++
-    let iterations = 0
+    const ctx: TurnCtx = { human: wake.tag === 'HUMAN', plan: false, risk: false, tests: null, blocked: false, messageIds: [] }
+    // One controller for the whole turn: model calls, tool execution and the pause park all answer to it.
+    const ac = new AbortController()
+    r.abort = ac
+    try {
+      if (wake.assign) activateTask(r, wake.assign)
+      r.history.push({ role: 'user', content: wakeText(r, wake) })
+      r.turns++
+      let iterations = 0
 
-    while (true) {
-      await pauseGate
-      if (!fresh(g)) return
-      if (store.stats().costUsd >= config.budgetUsd) {
-        failRun(`Run budget of $${config.budgetUsd} reached`)
-        return
-      }
-      if (iterations >= config.maxIterationsPerTurn) {
-        store.agentLog(r.id, 'WARN', `stopped after ${iterations} model calls in one turn`)
-        break
-      }
-      iterations++
+      while (true) {
+        if (pauseGate) {
+          await awaitPause(ac.signal)
+          if (!fresh(g)) return
+          if (!runActive()) {
+            store.agentLog(r.id, 'INFO', `run ${runInfo().status} while paused · turn dropped`)
+            break
+          }
+        }
+        if (ac.signal.aborted) break
+        if (store.stats().costUsd >= config.budgetUsd) {
+          failRun(`Run budget of $${config.budgetUsd} reached`)
+          return
+        }
+        if (iterations >= config.maxIterationsPerTurn) {
+          store.agentLog(r.id, 'WARN', `stopped after ${iterations} model calls in one turn`)
+          break
+        }
+        iterations++
 
-      const ac = new AbortController()
-      const outcome = await callModel(r, ac, ctx, g)
-      if (!fresh(g)) return
-      if (outcome === 'aborted') {
-        finishTurn(r, ctx)
-        return
-      }
-      if (outcome === 'error') break
-
-      store.addUsage(outcome.usage)
-      r.history.push({ role: 'assistant', content: outcome.content })
-      if (outcome.stopReason === 'refusal') {
-        handleRefusal(r, outcome, ctx)
-        break
-      }
-      if (!outcome.toolUses.length) break
-
-      store.setAgent(r.id, { status: 'working' })
-      const results: Anthropic.Beta.BetaToolResultBlockParam[] = []
-      for (const tu of outcome.toolUses) {
-        results.push(await execTool(r, tu, ac.signal, ctx, g))
+        const outcome = await callModel(r, ac, ctx, g)
         if (!fresh(g)) return
+        if (outcome === 'aborted') break
+        if (outcome instanceof Error) {
+          handleModelError(r, outcome, ctx)
+          if (!fresh(g)) return
+          break
+        }
+
+        store.addUsage(outcome.usage)
+        if (store.stats().costUsd >= config.budgetUsd) {
+          failRun(`Run budget of $${config.budgetUsd} reached`)
+          return
+        }
+        if (outcome.stopReason === 'refusal') {
+          // A classifier refusal carries no content; an empty assistant turn would 400 every later call.
+          r.history.push({ role: 'assistant', content: [{ type: 'text', text: outcome.text.trim() || '(the model declined this request)' }] })
+          handleRefusal(r, outcome, ctx)
+          break
+        }
+        if (outcome.stopReason === 'max_tokens') store.agentLog(r.id, 'WARN', `response truncated at ${MAX_TOKENS} output tokens`)
+        r.history.push({ role: 'assistant', content: outcome.content })
+        if (!outcome.toolUses.length) break
+
+        store.setAgent(r.id, { status: 'working' })
+        const results: Anthropic.Beta.BetaToolResultBlockParam[] = []
+        for (const tu of outcome.toolUses) {
+          if (ac.signal.aborted) {
+            results.push({ type: 'tool_result', tool_use_id: tu.id, content: 'error: interrupted by the human operator', is_error: true })
+            continue
+          }
+          results.push(await execTool(r, tu, ac.signal, ctx, g))
+          if (!fresh(g)) return
+        }
+        r.history.push({ role: 'user', content: results })
       }
-      r.history.push({ role: 'user', content: results })
-      if (ac.signal.aborted) break
+      finishTurn(r, ctx)
+    } finally {
+      if (r.abort === ac) r.abort = null
     }
-    finishTurn(r, ctx)
   }
 
-  async function callModel(r: Runner, ac: AbortController, ctx: TurnCtx, g: number): Promise<LLMResult | 'aborted' | 'error'> {
-    r.abort = ac
+  async function callModel(r: Runner, ac: AbortController, ctx: TurnCtx, g: number): Promise<LLMResult | 'aborted' | Error> {
     store.setAgent(r.id, { status: r.id === 'atlas' ? 'working' : 'thinking' })
     inFlight.add(r.id)
     syncTyping()
@@ -329,7 +422,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
         tools: tools.definitionsFor(r.id),
         messages: r.history,
         maxTokens: MAX_TOKENS,
-        effort: r.persona.effort,
+        effort: config.effort,
         signal: ac.signal,
         onText: stream.onText,
       })
@@ -344,10 +437,10 @@ export function createOrchestrator(deps: Deps): Orchestrator {
         r.history.push({ role: 'assistant', content: [{ type: 'text', text: partial || '(interrupted by the human operator)' }] })
         return 'aborted'
       }
-      store.agentLog(r.id, 'FAIL', `model call failed · ${clip(errMsg(e), 140)}`)
-      return 'error'
+      const err = e instanceof Error ? e : new Error(String(e))
+      r.history.push({ role: 'assistant', content: [{ type: 'text', text: partial || `(model call failed: ${clip(err.message, 140)})` }] })
+      return err
     } finally {
-      if (r.abort === ac) r.abort = null
       if (fresh(g)) {
         inFlight.delete(r.id)
         syncTyping()
@@ -388,13 +481,31 @@ export function createOrchestrator(deps: Deps): Orchestrator {
         const body = finalText?.trim() ? finalText : buf
         if (id) store.patchThread(id, { body, streaming: false })
         else if (body.trim()) ctx.messageIds.push(post({ kind: 'message', who: r.id, body }).id)
-        for (const m of body.matchAll(MENTION)) {
-          const who = resolveAgent(m[1])
-          if (who && who !== r.id && !ctx.mentions.has(who)) ctx.mentions.set(who, body)
-        }
         return body
       },
     }
+  }
+
+  /**
+   * A model call that failed for a reason other than an interrupt (unknown
+   * model, API failure after the SDK's retries). No retry: a worker is marked
+   * blocked and Atlas decides; Atlas itself has no one to escalate to, so the
+   * run fails and the UI shows why.
+   */
+  function handleModelError(r: Runner, e: Error, ctx: TurnCtx): void {
+    const msg = clip(e.message, 140)
+    store.agentLog(r.id, 'FAIL', `model call failed · ${msg}`)
+    ctx.messageIds.push(post({ kind: 'message', who: r.id, body: `model call failed: ${msg}` }).id)
+    if (r.id === 'atlas') {
+      failRun(`Atlas model call failed: ${msg}`)
+      return
+    }
+    ctx.blocked = true
+    store.setAgent(r.id, { status: 'blocked', eta: 'blocked' })
+    patchTask(r.id, { state: 'blocked', meta: 'blocked' })
+    refreshAtlas()
+    recompute()
+    enqueue('atlas', { tag: 'REPORT', attrs: ` from=${r.id} kind=blocked`, inline: `model call failed: ${msg}` })
   }
 
   function handleRefusal(r: Runner, result: LLMResult, ctx: TurnCtx): void {
@@ -418,11 +529,6 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     if (badge && last) store.patchThread(last, { badge })
     const status: AgentStatus = agentState(r.id).status === 'blocked' ? 'blocked' : 'idle'
     store.setAgent(r.id, { status })
-    // "@Probe the suite is yours" is a handoff in all but the tool call; deliver it once the
-    // speaker's tools (typically the push being referred to) have run.
-    for (const [who, line] of ctx.mentions) {
-      if (who !== 'atlas') enqueue(who, { tag: 'HANDOFF', attrs: ` from=${r.id}`, inline: clip(line, 160) })
-    }
   }
 
   // ---- tools ----------------------------------------------------------------
@@ -457,10 +563,16 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     store.agentLog(r.id, log.level, log.msg)
 
     noteBadgeEvents(spec.name, input, outcome, ctx)
-    let note: string | undefined
-    if (outcome.effect) note = applyEffect(r, outcome.effect, outcome, ctx)
-    const content = note ? `${outcome.result}\n${note}` : outcome.result
-    return { type: 'tool_result', tool_use_id: tu.id, content, is_error: !outcome.ok }
+    const note = outcome.effect ? applyEffect(r, outcome.effect, outcome, ctx) : undefined
+    // An effect that could not be applied ("error: …") turns an ok tool outcome into an error result.
+    const failed = note !== undefined && note.startsWith('error:')
+    if (failed) {
+      store.patchThread(item.id, { status: 'error' })
+      store.agentTool(r.id, { ...call, dur, status: 'error' })
+      store.agentLog(r.id, 'WARN', clip(note, 120))
+    }
+    const content = failed ? note : note ? `${outcome.result}\n${note}` : outcome.result
+    return { type: 'tool_result', tool_use_id: tu.id, content, is_error: !outcome.ok || failed }
   }
 
   function noteBadgeEvents(name: string, input: Record<string, unknown>, outcome: ToolOutcome, ctx: TurnCtx): void {
@@ -517,19 +629,42 @@ export function createOrchestrator(deps: Deps): Orchestrator {
 
   function effectAssign(e: Extract<ToolEffect, { kind: 'assign' }>): undefined {
     const id = `${e.phase}/${e.agent}/${slug(e.title)}`
-    store.upsertTask({ id, title: e.title, owner: e.agent, phase: e.phase, state: 'active', meta: '0%' })
     const target = runners.get(e.agent)
-    if (target) target.taskId = id
-    store.setAgent(e.agent, { status: 'working', pct: 0, subtask: e.title, subtaskTitle: e.subtask, eta: e.eta ?? '—' })
+    const assign: Assignment = { id, subtask: e.subtask, eta: e.eta ?? '—' }
+    // An agent mid-turn or with an active task keeps reporting against that task; the new one
+    // waits as `queued` and becomes current only when its wake is dequeued. The record always
+    // starts `queued`: `activateTask` alone flips it to active and writes the agent row, so a
+    // re-assignment of a title the agent already held goes through full activation too.
+    const held = target?.taskId ? store.tasks().find((t) => t.id === target.taskId) : undefined
+    const defer = target !== undefined && (target.busy || held?.state === 'active')
+    store.upsertTask({ id, title: e.title, owner: e.agent, phase: e.phase, state: 'queued', meta: 'queued' })
+    if (!defer && target) activateTask(target, assign)
     refreshAtlas()
     recompute()
     enqueue(e.agent, {
       tag: 'ASSIGNMENT',
       inline: `title: ${e.title}`,
-      body: `phase: ${e.phase}\nsubtask: ${e.subtask}\neta: ${e.eta ?? '—'}`,
+      body: `phase: ${e.phase}\nsubtask: ${oneLine(e.subtask)}\neta: ${oneLine(e.eta ?? '—')}`,
       tree: true,
+      assign,
     })
     return undefined
+  }
+
+  /** Makes `a` the runner's current task; a previous task still active is closed out rather than lost. */
+  function activateTask(r: Runner, a: Assignment): void {
+    const tasks = store.tasks()
+    const next = tasks.find((t) => t.id === a.id)
+    if (!next || (r.taskId === a.id && next.state === 'active')) return
+    if (r.taskId && r.taskId !== a.id) {
+      const prev = tasks.find((t) => t.id === r.taskId)
+      if (prev?.state === 'active') store.upsertTask({ ...prev, state: 'done', meta: 'done' })
+    }
+    r.taskId = a.id
+    if (next.state !== 'active') store.upsertTask({ ...next, state: 'active', meta: '0%' })
+    store.setAgent(r.id, { status: 'working', pct: 0, subtask: next.title, subtaskTitle: a.subtask, eta: a.eta })
+    refreshAtlas()
+    recompute()
   }
 
   function effectHandoff(e: Extract<ToolEffect, { kind: 'handoff' }>): undefined {
@@ -594,22 +729,25 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     }
     approvedEarly = false
     const merged = mergePr()
-    if (!merged.ok) return `merge failed: ${merged.reason ?? 'unknown reason'}`
-    store.setRun({ status: 'done' })
-    recompute('done')
-    stopTicker()
+    if (!merged.ok) return `error: merge failed — ${merged.reason ?? 'unknown reason'}`
+    markDone()
     return 'note: gate off — PR merged, run is done'
   }
 
+  /** The run is done only once the PR is merged; the human gate is honoured here exactly as in run_request_merge. */
   function effectFinish(): string | undefined {
     if (!workspace.pr.state().merged) {
+      const info = runInfo()
+      if (info.approvalGate && !approvedEarly) {
+        store.setRun({ status: 'needs_approval' })
+        recompute()
+        return 'error: the PR is not merged and the human approval gate is on — call run_request_merge and wait for [GATE_APPROVED] before run_finish'
+      }
       const merged = mergePr()
-      if (!merged.ok) store.agentLog('atlas', 'WARN', `run finished with PR unmerged · ${merged.reason ?? 'merge failed'}`)
+      if (!merged.ok) return `error: merge failed — ${merged.reason ?? 'unknown reason'}; the run is not finished`
+      approvedEarly = false
     }
-    store.setRun({ status: 'done' })
-    recompute('done')
-    store.setTyping([])
-    stopTicker()
+    markDone()
     return undefined
   }
 
@@ -630,9 +768,24 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     return AGENT_IDS.find((id) => id === w || nameOf(id).toLowerCase() === w) ?? null
   }
 
+  /** One message on the tag line; several, or a multi-line one, indented beneath it. */
+  function humanWakeText(texts: string[]): Pick<Wake, 'inline' | 'body'> {
+    const single = texts.length === 1 && !/\n/.test(texts[0])
+    return single ? { inline: texts[0], body: undefined } : { inline: undefined, body: texts.map(indent).join('\n\n') }
+  }
+
   function humanWake(target: MessageTarget, body: string): void {
     const to: AgentId = target === 'all' ? 'atlas' : target
-    enqueue(to, { tag: 'HUMAN', attrs: ` target=${target}`, inline: body }, true)
+    const attrs = ` target=${target}`
+    // A message that arrives while an earlier one is still waiting joins that wake — one turn, both messages, in order.
+    const pending = runners.get(to)?.inbox.find((w) => w.tag === 'HUMAN' && w.attrs === attrs)
+    if (pending?.texts) {
+      pending.texts.push(body)
+      Object.assign(pending, humanWakeText(pending.texts))
+      return
+    }
+    const texts = [body]
+    enqueue(to, { tag: 'HUMAN', attrs, texts, ...humanWakeText(texts) }, true)
   }
 
   function slashCommand(body: string, target: MessageTarget): boolean {
@@ -673,7 +826,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     if (info.status === 'needs_approval') {
       const merged = mergePr()
       if (!merged.ok) return
-      store.setRun({ status: 'live' })
+      store.setRun({ status: paused ? 'paused' : 'live' })
       recompute()
       enqueue('atlas', { tag: 'GATE_APPROVED' }, true)
       return
@@ -682,7 +835,8 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   }
 
   function pause(): void {
-    if (runInfo().status !== 'live') return
+    if (paused || runInfo().status !== 'live') return
+    paused = true
     store.setRun({ status: 'paused' })
     pauseGate = new Promise<void>((resolve) => {
       releasePause = resolve
@@ -690,10 +844,11 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     recompute()
   }
 
+  /** Always lifts the gate; the status goes back to live unless a merge request moved it on meanwhile. */
   function resume(): void {
-    if (runInfo().status !== 'paused') return
-    store.setRun({ status: 'live' })
+    if (!paused) return
     release()
+    if (runInfo().status === 'paused') store.setRun({ status: 'live' })
     recompute()
   }
 
@@ -720,7 +875,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
       runners = newRunners()
       refreshAtlas()
       startTicker()
-      enqueue('atlas', { tag: 'RUN_START', body: `goal: ${runInfo().goal}` })
+      enqueue('atlas', { tag: 'RUN_START', body: `goal: ${oneLine(runInfo().goal)}` })
     },
 
     pause,
@@ -744,9 +899,10 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     },
 
     interrupt(agent) {
-      const r = runners.get(agent)
-      if (!r) return
-      r.abort?.abort()
+      // Only a turn in progress can be interrupted; the log and the idle status would otherwise be a lie.
+      const ac = runners.get(agent)?.abort
+      if (!ac || ac.signal.aborted) return
+      ac.abort()
       store.agentLog(agent, 'WARN', 'interrupted by human')
       store.setAgent(agent, { status: 'idle' })
     },

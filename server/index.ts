@@ -6,14 +6,13 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { PERSONAS } from './agents.js'
-import { loadConfig, repoRoot } from './config.js'
+import { loadConfig, repoRoot, type ServerConfig } from './config.js'
 import { createServer } from './http.js'
 import { createLLM } from './llm/index.js'
 import { createOrchestrator } from './orchestrator.js'
 import { createRunStore } from './run.js'
 import { createToolRegistry } from './tools.js'
 import { createWorkspace } from './workspace.js'
-import type { Config } from './contracts.js'
 
 const EXIT_GRACE_MS = 1500
 
@@ -38,16 +37,18 @@ function loadDotEnv(path: string): void {
   }
 }
 
-function banner(config: Config): string {
+function banner(config: ServerConfig): string {
   const models = Object.entries(config.models)
     .map(([id, m]) => `${id}=${m}`)
     .join(' ')
+  const host = config.host.includes(':') ? `[${config.host}]` : config.host
   return [
-    `agent-chatroom http://localhost:${config.port}`,
+    `agent-chatroom http://${host}:${config.port}`,
     `llm=${config.llm}`,
     models,
     `effort=${config.effort}`,
-    `budget=$${config.budgetUsd.toFixed(2)}`,
+    `budget=$${config.budgetUsd.toFixed(2)}/run`,
+    `lifetime=$${config.lifetimeBudgetUsd.toFixed(2)}`,
     `static=${config.staticDir ?? 'off (vite dev server serves the client)'}`,
   ].join(' · ')
 }
@@ -67,7 +68,7 @@ async function main(): Promise<void> {
 
   await new Promise<void>((done, fail) => {
     server.once('error', fail)
-    server.listen(config.port, () => {
+    server.listen(config.port, config.host, () => {
       server.off('error', fail)
       done()
     })
@@ -108,6 +109,11 @@ async function main(): Promise<void> {
   process.on('SIGTERM', () => shutdown('SIGTERM'))
   server.on('error', (err) => console.error('server error:', err))
 }
+
+// A bug in one request or one agent turn must not take the whole console down:
+// log it and keep serving. Startup failures still exit through main().catch.
+process.on('uncaughtException', (err: unknown) => console.error('uncaught exception:', err))
+process.on('unhandledRejection', (reason: unknown) => console.error('unhandled rejection:', reason))
 
 main().catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : err)

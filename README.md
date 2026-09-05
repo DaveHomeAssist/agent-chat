@@ -19,6 +19,9 @@ npm install
 cp .env.example .env      # optional; the server also reads plain environment variables
 ```
 
+The server listens on `127.0.0.1` only. There is no authentication, so `HOST=0.0.0.0` is an
+explicit opt-in: anyone who can reach the port can drive the run and spend your key.
+
 ### With real models
 
 Provide Anthropic credentials, start both processes, and press **Start run** in the header:
@@ -58,6 +61,7 @@ npm start          # one process: serves dist/ and the API on PORT
 | `ANTHROPIC_API_KEY` | — | Credentials. `ANTHROPIC_AUTH_TOKEN` and an `ant auth login` profile also work. |
 | `MOCK_LLM` | off | `1`/`true` drives the run with the scripted mock instead of a model. |
 | `RUN_BUDGET_USD` | `5` | Hard cost ceiling per run, must be > 0. The run stops (`failed`) when reached. |
+| `LIFETIME_BUDGET_USD` | 4 × `RUN_BUDGET_USD` | Cumulative ceiling across every run of the process, must be > 0. `POST /api/run/start` is refused (403) once reached. |
 | `AGENT_MODEL_ATLAS` … `_SENTRY` | `claude-opus-5` | Per-agent model id. |
 | `EFFORT` | `high` | Reasoning effort for every agent: `low` `medium` `high` `xhigh` `max`. |
 | `MAX_ITERATIONS_PER_TURN` | `24` | Model calls one agent may make per wake. |
@@ -65,6 +69,7 @@ npm start          # one process: serves dist/ and the API on PORT
 | `MOCK_SPEED` | `1` | Multiplier on the mock's pacing; `0` is instant. |
 | `AUTO_START` | on when mock | Start the run at boot. `0`/`false` forces off. |
 | `PORT` | `8787` | Server port. |
+| `HOST` | `127.0.0.1` | Interface to listen on. `0.0.0.0` exposes the unauthenticated server to your network — opt in deliberately. |
 | `STATIC_DIR` | `dist` if present | Directory of built client files to serve. |
 
 A `.env` file in the repo root is read at boot; values already in the environment win.
@@ -108,16 +113,22 @@ target is woken with it.
 
 Every agent defaults to Opus 5 at high effort. Spend is metered from the API's usage numbers
 (input, output, cache read at 0.1×, cache write at 1.25× — `server/llm/pricing.ts`) and shown
-in the header; when it reaches `RUN_BUDGET_USD` the run stops with status `failed`. System
-prompts are frozen per persona so they cache across turns; watch the counters on your first
-real run before raising the ceiling. Requests are sent with `fallbacks: 'default'`, so a
+in the header; when it reaches `RUN_BUDGET_USD` the run stops with status `failed`. That
+ceiling resets with every **Start run**, so `LIFETIME_BUDGET_USD` (default 4× the per-run
+budget) caps the total across all runs of one server process — once reached, starting another
+run is refused until the server restarts. System prompts are frozen per persona so they cache
+across turns; watch the counters on your first real run before raising either ceiling. Requests are sent with `fallbacks: 'default'`, so a
 refusal or capacity problem on the primary model is rerouted server-side rather than ending
 the run.
 
 ## HTTP / SSE API
 
 All JSON, no framework. Every POST returns `{ ok: true, seq }` or `{ ok: false, error }`
-(400 bad body, 404 unknown route, 405 wrong method, 413 body over 64 KB, 500 handler error).
+(400 bad body or URL, 403 cross-site request or lifetime budget reached, 404 unknown route,
+405 wrong method, 413 body over 64 KB, 415 `/api/message` without `Content-Type: application/json`,
+429 more than 5 messages in a burst or 1/s sustained, 500 handler error). POSTs must be
+same-origin: a request carrying an `Origin` whose host differs from `Host`, or
+`Sec-Fetch-Site: cross-site`, is refused; requests without those headers (curl) pass.
 
 | Route | Body | Effect |
 | --- | --- | --- |

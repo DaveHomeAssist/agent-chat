@@ -17,8 +17,13 @@
  *                 Duration = fileCount × 1.9s.
  * pnpm lint       The same unused-import heuristic as eslint warnings; exit 0.
  * pnpm test       Vitest-style unit run; passes iff typecheck passes.
- * pnpm e2e        The 24-case suite in seed/e2e.ts. Per case, the first rule
- *                 that matches decides:
+ * pnpm e2e        The 24-case suite in seed/e2e.ts, run against the LAST
+ *                 PUSHED tree (the seed before any push) — never the working
+ *                 tree, so Probe cannot report green on edits Forge has not
+ *                 pushed. stdout opens with "e2e on <sha>"; when the working
+ *                 tree differs, stderr carries one line
+ *                 "note: N unpushed change(s) not included". Per case, the
+ *                 first rule that matches decides:
  *                   register.* fail  if services/auth/webauthn/register.ts is missing
  *                   login.*    fail  if services/auth/webauthn/verify.ts is missing
  *                   register.* fail  "relation credentials does not exist" if no
@@ -31,8 +36,10 @@
  *                                    text/varchar fails login.windowsHello
  *                                    (cred_id mismatch); bytea passes
  *                   everything else passes.
- *                 `--grep` filters on "passkey › <name>". Every run stores a
- *                 trace artifact (trace-latest.zip plus a numbered copy).
+ *                 `--grep <text>` is a case-insensitive substring match on
+ *                 "passkey › <name>" — never a RegExp, since the pattern is
+ *                 model-supplied text. Every run stores a trace artifact
+ *                 (trace-latest.zip plus a numbered copy).
  *                 Duration = cases × 4.9s + 0.8s.
  *
  * push() hashes the tree, the message and the parent sha into a 7-hex sha.
@@ -259,8 +266,8 @@ export function createWorkspace(): WorkspaceWithHistory {
     return [...tree.keys()].filter((p) => p.endsWith('.ts')).sort()
   }
 
-  function migrationPaths(): string[] {
-    return [...tree.keys()].filter((p) => p.startsWith(MIGRATIONS_DIR) && p.endsWith('.sql')).sort()
+  function migrationPaths(t: Tree = tree): string[] {
+    return [...t.keys()].filter((p) => p.startsWith(MIGRATIONS_DIR) && p.endsWith('.sql')).sort()
   }
 
   // ---- files ---------------------------------------------------------------
@@ -425,13 +432,13 @@ export function createWorkspace(): WorkspaceWithHistory {
     }
   }
 
-  /** Where the credentials migration stands: absent, or its latest cred_id column type. */
-  function credentialsMigration(): { present: boolean; credIdType: 'text' | 'bytea' | 'unknown'; path: string | null } {
+  /** Where the credentials migration stands in tree `t`: absent, or its latest cred_id column type. */
+  function credentialsMigration(t: Tree = tree): { present: boolean; credIdType: 'text' | 'bytea' | 'unknown'; path: string | null } {
     let present = false
     let credIdType: 'text' | 'bytea' | 'unknown' = 'unknown'
     let path: string | null = null
-    for (const p of migrationPaths()) {
-      const sql = tree.get(p) ?? ''
+    for (const p of migrationPaths(t)) {
+      const sql = t.get(p) ?? ''
       if (/create\s+table\s+(?:if\s+not\s+exists\s+)?"?(?:\w+\.)?"?credentials\b/i.test(sql)) present = true
       for (const m of sql.matchAll(/\bcred_id\b[^,;\n]*?\b(text|varchar|character\s+varying|bytea)\b/gi)) {
         credIdType = m[1].toLowerCase() === 'bytea' ? 'bytea' : 'text'
@@ -441,19 +448,20 @@ export function createWorkspace(): WorkspaceWithHistory {
     return { present, credIdType, path }
   }
 
-  function replayGuardOffByOne(): boolean {
-    const src = tree.get(VERIFY_PATH)
+  function replayGuardOffByOne(t: Tree): boolean {
+    const src = t.get(VERIFY_PATH)
     return !!src && /\b(?:signCount|sign_count|counter)\s*>=/.test(src)
   }
 
-  function e2eFailure(tc: E2eCase): E2eFailure | null {
-    const migration = credentialsMigration()
-    const replay = replayGuardOffByOne()
+  /** Outcome of one e2e case against tree `t` (the last pushed tree). */
+  function e2eFailure(tc: E2eCase, t: Tree): E2eFailure | null {
+    const migration = credentialsMigration(t)
+    const replay = replayGuardOffByOne(t)
     const textCredId = migration.credIdType === 'text'
-    if (tc.group === 'register' && !tree.has(REGISTER_PATH)) {
+    if (tc.group === 'register' && !t.has(REGISTER_PATH)) {
       return { name: tc.name, detail: '404 route not mounted', trace: [`POST /webauthn/register → 404`, `${REGISTER_PATH} does not exist`] }
     }
-    if (tc.group === 'login' && !tree.has(VERIFY_PATH)) {
+    if (tc.group === 'login' && !t.has(VERIFY_PATH)) {
       return { name: tc.name, detail: '404 route not mounted', trace: [`POST /webauthn/login → 404`, `${VERIFY_PATH} does not exist`] }
     }
     if (tc.group === 'register' && !migration.present) {
@@ -490,19 +498,26 @@ export function createWorkspace(): WorkspaceWithHistory {
   function runE2e(grep: string | null): CommandResult {
     let selected: E2eCase[] = [...E2E_CASES]
     if (grep) {
-      let re: RegExp
-      try {
-        re = new RegExp(grep, 'i')
-      } catch {
-        re = new RegExp(grep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
-      }
-      selected = selected.filter((tc) => re.test(`passkey › ${tc.name}`))
+      // Model-supplied text is never compiled as a RegExp: a pathological
+      // pattern would block the event loop in this synchronous filter.
+      const needle = grep.toLowerCase()
+      selected = selected.filter((tc) => `passkey › ${tc.name}`.toLowerCase().includes(needle))
     }
+    // The suite runs against the last push (the seed before any), not the
+    // working tree — only what is on the branch is under test.
+    const pushed = base
+    const sha = commits[commits.length - 1]
+    const unpushed = diff().files
     const durationMs = selected.length * 4900 + 800
     const failures: E2eFailure[] = []
-    const out: string[] = [`Running ${selected.length} test${selected.length === 1 ? '' : 's'} using 4 workers`, '']
+    const out: string[] = [
+      sha ? `e2e on ${sha}` : `e2e on seed (nothing pushed to ${SEED_BRANCH} yet)`,
+      `Running ${selected.length} test${selected.length === 1 ? '' : 's'} using 4 workers`,
+      ...(grep ? [`grep: substring match, case-insensitive · ${JSON.stringify(grep)}`] : []),
+      '',
+    ]
     selected.forEach((tc, i) => {
-      const failure = e2eFailure(tc)
+      const failure = e2eFailure(tc, pushed)
       if (failure) failures.push(failure)
       const line = 12 + E2E_CASES.indexOf(tc) * 7
       out.push(`  ${failure ? '✘' : '✓'} ${String(i + 1).padStart(3)} [${tc.browser}] › ${E2E_SUITE_FILE}:${line}:3 › passkey › ${tc.name} (${caseDuration(tc)})`)
@@ -529,7 +544,8 @@ export function createWorkspace(): WorkspaceWithHistory {
     }
     lastTests = tests
     storeTrace(tests, failures)
-    return { exitCode: failures.length ? 1 : 0, stdout: out.join('\n'), stderr: '', durationMs, tests }
+    const stderr = unpushed ? `note: ${unpushed} unpushed change(s) not included` : ''
+    return { exitCode: failures.length ? 1 : 0, stdout: out.join('\n'), stderr, durationMs, tests }
   }
 
   function storeTrace(tests: TestSummary, failures: E2eFailure[]): void {

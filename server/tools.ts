@@ -249,6 +249,7 @@ const HANDLERS: Record<string, Handler> = {
   'agent.progress': {
     summarize: (i) => `${text(i.pct)}% · ${head(text(i.subtask), 40)}`,
     execute(i) {
+      // The strict schema cannot carry minimum/maximum, so the range is enforced here: `int` clamps to 0..100.
       const effect: ToolEffect = { kind: 'progress', pct: int(i, 'pct', 0, 100), subtask: optStr(i, 'subtask'), eta: optStr(i, 'eta'), io: strList(i, 'io') }
       return { ok: true, result: 'ok', effect }
     },
@@ -498,6 +499,68 @@ const HANDLERS: Record<string, Handler> = {
 // Registry
 // ---------------------------------------------------------------------------
 
+/** JSON Schema keywords strict mode rejects; each is folded into the node's description instead. */
+const STRICT_UNSUPPORTED: readonly string[] = ['minimum', 'maximum', 'multipleOf', 'minLength', 'maxLength', 'pattern', 'format']
+
+/** Schema keywords whose value maps arbitrary names to sub-schemas (a property may itself be called "pattern"). */
+const SCHEMA_MAPS: readonly string[] = ['properties', '$defs', 'definitions']
+
+function constraintNote(key: string, value: unknown, node: Record<string, unknown>): string | null {
+  switch (key) {
+    case 'minimum':
+      return 'maximum' in node ? `Range ${String(value)}–${String(node.maximum)}.` : `Minimum ${String(value)}.`
+    case 'maximum':
+      return 'minimum' in node ? null : `Maximum ${String(value)}.`
+    case 'multipleOf':
+      return `Multiple of ${String(value)}.`
+    case 'minLength':
+      return `At least ${String(value)} characters.`
+    case 'maxLength':
+      return `At most ${String(value)} characters.`
+    case 'pattern':
+      return `Matches /${String(value)}/.`
+    case 'format':
+      return `Format: ${String(value)}.`
+    default:
+      return null
+  }
+}
+
+/** Whether `desc` already states the note (a range counts in either dash style). */
+function mentions(desc: string, note: string): boolean {
+  return desc.includes(note) || desc.includes(note.replace('–', '-'))
+}
+
+/**
+ * Deep copy of a schema with the keywords strict mode does not support removed.
+ * Ranges and formats survive as description text so the model still sees them;
+ * enum/type/required/additionalProperties/properties/items/description are kept.
+ */
+function strictSchema(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(strictSchema)
+  if (!node || typeof node !== 'object') return node
+  const src = node as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  const notes: string[] = []
+  for (const [key, value] of Object.entries(src)) {
+    if (STRICT_UNSUPPORTED.includes(key)) {
+      const note = constraintNote(key, value, src)
+      if (note) notes.push(note)
+      continue
+    }
+    const isMap = SCHEMA_MAPS.includes(key) && !!value && typeof value === 'object' && !Array.isArray(value)
+    out[key] = isMap
+      ? Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, strictSchema(v)]))
+      : strictSchema(value)
+  }
+  if (notes.length) {
+    const desc = typeof out.description === 'string' ? out.description.trim() : ''
+    const missing = notes.filter((n) => !mentions(desc, n))
+    if (missing.length) out.description = [desc, ...missing].filter(Boolean).join(' ')
+  }
+  return out
+}
+
 function buildSpec(name: string): ToolSpec {
   const entry = TOOL_CATALOGUE[name]
   const handler = HANDLERS[name]
@@ -549,7 +612,7 @@ export function createToolRegistry(): ToolRegistry {
         defs = forAgent(agent).map((s) => ({
           name: s.apiName,
           description: s.description,
-          input_schema: { ...s.inputSchema },
+          input_schema: strictSchema(s.inputSchema) as Anthropic.Beta.BetaTool['input_schema'],
           strict: true,
         }))
         definitions.set(agent, defs)

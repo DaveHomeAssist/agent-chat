@@ -3,16 +3,20 @@ import { stat } from 'node:fs/promises'
 import http from 'node:http'
 import { extname, resolve, sep } from 'node:path'
 import { AGENT_IDS, API, type AgentId, type MessageTarget, type RunEvent } from '../shared/protocol.js'
-import type { Config, Orchestrator, RunStore } from './contracts.js'
+import type { ServerConfig } from './config.js'
+import type { Orchestrator, RunStore } from './contracts.js'
 
 const MAX_BODY_BYTES = 64 * 1024
 const MAX_MESSAGE_CHARS = 4000
 const HEARTBEAT_MS = 15_000
+/** POST /api/message: this many in a burst, then one per second. */
+const MESSAGE_BURST = 5
+const MESSAGE_PER_SEC = 1
 
 interface Deps {
   store: RunStore
   orchestrator: Orchestrator
-  config: Config
+  config: ServerConfig
 }
 
 type Req = http.IncomingMessage
@@ -60,13 +64,13 @@ export function createServer(deps: Deps): http.Server {
 
   return http.createServer((req, res) => {
     const started = Date.now()
-    const url = new URL(req.url ?? '/', 'http://localhost')
-    const path = url.pathname
-    res.once('finish', () => console.log(`${req.method} ${path} ${res.statusCode} ${Date.now() - started}ms`))
+    res.once('finish', () => console.log(`${req.method} ${req.url} ${res.statusCode} ${Date.now() - started}ms`))
 
-    dispatch(req, res, path, routes, staticDir).catch((err: unknown) => {
+    // Everything that can throw — the URL parse included — runs inside this
+    // promise so one bad request is a 4xx/5xx, never an uncaught exception.
+    dispatch(req, res, routes, staticDir).catch((err: unknown) => {
       const status = err instanceof HttpError ? err.status : 500
-      if (status === 500) console.error(`${req.method} ${path} failed:`, err)
+      if (status === 500) console.error(`${req.method} ${req.url} failed:`, err)
       if (res.headersSent) {
         res.destroy()
         return
@@ -75,13 +79,16 @@ export function createServer(deps: Deps): http.Server {
         res.setHeader('Connection', 'close')
         res.once('finish', () => req.destroy())
       }
+      if (status === 429) res.setHeader('Retry-After', '1')
       json(res, status, { ok: false, error: err instanceof Error ? err.message : String(err) })
     })
   })
 }
 
-async function dispatch(req: Req, res: Res, path: string, routes: Route[], staticDir: string | null): Promise<void> {
+async function dispatch(req: Req, res: Res, routes: Route[], staticDir: string | null): Promise<void> {
   const method = req.method ?? 'GET'
+  const path = pathname(req)
+  if (method === 'POST') assertSameOrigin(req)
   let pathKnown = false
   for (const route of routes) {
     const params = route.match(path)
@@ -100,12 +107,90 @@ async function dispatch(req: Req, res: Res, path: string, routes: Route[], stati
   throw new HttpError(404, `no route for ${path}`)
 }
 
-function buildRoutes({ store, orchestrator }: Deps): Route[] {
+/** The request path, or a 400 — `new URL` throws on e.g. an absolute-form target with a bad port. */
+function pathname(req: Req): string {
+  try {
+    return new URL(req.url ?? '/', 'http://localhost').pathname
+  } catch {
+    throw new HttpError(400, 'bad request url')
+  }
+}
+
+/**
+ * CSRF guard. Every POST here is a CORS "simple request", so a page on any
+ * origin could fire one; browsers always send `Origin` (and `Sec-Fetch-Site`)
+ * on POST, so a mismatch means cross-site. Requests without either header —
+ * curl, the built client is same-origin, the Vite proxy keeps Host — pass.
+ */
+function assertSameOrigin(req: Req): void {
+  if (req.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, 'cross-site request')
+  const origin = req.headers.origin
+  if (origin === undefined) return
+  let host: string | null
+  try {
+    host = new URL(origin).host
+  } catch {
+    host = null // includes the literal "null" origin
+  }
+  if (host === null || host.toLowerCase() !== req.headers.host?.toLowerCase()) {
+    throw new HttpError(403, 'cross-site request')
+  }
+}
+
+function isJsonRequest(req: Req): boolean {
+  const type = req.headers['content-type']?.split(';')[0].trim().toLowerCase()
+  return type === 'application/json'
+}
+
+/** Token bucket: `burst` immediately, then `perSec` more per second. */
+function tokenBucket(burst: number, perSec: number): { take(): boolean } {
+  let tokens = burst
+  let last = Date.now()
+  return {
+    take() {
+      const now = Date.now()
+      tokens = Math.min(burst, tokens + ((now - last) / 1000) * perSec)
+      last = now
+      if (tokens < 1) return false
+      tokens -= 1
+      return true
+    },
+  }
+}
+
+/**
+ * Process-lifetime spend. `RunStats.costUsd` restarts at 0 on every run, so
+ * this banks the deltas between observations: a drop means a reset, and the
+ * new value is the fresh run's spend so far.
+ */
+function lifetimeMeter(store: RunStore): () => number {
+  let total = 0
+  let last = 0
+  const observe = (cost: number) => {
+    total += cost >= last ? cost - last : cost
+    last = cost
+  }
+  observe(store.stats().costUsd)
+  store.subscribe((e) => {
+    if (e.type === 'stats') observe(e.stats.costUsd)
+    else if (e.type === 'snapshot') observe(e.snapshot.stats.costUsd)
+  })
+  return () => {
+    observe(store.stats().costUsd)
+    return total
+  }
+}
+
+function buildRoutes({ store, orchestrator, config }: Deps): Route[] {
   const exact = (p: string) => (path: string) => (path === p ? {} : null)
   const interrupt = /^\/api\/agents\/([^/]+)\/interrupt$/
+  const messageBucket = tokenBucket(MESSAGE_BURST, MESSAGE_PER_SEC)
+  const lifetimeSpend = lifetimeMeter(store)
 
-  const command = (fn: (body: unknown) => Promise<void> | void): Route['handle'] => {
+  /** `guard` runs before the body is read, so refusals cost nothing. */
+  const command = (fn: (body: unknown) => Promise<void> | void, guard?: (req: Req) => void): Route['handle'] => {
     return async (req, res) => {
+      guard?.(req)
       const body = await readJson(req)
       await fn(body)
       json(res, 200, { ok: true, seq: store.seq() })
@@ -118,18 +203,30 @@ function buildRoutes({ store, orchestrator }: Deps): Route[] {
     {
       method: 'POST',
       match: exact(API.message),
-      handle: command(async (body) => {
-        const { text, target } = parseMessage(body)
-        await orchestrator.humanMessage(text, target)
-      }),
+      handle: command(
+        async (body) => {
+          const { text, target } = parseMessage(body)
+          await orchestrator.humanMessage(text, target)
+        },
+        (req) => {
+          if (!isJsonRequest(req)) throw new HttpError(415, 'Content-Type must be application/json')
+          if (!messageBucket.take()) throw new HttpError(429, 'slow down')
+        },
+      ),
     },
     {
       method: 'POST',
       match: exact(API.start),
-      handle: command(() => {
-        // start() may resolve only when the run ends, so the request does not wait on it.
-        orchestrator.start().catch((err: unknown) => console.error('run failed:', err))
-      }),
+      handle: command(
+        () => {
+          // start() may resolve only when the run ends, so the request does not wait on it.
+          orchestrator.start().catch((err: unknown) => console.error('run failed:', err))
+        },
+        () => {
+          // The per-run ceiling resets with every start; this one does not.
+          if (lifetimeSpend() >= config.lifetimeBudgetUsd) throw new HttpError(403, 'lifetime budget reached')
+        },
+      ),
     },
     { method: 'POST', match: exact(API.pause), handle: command(() => orchestrator.pause()) },
     { method: 'POST', match: exact(API.resume), handle: command(() => orchestrator.resume()) },
@@ -271,7 +368,13 @@ function json(res: Res, status: number, payload: unknown): void {
 
 async function serveStatic(req: Req, res: Res, path: string, staticDir: string): Promise<void> {
   const root = resolve(staticDir)
-  const target = resolve(root, `.${decodeURIComponent(path)}`)
+  let decoded: string
+  try {
+    decoded = decodeURIComponent(path)
+  } catch {
+    throw new HttpError(400, 'bad request url')
+  }
+  const target = resolve(root, `.${decoded}`)
   if (target !== root && !target.startsWith(root + sep)) throw new HttpError(403, 'forbidden')
 
   const file = (await isFile(target)) ? target : extname(path) ? null : resolve(root, 'index.html')
