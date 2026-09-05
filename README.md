@@ -15,7 +15,7 @@ The layout has a hard floor of 1180 × 700 — it is a desktop console, not a re
 Requires Node 22 or newer.
 
 ```bash
-npm install
+npm ci
 cp .env.example .env      # optional; the server also reads plain environment variables
 ```
 
@@ -60,7 +60,7 @@ npm start          # one process: serves dist/ and the API on PORT
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | — | Credentials. `ANTHROPIC_AUTH_TOKEN` and an `ant auth login` profile also work. |
 | `MOCK_LLM` | off | `1`/`true` drives the run with the scripted mock instead of a model. |
-| `RUN_BUDGET_USD` | `5` | Hard cost ceiling per run, must be > 0. The run stops (`failed`) when reached. |
+| `RUN_BUDGET_USD` | `5` | Reported-usage limit per run, must be > 0. The run stops (`failed`) when reached; in-flight requests may overshoot. |
 | `LIFETIME_BUDGET_USD` | 4 × `RUN_BUDGET_USD` | Cumulative ceiling across every run of the process, must be > 0. `POST /api/run/start` is refused (403) once reached. |
 | `AGENT_MODEL_ATLAS` … `_SENTRY` | `claude-opus-5` | Per-agent model id. |
 | `EFFORT` | `high` | Reasoning effort for every agent: `low` `medium` `high` `xhigh` `max`. |
@@ -89,8 +89,8 @@ file contents, not a process.
 | `run.handoff` | Atlas | Record a handoff and wake the receiver with a note. |
 | `run.set_phase` | Atlas | Advance spec → build → test → review → ship; posts a divider. |
 | `run.read_status` | Atlas | Every agent's status, the diff, last test result, open PR comments. |
-| `run.request_merge` | Atlas | Merge the PR, or hold for the human when the gate is on. |
-| `run.finish` | Atlas | End the run with a summary. |
+| `run.request_merge` | Atlas | Check current revision evidence, then merge or hold for human approval. |
+| `run.finish` | Atlas | Complete only if the simulated PR is already merged; never initiates a merge. |
 | `agent.progress` | workers | Update pct / subtask / eta / files for the sidebar. |
 | `agent.done` · `agent.blocked` | workers | Report the subtask finished or stuck; Atlas is woken. |
 | `agent.queue` | workers | Note a follow-up item. |
@@ -109,17 +109,52 @@ The composer understands `/approve merge`, `/assign <agent> <task>`, `/rollback 
 `/pause` and `/resume`; anything else is posted to the room (or DM'd to one agent) and the
 target is woken with it.
 
+## Completion and approval
+
+The simulator merges only a pushed revision with a clean working tree, an explicit positive
+Sentry review, passing full e2e coverage (all 24 cases), and no unresolved blocking comments.
+Unit tests, a passing subset, zero matched cases, old tests and old reviews cannot satisfy
+this gate. A filter such as `--grep passkey` is valid only if it selects all 24 cases.
+
+Edits, migrations, document changes, pushes and rollback invalidate tests and review. Human
+approval is tied to the same revision; approving before evidence exists cannot pre-authorize
+future work. A review or merge request returned by a model after a revision change is rejected.
+Atlas can inspect revision evidence and merge readiness through `run.read_status`.
+
+With **Approve before merge** enabled, `run.request_merge` holds a valid revision in
+`needs_approval`. The human's **Approve merge** control rechecks the evidence and merges that
+revision. Disabling the gate releases a valid held merge. Successful merge immediately ends
+the run as `done`; no additional model request is needed. `run.finish` only acknowledges an
+existing merge. Failed prerequisites and rejected merges stay incomplete.
+
+Both `done` and `failed` cancel outstanding work, drop queued wakes and stop late tool effects,
+stream updates and task mutations. Restart creates a new run identity; stale responses cannot
+change it. An unrecoverable provider error from any agent explicitly fails the run. Human
+interruption cancels that agent's turn, keeps the run live (or paused), and allows another
+human message. Pause holds subsequent model requests and tool dispatch until resume.
+
+Tool access is enforced from `TOOL_CATALOGUE` both at dispatch and inside the registry,
+including direct execution: Atlas cannot execute `repo_write` or other worker tools.
+All repository, test, review and merge operations described here remain simulated.
+
 ## Cost
 
 Every agent defaults to Opus 5 at high effort. Spend is metered from the API's usage numbers
 (input, output, cache read at 0.1×, cache write at 1.25× — `server/llm/pricing.ts`) and shown
 in the header; when it reaches `RUN_BUDGET_USD` the run stops with status `failed`. That
-ceiling resets with every **Start run**, so `LIFETIME_BUDGET_USD` (default 4× the per-run
-budget) caps the total across all runs of one server process — once reached, starting another
+reported-usage limit resets with every **Start run**, so `LIFETIME_BUDGET_USD` (default 4× the per-run
+budget) prevents further starts once total reported spend across the server process reaches it — starting another
 run is refused until the server restarts. System prompts are frozen per persona so they cache
-across turns; watch the counters on your first real run before raising either ceiling. Requests are sent with `fallbacks: 'default'`, so a
-refusal or capacity problem on the primary model is rerouted server-side rather than ending
-the run.
+across turns; watch the counters on your first real run before raising either limit.
+
+Usage is checked immediately after every response, including text-only responses. This is
+**enforcement based on reported usage, not a promise of zero overshoot**: concurrent requests
+may already have incurred cost before cancellation arrives. Known usage from completed or
+partially reported requests is retained even after interruption or termination. Usage arriving
+from an older run counts toward the lifetime ledger without charging the new run. Unreported
+usage cannot be metered locally. Requests use `fallbacks: 'default'` to enable provider-side
+fallback for refusals or capacity problems. An unrecoverable provider failure after fallback
+and retries fails the run explicitly.
 
 ## HTTP / SSE API
 
@@ -138,11 +173,35 @@ same-origin: a request carrying an `Origin` whose host differs from `Host`, or
 | `POST /api/run/start` | — | (Re)start from a clean workspace. |
 | `POST /api/run/pause` · `resume` | — | Stop / continue waking agents. |
 | `POST /api/run/gate` | `{ enabled }` | Hold the merge for a human, or auto-release. |
-| `POST /api/run/approve` | — | Release a held merge. |
+| `POST /api/run/approve` | — | Recheck the held revision, merge and complete; early approval applies only to currently valid evidence. |
 | `POST /api/agents/:id/interrupt` | — | Abort that agent's in-flight model call. |
 
 Types for all of it live in [`shared/protocol.ts`](shared/protocol.ts); the wire is the only
 coupling between client and server.
+
+## Verification
+
+`npm test` uses Node's test runner with the existing TypeScript loader; no paid calls are made.
+The tests cover tool permissions, revision evidence, approval, completion, cancellation races,
+restart isolation, provider failures, interruption, configured effort, reported budgets and
+HTTP protections. The Anthropic adapter tests use the installed SDK with a fake transport.
+
+```bash
+npm ci
+npm run build
+npm test
+node dist-server/server/seed/selfcheck.js
+git diff --check
+```
+
+GitHub Actions runs locked installation, build/typechecks, regressions and simulator selfchecks
+on runtime-branch pushes, pull requests into main and pushes to main. It does not deploy.
+For manual browser verification, start the mock with `AUTO_START=0`, exercise Start/Pause/Resume,
+wait for Approve merge, and confirm DONE with no active agents. Use a separate mock process
+with `RUN_BUDGET_USD=0.000001` to check the FAILED banner. Interrupt an active agent from its
+Subtask panel and confirm the output log says “interrupted by human” without failing the run.
+
+OpenAI/Codex integration and real repository execution remain a separate next increment.
 
 ## Architecture
 

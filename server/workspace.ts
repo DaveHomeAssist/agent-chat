@@ -55,7 +55,7 @@ import type { CommandResult, DiffStat, PrComment, PrState, SecFinding, Workspace
 import { E2E_CASES, E2E_SUITE_FILE, type E2eCase } from './seed/e2e.js'
 import { SEED_BRANCH, SEED_FILES, SEED_REPO } from './seed/repo.js'
 
-export type TestSummary = NonNullable<CommandResult['tests']>
+export type TestSummary = NonNullable<CommandResult['tests']> & { revision: number; sha: string | null; fullSuite: boolean }
 
 /** The concrete workspace also remembers the last e2e result for `run.read_status`. */
 export interface WorkspaceWithHistory extends Workspace {
@@ -235,10 +235,6 @@ function findUnusedImports(src: string): UnusedImport[] {
   return found
 }
 
-function truncateLine(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text
-}
-
 // ---------------------------------------------------------------------------
 // Workspace
 // ---------------------------------------------------------------------------
@@ -253,12 +249,21 @@ export function createWorkspace(): WorkspaceWithHistory {
   let traceCounter = FIRST_TRACE_NUMBER
   let lastTests: TestSummary | null = null
   let commentSeq = 0
+  let revision = 0
 
   function freshPr(): PrState {
-    return { number: PR_NUMBER, title: PR_TITLE, branch: SEED_BRANCH, comments: [], review: 'none', merged: false, commits: [] }
+    return { number: PR_NUMBER, title: PR_TITLE, branch: SEED_BRANCH, comments: [], review: 'none', reviewRevision: null, merged: false, commits: [] }
+  }
+
+  function invalidateEvidence(): void {
+    revision++
+    lastTests = null
+    pr.review = 'none'
+    pr.reviewRevision = null
   }
 
   function touch(path: string): void {
+    invalidateEvidence()
     if (!touched.includes(path)) touched.push(path)
   }
 
@@ -279,8 +284,10 @@ export function createWorkspace(): WorkspaceWithHistory {
   function write(path: string, content: string): { created: boolean } {
     const p = normalizePath(path)
     const created = !tree.has(p)
-    tree.set(p, content)
-    touch(p)
+    if (tree.get(p) !== content) {
+      tree.set(p, content)
+      touch(p)
+    }
     return { created }
   }
 
@@ -335,6 +342,7 @@ export function createWorkspace(): WorkspaceWithHistory {
   }
 
   function push(message: string): { sha: string; stat: DiffStat } {
+    invalidateEvidence()
     const stat = diff()
     const sha = sha7(hashTree(tree), message, commits[commits.length - 1] ?? 'root')
     commits.push(sha)
@@ -345,6 +353,7 @@ export function createWorkspace(): WorkspaceWithHistory {
   }
 
   function rollback(): { sha: string | null } {
+    invalidateEvidence()
     tree = new Map(base)
     touched = []
     return { sha: commits[commits.length - 1] ?? null }
@@ -537,6 +546,9 @@ export function createWorkspace(): WorkspaceWithHistory {
     out.push(`  ${selected.length - failures.length} passed (${seconds(durationMs)})`)
     if (grep && !selected.length) out.push(`  no tests matched --grep ${JSON.stringify(grep)}`)
     const tests: TestSummary = {
+      revision,
+      sha: sha ?? null,
+      fullSuite: selected.length === E2E_CASES.length,
       passed: selected.length - failures.length,
       failed: failures.length,
       total: selected.length,
@@ -638,12 +650,32 @@ export function createWorkspace(): WorkspaceWithHistory {
 
   // ---- PR ------------------------------------------------------------------
 
+  function checkMerge(): { ok: boolean; reason?: string } {
+    if (pr.merged) return { ok: false, reason: `PR #${pr.number} is already merged` }
+    const sha = commits.at(-1)
+    if (!sha) return { ok: false, reason: `nothing to merge — no commits pushed to ${pr.branch}` }
+    // diff() is a display summary and can omit byte-only changes such as a final newline.
+    if (tree.size !== base.size || [...tree].some(([path, content]) => base.get(path) !== content)) {
+      return { ok: false, reason: 'working tree has unpushed changes' }
+    }
+    const open = pr.comments.filter((c) => c.blocking && !c.resolved)
+    if (open.length) return { ok: false, reason: `blocking comments unresolved: ${open.map((c) => c.id).join(', ')}` }
+    if (pr.review !== 'approved' || pr.reviewRevision !== revision) {
+      return { ok: false, reason: 'positive review required for the current revision' }
+    }
+    if (!lastTests || lastTests.revision !== revision || lastTests.sha !== sha || !lastTests.fullSuite ||
+      lastTests.failed !== 0 || lastTests.passed !== E2E_CASES.length) {
+      return { ok: false, reason: 'passing full e2e coverage required for the current pushed revision' }
+    }
+    return { ok: true }
+  }
+
   const prApi: Workspace['pr'] = {
     state: () => ({ ...pr, comments: pr.comments.map((c) => ({ ...c })), commits: [...pr.commits] }),
     comment(author: AgentId, body: string, blocking: boolean): PrComment {
       const c: PrComment = { id: `c${++commentSeq}`, author, body, blocking, resolved: false }
       pr.comments.push(c)
-      return c
+      return { ...c }
     },
     resolve(id: string): boolean {
       const c = pr.comments.find((x) => x.id === id)
@@ -653,15 +685,12 @@ export function createWorkspace(): WorkspaceWithHistory {
     },
     review(_author, verdict) {
       pr.review = verdict === 'approve' ? 'approved' : 'changes_requested'
+      pr.reviewRevision = revision
     },
+    checkMerge,
     merge() {
-      if (pr.merged) return { ok: false, reason: `PR #${pr.number} is already merged` }
-      if (!pr.commits.length) return { ok: false, reason: `nothing to merge — no commits pushed to ${pr.branch}` }
-      const open = pr.comments.filter((c) => c.blocking && !c.resolved)
-      if (open.length) {
-        return { ok: false, reason: `blocking comment${open.length === 1 ? '' : 's'} unresolved: ${open.map((c) => `${c.id} (${c.author}) ${truncateLine(c.body, 60)}`).join('; ')}` }
-      }
-      if (pr.review === 'changes_requested') return { ok: false, reason: 'review verdict is changes_requested' }
+      const ready = checkMerge()
+      if (!ready.ok) return ready
       pr.merged = true
       return { ok: true }
     },
@@ -700,6 +729,7 @@ export function createWorkspace(): WorkspaceWithHistory {
   }
 
   function reset(): void {
+    invalidateEvidence()
     tree = new Map(Object.entries(SEED_FILES))
     base = new Map(tree)
     touched = []
@@ -714,6 +744,7 @@ export function createWorkspace(): WorkspaceWithHistory {
   return {
     repo: SEED_REPO,
     branch: SEED_BRANCH,
+    revision: () => revision,
     list: () => [...tree.keys()].sort(),
     read,
     write,

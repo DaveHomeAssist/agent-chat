@@ -6,6 +6,7 @@
  * `snapshot()`.
  */
 
+import { randomUUID } from 'node:crypto'
 import type {
   Agent,
   AgentId,
@@ -58,7 +59,7 @@ function clock(withSeconds: boolean): string {
 }
 
 function runId(): string {
-  return `run_${Date.now().toString(36)}`
+  return `run_${randomUUID()}`
 }
 
 function agentFrom(p: Persona, model: string): Agent {
@@ -89,6 +90,7 @@ export function createRunStore(personas: Persona[], models: Record<AgentId, stri
   let endedAtMs: number | null = null
   let budgetUsd = 0
   let tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 }
+  let lifetimeCost = 0
   let agents: Agent[] = []
   let thread: ThreadItem[] = []
   let threadSeq = new Map<string, number>()
@@ -250,17 +252,21 @@ export function createRunStore(personas: Persona[], models: Record<AgentId, stri
       publish({ type: 'typing', seq: s, typing })
     },
 
-    addUsage(u: LLMUsage) {
+    addUsage(u: LLMUsage, usageRunId = run.id) {
+      const cost = costUsd(u)
+      lifetimeCost += cost
+      if (usageRunId !== run.id) return
       const s = ++seq
       tokens.input += u.inputTokens
       tokens.output += u.outputTokens
       tokens.cacheRead += u.cacheReadTokens
       tokens.cacheWrite += u.cacheWriteTokens
-      tokens.cost += costUsd(u)
+      tokens.cost += cost
       publish({ type: 'stats', seq: s, stats: stats() })
     },
 
     stats,
+    lifetimeCostUsd: () => lifetimeCost,
 
     tick() {
       const s = ++seq

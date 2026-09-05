@@ -221,6 +221,9 @@ const HANDLERS: Record<string, Handler> = {
         pr: {
           number: pr.number,
           review: pr.review,
+          revision: ctx.workspace.revision(),
+          reviewRevision: pr.reviewRevision,
+          mergeReady: ctx.workspace.pr.checkMerge(),
           merged: pr.merged,
           commits: pr.commits.length,
           openComments: pr.comments.filter((c) => !c.resolved).map((c) => ({ id: c.id, author: c.author, blocking: c.blocking, body: head(c.body, 160) })),
@@ -578,9 +581,18 @@ function buildSpec(name: string): ToolSpec {
       }
     },
     async execute(input, ctx) {
+      if (!toolNamesFor(ctx.agent).includes(name)) return { ok: false, result: `error: ${ctx.agent} is not authorized to execute ${name}` }
+      if ((name === 'pr.review' || name === 'run.request_merge') && ctx.revision !== undefined && ctx.revision !== ctx.workspace.revision()) {
+        return { ok: false, result: 'error: revision changed during the model request; inspect the current revision first' }
+      }
       if (ctx.signal.aborted) return { ok: false, result: 'error: interrupted before the tool ran' }
+      if (!['live', 'paused', 'needs_approval'].includes(ctx.run.snapshot().run.status)) {
+        return { ok: false, result: 'error: run is not active' }
+      }
       try {
-        return await handler.execute(input ?? {}, ctx)
+        const outcome = await handler.execute(input ?? {}, ctx)
+        if (ctx.signal.aborted) return { ok: false, result: 'error: tool interrupted' }
+        return outcome
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         return { ok: false, result: `error: ${msg}`, log: { level: 'FAIL', msg: `${name} · ${head(msg, 60)}` } }

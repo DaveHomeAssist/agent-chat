@@ -10,7 +10,7 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import type { AgentId, AgentStatus, MessageTarget, Phase, RunInfo, ThreadItem, ToolCall } from '../shared/protocol.js'
 import { AGENT_IDS, PHASES } from '../shared/protocol.js'
-import { LLMAbortedError } from './contracts.js'
+import { LLMRequestError, toolNamesFor } from './contracts.js'
 import type {
   Config,
   LLM,
@@ -123,7 +123,8 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   let runners = new Map<AgentId, Runner>()
   let ticker: NodeJS.Timeout | null = null
   const inFlight = new Set<AgentId>()
-  let approvedEarly = false
+  let approvedRevision: number | null = null
+  let pendingMergeRevision: number | null = null
   /** Human pause, tracked apart from `run.status` — a merge request or the end of the run may overwrite that. */
   let paused = false
   let pauseGate: Promise<void> | null = null
@@ -134,7 +135,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
 
   // ---- state helpers ------------------------------------------------------
 
-  const fresh = (g: number): boolean => g === gen && !disposed
+  const fresh = (g: number): boolean => g === gen && !disposed && runActive()
   const post = (item: ThreadDraft): ThreadItem => store.appendThread(item as Parameters<RunStore['appendThread']>[0])
   const runInfo = (): RunInfo => store.snapshot().run
   const runActive = (): boolean => ACTIVE_STATUSES.includes(runInfo().status)
@@ -227,11 +228,17 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   /** Ends the run as failed. Idempotent: a run that has already ended keeps its outcome. */
   function failRun(error: string): void {
     if (runEnded()) return
+    endRun('failed', error)
+  }
+
+  function endRun(status: 'done' | 'failed', error?: string): void {
     gen++
     abortAll()
     release()
     stopTicker()
-    store.setRun({ status: 'failed', error })
+    approvedRevision = null
+    pendingMergeRevision = null
+    store.setRun({ status, ...(error ? { error } : {}) })
     // Nothing in flight will report back (gen moved on), so close out what it left mid-way.
     for (const r of runners.values()) {
       const a = agentState(r.id)
@@ -243,16 +250,12 @@ export function createOrchestrator(deps: Deps): Orchestrator {
       else if (item.kind === 'tool' && item.status === 'running') store.patchThread(item.id, { dur: '—', status: 'error' })
     }
     store.setTyping([])
-    recompute()
+    recompute(status === 'done' ? 'done' : undefined)
   }
 
   /** Ends the run as done. Releases anyone parked on a pause so they are not stranded. */
   function markDone(): void {
-    release()
-    stopTicker()
-    store.setRun({ status: 'done' })
-    store.setTyping([])
-    recompute('done')
+    if (!runEnded()) endRun('done')
   }
 
   // ---- wake queue -----------------------------------------------------------
@@ -292,7 +295,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
         try {
           await runTurn(r, wake, g)
         } catch (e) {
-          if (fresh(g)) store.agentLog(r.id, 'FAIL', clip(errMsg(e), 160))
+          if (fresh(g)) failRun(`${nameOf(r.id)} turn failed: ${clip(errMsg(e), 160)}`)
         }
       }
     } finally {
@@ -348,6 +351,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
       let iterations = 0
 
       while (true) {
+        if (!fresh(g)) return
         if (pauseGate) {
           await awaitPause(ac.signal)
           if (!fresh(g)) return
@@ -367,6 +371,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
         }
         iterations++
 
+        const revision = workspace.revision()
         const outcome = await callModel(r, ac, ctx, g)
         if (!fresh(g)) return
         if (outcome === 'aborted') break
@@ -376,7 +381,6 @@ export function createOrchestrator(deps: Deps): Orchestrator {
           break
         }
 
-        store.addUsage(outcome.usage)
         if (store.stats().costUsd >= config.budgetUsd) {
           failRun(`Run budget of $${config.budgetUsd} reached`)
           return
@@ -394,16 +398,18 @@ export function createOrchestrator(deps: Deps): Orchestrator {
         store.setAgent(r.id, { status: 'working' })
         const results: Anthropic.Beta.BetaToolResultBlockParam[] = []
         for (const tu of outcome.toolUses) {
+          if (pauseGate) await awaitPause(ac.signal)
+          if (!fresh(g)) return
           if (ac.signal.aborted) {
             results.push({ type: 'tool_result', tool_use_id: tu.id, content: 'error: interrupted by the human operator', is_error: true })
             continue
           }
-          results.push(await execTool(r, tu, ac.signal, ctx, g))
+          results.push(await execTool(r, tu, ac.signal, ctx, g, revision))
           if (!fresh(g)) return
         }
         r.history.push({ role: 'user', content: results })
       }
-      finishTurn(r, ctx)
+      if (fresh(g)) finishTurn(r, ctx)
     } finally {
       if (r.abort === ac) r.abort = null
     }
@@ -413,7 +419,8 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     store.setAgent(r.id, { status: r.id === 'atlas' ? 'working' : 'thinking' })
     inFlight.add(r.id)
     syncTyping()
-    const stream = createStreamer(r, ctx, g)
+    const usageRunId = runInfo().id
+    const stream = createStreamer(r, ctx, g, ac.signal)
     try {
       const result = await llm.complete({
         agent: r.id,
@@ -426,13 +433,26 @@ export function createOrchestrator(deps: Deps): Orchestrator {
         signal: ac.signal,
         onText: stream.onText,
       })
+      // Reported cost survives interruption, termination and restart. Old run usage
+      // goes to the lifetime ledger without touching the new run's tasks or spend.
+      store.addUsage(result.usage, usageRunId)
+      if (fresh(g) && store.stats().costUsd >= config.budgetUsd) {
+        failRun(`Run budget of $${config.budgetUsd} reached`)
+      }
       if (!fresh(g)) return 'aborted'
+      if (ac.signal.aborted) {
+        const partial = stream.finish(null)
+        r.history.push({ role: 'assistant', content: [{ type: 'text', text: partial || '(interrupted by the human operator)' }] })
+        return 'aborted'
+      }
       stream.finish(result.text)
       return result
     } catch (e) {
+      if (e instanceof LLMRequestError && e.usage) store.addUsage(e.usage, usageRunId)
+      if (fresh(g) && store.stats().costUsd >= config.budgetUsd) failRun(`Run budget of $${config.budgetUsd} reached`)
       const partial = stream.finish(null)
       if (!fresh(g)) return 'aborted'
-      if (e instanceof LLMAbortedError || ac.signal.aborted) {
+      if (ac.signal.aborted) {
         // Keep the transcript alternating so the next wake is a clean user turn.
         r.history.push({ role: 'assistant', content: [{ type: 'text', text: partial || '(interrupted by the human operator)' }] })
         return 'aborted'
@@ -449,7 +469,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   }
 
   /** Mirrors streamed text into one thread message per assistant turn. */
-  function createStreamer(r: Runner, ctx: TurnCtx, g: number) {
+  function createStreamer(r: Runner, ctx: TurnCtx, g: number, signal: AbortSignal) {
     let id: string | null = null
     let buf = ''
     let timer: NodeJS.Timeout | null = null
@@ -458,12 +478,12 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     const flush = (): void => {
       timer = null
       lastFlush = Date.now()
-      if (id && fresh(g)) store.patchThread(id, { body: buf })
+      if (id && fresh(g) && !signal.aborted) store.patchThread(id, { body: buf })
     }
 
     return {
       onText(delta: string): void {
-        if (!fresh(g) || !delta) return
+        if (!fresh(g) || signal.aborted || !delta) return
         buf += delta
         if (!id) {
           id = post({ kind: 'message', who: r.id, body: buf, streaming: true }).id
@@ -488,24 +508,14 @@ export function createOrchestrator(deps: Deps): Orchestrator {
 
   /**
    * A model call that failed for a reason other than an interrupt (unknown
-   * model, API failure after the SDK's retries). No retry: a worker is marked
-   * blocked and Atlas decides; Atlas itself has no one to escalate to, so the
-   * run fails and the UI shows why.
+   * model, API failure after the SDK's retries). Fail explicitly for every
+   * agent: asking another agent cannot repair an unrecoverable provider error.
    */
   function handleModelError(r: Runner, e: Error, ctx: TurnCtx): void {
     const msg = clip(e.message, 140)
     store.agentLog(r.id, 'FAIL', `model call failed · ${msg}`)
     ctx.messageIds.push(post({ kind: 'message', who: r.id, body: `model call failed: ${msg}` }).id)
-    if (r.id === 'atlas') {
-      failRun(`Atlas model call failed: ${msg}`)
-      return
-    }
-    ctx.blocked = true
-    store.setAgent(r.id, { status: 'blocked', eta: 'blocked' })
-    patchTask(r.id, { state: 'blocked', meta: 'blocked' })
-    refreshAtlas()
-    recompute()
-    enqueue('atlas', { tag: 'REPORT', attrs: ` from=${r.id} kind=blocked`, inline: `model call failed: ${msg}` })
+    failRun(`${nameOf(r.id)} model call failed: ${msg}`)
   }
 
   function handleRefusal(r: Runner, result: LLMResult, ctx: TurnCtx): void {
@@ -539,12 +549,17 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     signal: AbortSignal,
     ctx: TurnCtx,
     g: number,
+    revision: number,
   ): Promise<Anthropic.Beta.BetaToolResultBlockParam> {
+    const reject = (reason: string): Anthropic.Beta.BetaToolResultBlockParam =>
+      ({ type: 'tool_result', tool_use_id: tu.id, content: `error: ${reason}`, is_error: true })
+    if (!fresh(g) || signal.aborted) return reject('turn is no longer active')
     const spec = tools.byApiName(tu.name)
     if (!spec) {
       store.agentLog(r.id, 'WARN', `unknown tool ${tu.name}`)
       return { type: 'tool_result', tool_use_id: tu.id, content: `error: unknown tool ${tu.name}`, is_error: true }
     }
+    if (!toolNamesFor(r.id).includes(spec.name)) return reject(`${r.id} is not authorized to execute ${spec.name}`)
     const input = (tu.input && typeof tu.input === 'object' ? tu.input : {}) as Record<string, unknown>
     const summary = spec.summarize(input)
     const call: ToolCall = { id: tu.id, name: spec.name, arg: summary, dur: '…', status: 'running' }
@@ -552,15 +567,18 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     const item = post({ kind: 'tool', who: r.id, tool: spec.name, body: summary, dur: '…', status: 'running', lines: [] })
 
     const t0 = Date.now()
-    const outcome = await spec.execute(input, { agent: r.id, workspace, run: store, signal })
-    if (!fresh(g)) return { type: 'tool_result', tool_use_id: tu.id, content: outcome.result, is_error: !outcome.ok }
+    const outcome = await spec.execute(input, { agent: r.id, revision, workspace, run: store, signal })
+    if (!fresh(g)) return reject('run ended or restarted during tool execution')
+
+    invalidateApproval()
 
     const dur = fmtDur(Date.now() - t0)
-    const status = outcome.ok ? 'ok' : 'error'
+    const status = outcome.ok && !signal.aborted ? 'ok' : 'error'
     store.patchThread(item.id, { dur, status, lines: outcome.lines ?? [] })
     store.agentTool(r.id, { ...call, dur, status })
     const log = outcome.log ?? { level: 'INFO' as const, msg: `${spec.name} ${summary}` }
     store.agentLog(r.id, log.level, log.msg)
+    if (signal.aborted) return reject('tool interrupted; no effects applied')
 
     noteBadgeEvents(spec.name, input, outcome, ctx)
     const note = outcome.effect ? applyEffect(r, outcome.effect, outcome, ctx) : undefined
@@ -720,33 +738,39 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     return undefined
   }
 
+  function invalidateApproval(): void {
+    const revision = workspace.revision()
+    if (approvedRevision !== revision) approvedRevision = null
+    if (pendingMergeRevision !== null && pendingMergeRevision !== revision) {
+      pendingMergeRevision = null
+      if (runInfo().status === 'needs_approval') {
+        store.setRun({ status: paused ? 'paused' : 'live' })
+        post({ kind: 'message', who: 'atlas', body: 'Revision changed. Fresh tests, review and a new merge request are required.' })
+        recompute()
+      }
+    }
+  }
+
   function effectRequestMerge(): string | undefined {
-    const info = runInfo()
-    if (info.approvalGate && !approvedEarly) {
+    invalidateApproval()
+    const ready = workspace.pr.checkMerge()
+    if (!ready.ok) return `error: merge prerequisites failed — ${ready.reason}`
+    const revision = workspace.revision()
+    if (runInfo().approvalGate && approvedRevision !== revision) {
+      pendingMergeRevision = revision
       store.setRun({ status: 'needs_approval' })
       recompute()
-      return 'note: the human approval gate is on — the run is holding until the human approves'
+      return 'note: the human approval gate is on — holding this revision until the human approves'
     }
-    approvedEarly = false
     const merged = mergePr()
     if (!merged.ok) return `error: merge failed — ${merged.reason ?? 'unknown reason'}`
     markDone()
-    return 'note: gate off — PR merged, run is done'
+    return 'note: PR merged, run is done'
   }
 
-  /** The run is done only once the PR is merged; the human gate is honoured here exactly as in run_request_merge. */
+  /** Completion acknowledges an existing merge; it never initiates one. */
   function effectFinish(): string | undefined {
-    if (!workspace.pr.state().merged) {
-      const info = runInfo()
-      if (info.approvalGate && !approvedEarly) {
-        store.setRun({ status: 'needs_approval' })
-        recompute()
-        return 'error: the PR is not merged and the human approval gate is on — call run_request_merge and wait for [GATE_APPROVED] before run_finish'
-      }
-      const merged = mergePr()
-      if (!merged.ok) return `error: merge failed — ${merged.reason ?? 'unknown reason'}; the run is not finished`
-      approvedEarly = false
-    }
+    if (!workspace.pr.state().merged) return 'error: PR is not merged; use run_request_merge and satisfy the approval gate first'
     markDone()
     return undefined
   }
@@ -822,16 +846,24 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   // ---- public API -----------------------------------------------------------
 
   function approve(): void {
-    const info = runInfo()
-    if (info.status === 'needs_approval') {
-      const merged = mergePr()
-      if (!merged.ok) return
-      store.setRun({ status: paused ? 'paused' : 'live' })
-      recompute()
-      enqueue('atlas', { tag: 'GATE_APPROVED' }, true)
+    if (!runActive()) return
+    invalidateApproval()
+    const ready = workspace.pr.checkMerge()
+    if (!ready.ok) {
+      approvedRevision = null
+      post({ kind: 'message', who: 'atlas', body: `Approval blocked — ${ready.reason}` })
       return
     }
-    if (info.status === 'live' || info.status === 'paused') approvedEarly = true
+    const revision = workspace.revision()
+    approvedRevision = revision
+    if (runInfo().status !== 'needs_approval' || pendingMergeRevision !== revision) return
+    const merged = mergePr()
+    if (!merged.ok) {
+      approvedRevision = null
+      return
+    }
+    post({ kind: 'message', who: 'atlas', body: 'Human approval received. Simulated PR #482 merged; run complete.' })
+    markDone()
   }
 
   function pause(): void {
@@ -854,10 +886,12 @@ export function createOrchestrator(deps: Deps): Orchestrator {
 
   const orchestrator: Orchestrator = {
     async start() {
+      if (disposed) return
       gen++
       abortAll()
       release()
-      approvedEarly = false
+      approvedRevision = null
+      pendingMergeRevision = null
       const previous = runInfo()
       store.reset({
         label: 'RUN 04',
@@ -882,6 +916,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     resume,
 
     setGate(enabled) {
+      if (disposed) return
       store.setRun({ approvalGate: enabled })
       refreshAtlas()
       recompute()
@@ -892,13 +927,14 @@ export function createOrchestrator(deps: Deps): Orchestrator {
 
     async humanMessage(body, target) {
       const text = body.trim()
-      if (!text) return
+      if (!text || !runActive() || disposed) return
       if (text.startsWith('/') && slashCommand(text, target)) return
       post({ kind: 'human', body: text, target })
       humanWake(target, text)
     },
 
     interrupt(agent) {
+      if (!runActive() || disposed) return
       // Only a turn in progress can be interrupted; the log and the idle status would otherwise be a lie.
       const ac = runners.get(agent)?.abort
       if (!ac || ac.signal.aborted) return

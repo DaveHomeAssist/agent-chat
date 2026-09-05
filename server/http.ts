@@ -158,34 +158,11 @@ function tokenBucket(burst: number, perSec: number): { take(): boolean } {
   }
 }
 
-/**
- * Process-lifetime spend. `RunStats.costUsd` restarts at 0 on every run, so
- * this banks the deltas between observations: a drop means a reset, and the
- * new value is the fresh run's spend so far.
- */
-function lifetimeMeter(store: RunStore): () => number {
-  let total = 0
-  let last = 0
-  const observe = (cost: number) => {
-    total += cost >= last ? cost - last : cost
-    last = cost
-  }
-  observe(store.stats().costUsd)
-  store.subscribe((e) => {
-    if (e.type === 'stats') observe(e.stats.costUsd)
-    else if (e.type === 'snapshot') observe(e.snapshot.stats.costUsd)
-  })
-  return () => {
-    observe(store.stats().costUsd)
-    return total
-  }
-}
-
 function buildRoutes({ store, orchestrator, config }: Deps): Route[] {
   const exact = (p: string) => (path: string) => (path === p ? {} : null)
   const interrupt = /^\/api\/agents\/([^/]+)\/interrupt$/
   const messageBucket = tokenBucket(MESSAGE_BURST, MESSAGE_PER_SEC)
-  const lifetimeSpend = lifetimeMeter(store)
+  const lifetimeSpend = () => store.lifetimeCostUsd()
 
   /** `guard` runs before the body is read, so refusals cost nothing. */
   const command = (fn: (body: unknown) => Promise<void> | void, guard?: (req: Req) => void): Route['handle'] => {
@@ -219,6 +196,7 @@ function buildRoutes({ store, orchestrator, config }: Deps): Route[] {
       match: exact(API.start),
       handle: command(
         () => {
+          if (lifetimeSpend() >= config.lifetimeBudgetUsd) throw new HttpError(403, 'lifetime budget reached')
           // start() may resolve only when the run ends, so the request does not wait on it.
           orchestrator.start().catch((err: unknown) => console.error('run failed:', err))
         },

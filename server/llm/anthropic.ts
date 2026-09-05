@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { Config, LLM, LLMRequest, LLMResult, LLMUsage } from '../contracts.js'
-import { LLMAbortedError } from '../contracts.js'
+import { LLMAbortedError, LLMRequestError } from '../contracts.js'
 
 const CREDENTIALS_MESSAGE = 'Anthropic credentials rejected — set ANTHROPIC_API_KEY or run `ant auth login`'
 const NO_CREDENTIALS_MESSAGE = 'No Anthropic credentials found — set ANTHROPIC_API_KEY or run `ant auth login`'
@@ -12,10 +12,9 @@ const missingCredentials = (err: unknown): boolean =>
 /** Gates the `fallbacks: 'default'` scalar form; the array form needs a different header. */
 const FALLBACK_BETA = 'server-side-fallback-2026-07-01'
 
-export function createAnthropicLLM(_config: Config): LLM {
+export function createAnthropicLLM(_config: Config, client = new Anthropic({ maxRetries: 3 })): LLM {
   // Zero-arg: the SDK resolves ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN / an `ant auth login` profile.
   // maxRetries covers 429s and 5xx so the orchestrator never sees a transient failure.
-  const client = new Anthropic({ maxRetries: 3 })
 
   return {
     kind: 'anthropic',
@@ -42,12 +41,18 @@ export function createAnthropicLLM(_config: Config): LLM {
       )
       const onText = req.onText
       if (onText) stream.on('text', (delta) => onText(delta))
+      let reportedUsage: LLMUsage | undefined
+      // SDK snapshots accumulate the provider's usage fields. Keep only the
+      // latest snapshot, so failed/aborted streams retain known cost once.
+      stream.on('streamEvent', (_event, snapshot) => { reportedUsage = toUsage(snapshot, req.model) })
 
       let msg: Anthropic.Beta.BetaMessage
       try {
         msg = await stream.finalMessage()
       } catch (err) {
-        throw translateError(err, req.signal)
+        const translated = translateError(err, req.signal)
+        if (translated instanceof LLMAbortedError) throw new LLMAbortedError(reportedUsage)
+        throw new LLMRequestError(translated.message, reportedUsage)
       }
       return toResult(msg, req.model)
     },
