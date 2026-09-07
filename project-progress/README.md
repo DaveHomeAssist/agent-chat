@@ -2,6 +2,8 @@
 
 `index.html` is the canonical standalone visual project review. Open it directly in a browser; no server, installation or network is needed for the report. Evidence links need network access. Print / PDF uses the browser print dialog.
 
+The **Light mode** toggle follows your system preference on first visit and remembers an explicit choice in browser storage. It remains usable if storage is unavailable. Print output stays light in either theme.
+
 ## Update procedure
 
 1. Read root `AGENTS.md`. Refresh current Git/source/checks/CI and the relevant runtime or deployment source. Keep unavailable sources explicitly Unverified.
