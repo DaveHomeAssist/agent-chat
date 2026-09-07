@@ -1,5 +1,7 @@
 # STATUS
 
+> Current visual review: [Project progress](../project-progress/index.html), evidence snapshot Sep 6, 2026, 5:14 PM ET. Runtime fixes (PR #2) and OpenAI provider (PR #3) are merged. Historical pending-delivery claims below are superseded by that review. Broader real-model, durability, real-repository and hosting acceptance remain pending. See [update rules](../project-progress/README.md).
+
 _Ledger for overnight sessions. One section per phase of `docs/PLAN.md`. Update at every milestone and commit._
 
 ## Runtime correctness package

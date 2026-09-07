@@ -1,0 +1,200 @@
+{
+  "project": "Agent Chatroom",
+  "verifiedAt": "2026-09-06T17:14:00-04:00",
+  "verifiedLabel": "Sep 6, 2026 \u00b7 5:14 PM ET",
+  "codeRevision": "a346ef090aca2fa6d1d6b197b61a2110dc88a5ee",
+  "overall": "Partial",
+  "summary": "The simulated workflow and OpenAI integration are verified. Unattended real repository delivery remains ahead.",
+  "items": [
+    {
+      "id": "console",
+      "title": "Five-agent console",
+      "status": "Complete",
+      "phase": "Delivered",
+      "actualDate": "2026-09-04",
+      "dateLabel": "Sep 4 \u00b7 5:20 PM ET",
+      "notes": "React dashboard, orchestration, streaming, virtual workspace and human approval.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/1"
+    },
+    {
+      "id": "runtime",
+      "title": "Runtime correctness",
+      "status": "Complete",
+      "phase": "Delivered",
+      "actualDate": "2026-09-05",
+      "dateLabel": "Sep 5 \u00b7 3:06 AM ET",
+      "notes": "Revision-bound evidence, permissions, cancellation, restart isolation and reported usage.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/2"
+    },
+    {
+      "id": "openai",
+      "title": "OpenAI Responses provider",
+      "status": "Complete",
+      "phase": "Delivered",
+      "actualDate": "2026-09-05",
+      "dateLabel": "Sep 5 \u00b7 4:11 AM ET",
+      "notes": "Opt-in provider; validated calls, continuation and usage. All workspace operations remain simulated.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/3"
+    },
+    {
+      "id": "regressions",
+      "title": "Regression suite and CI",
+      "status": "Complete",
+      "phase": "Delivered",
+      "actualDate": "2026-09-05",
+      "dateLabel": "Sep 5 \u00b7 reverified Sep 6",
+      "notes": "89 tests, 42 simulator checks and build/typechecks pass. Browser CI is a separate remaining item.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/33954567943"
+    },
+    {
+      "id": "browser",
+      "title": "Offline browser acceptance",
+      "status": "Complete",
+      "phase": "Delivered",
+      "actualDate": "2026-09-06",
+      "dateLabel": "Sep 6 \u00b7 5:14 PM ET",
+      "notes": "59 tool calls; held for approval, then Done. Injected OpenAI transport: no paid model acceptance.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/tests/openai-smoke.ts"
+    },
+    {
+      "id": "ledger",
+      "title": "Roadmap and status reconciliation",
+      "status": "In Progress",
+      "phase": "Next",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "PR #4 is open with passing CI. Broader historical ledger entries still lag delivered code.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/4"
+    },
+    {
+      "id": "access",
+      "title": "Provider access and spending limits",
+      "status": "Unverified",
+      "phase": "Phase 0",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Verify credentials and current model/budget settings in the intended execution environment.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "hosting",
+      "title": "Hosting decision",
+      "status": "Pending",
+      "phase": "Phase 0",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Old Vercel deployment state unverified. No GitHub deployment records returned; this does not prove no hosting exists.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "m1",
+      "title": "Real model acceptance",
+      "status": "Partial",
+      "phase": "M1",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Add smoke:real, transcripts and reports; prove two consecutive successful budgeted runs. Provider code exists.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "budget",
+      "title": "Budget ceiling assurance",
+      "status": "Partial",
+      "phase": "M1",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Reported usage enforcement exists; in-flight calls can overshoot and missing usage remains unknown.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "persistence",
+      "title": "Persistent runs and restart recovery",
+      "status": "Not Started",
+      "phase": "M2",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Durable events, replay/resume and mid-run crash recovery. Current state is in memory.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "auth",
+      "title": "API authentication",
+      "status": "Not Started",
+      "phase": "M2",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Token enforcement and protected API/SSE access before remote exposure.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "history",
+      "title": "Run history and transcript export",
+      "status": "Not Started",
+      "phase": "M2",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Historical run API, picker and exports depend on persistent storage.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "browser-ci",
+      "title": "Browser regression tests in CI",
+      "status": "Partial",
+      "phase": "M2",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Unit tests/build/selfchecks exist; add browser workflow coverage.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "fidelity",
+      "title": "Dashboard controls and fidelity",
+      "status": "Partial",
+      "phase": "M2",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Provider/cache labels exist. Wire Snapshot and Reassign; correct activity footer and reconcile remaining checklist.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "workspace",
+      "title": "Real repository workspace",
+      "status": "Not Started",
+      "phase": "M3",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Isolated files, restricted commands, Git operations, configurable goals and GitHub PR integration.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "real-feature",
+      "title": "Real feature delivery acceptance",
+      "status": "Not Started",
+      "phase": "M3",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Prepare sandbox; prove real tests, agent PR, approval hold and human-approved merge.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "deploy",
+      "title": "Packaging and deployment",
+      "status": "Not Started",
+      "phase": "M4",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Container/runbook, persistent storage, secrets, HTTPS and selected host.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "remote",
+      "title": "Remote and phone acceptance",
+      "status": "Not Started",
+      "phase": "M4",
+      "plannedDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Verify authenticated deployed dashboard, mock and budgeted real runs; document deployment.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    }
+  ]
+}
