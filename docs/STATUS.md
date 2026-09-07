@@ -46,3 +46,7 @@ _Ledger for overnight sessions. One section per phase of `docs/PLAN.md`. Update 
 - 2026-09-04T21:20Z PR #1 merged (`2109a85`).
 - 2026-09-05T03:40Z 22 review fixes verified (typecheck, 43 selfchecks, build, e2e 14/14 + 28/28) and pushed as `b72b490` on `fix/review-findings`.
 - 2026-09-05T04:00Z PLAN.md and STATUS.md written. The historical claim that PR #2 existed was incorrect: GitHub refresh on 2026-09-05 found only merged PR #1.
+
+## Progress document presentation
+
+- 2026-09-06: Added a Light mode toggle with system preference initialization, remembered selection and keyboard support. Desktop/mobile browser checks verify switching, reload persistence and light print output. The browser automation tool blocks direct file URLs; local HTTP rendering was verified. Product milestone evidence remains dated Sep 6, 5:14 PM ET.
