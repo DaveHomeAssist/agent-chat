@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-09-06T17:14:00-04:00",
-  "verifiedLabel": "Sep 6, 2026 \u00b7 5:14 PM ET",
-  "codeRevision": "a346ef090aca2fa6d1d6b197b61a2110dc88a5ee",
+  "verifiedAt": "2026-09-07T04:01:28-04:00",
+  "verifiedLabel": "Sep 7, 2026 \u00b7 4:01 AM ET",
+  "codeRevision": "4042e3485b0e7a4ed17eedd4a7fcb3f1d80d435d",
   "overall": "Partial",
-  "summary": "The simulated workflow and OpenAI integration are verified. Unattended real repository delivery remains ahead.",
+  "summary": "The simulated workflow, OpenAI provider and real-model acceptance runner are verified offline. Paid acceptance awaits credentials and explicit budgets.",
   "items": [
     {
       "id": "console",
@@ -42,9 +42,9 @@
       "status": "Complete",
       "phase": "Delivered",
       "actualDate": "2026-09-05",
-      "dateLabel": "Sep 5 \u00b7 reverified Sep 6",
-      "notes": "89 tests, 42 simulator checks and build/typechecks pass. Browser CI is a separate remaining item.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/33954567943"
+      "dateLabel": "Sep 5 \u00b7 reverified Sep 7",
+      "notes": "101 tests (12 acceptance-runner regressions), 42 simulator checks and build/typechecks passed locally Sep 7. Runtime CI on prior main is green; delivery checks are tracked in the acceptance PR.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/4042e3485b0e7a4ed17eedd4a7fcb3f1d80d435d/tests/real-acceptance.test.ts"
     },
     {
       "id": "browser",
@@ -52,28 +52,48 @@
       "status": "Complete",
       "phase": "Delivered",
       "actualDate": "2026-09-06",
-      "dateLabel": "Sep 6 \u00b7 5:14 PM ET",
-      "notes": "59 tool calls; held for approval, then Done. Injected OpenAI transport: no paid model acceptance.",
+      "dateLabel": "Sep 6 \u00b7 reverified Sep 7",
+      "notes": "Fresh offline browser proof: 59 tool calls, held for approval then Done, no active agents. No paid requests.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/tests/openai-smoke.ts"
+    },
+    {
+      "id": "progress-document",
+      "title": "Visual progress document and controls",
+      "status": "Complete",
+      "phase": "Delivered",
+      "actualDate": "2026-09-06",
+      "dateLabel": "Sep 6, 2026",
+      "notes": "PRs #5\u20137 merged: durable update rules, light mode, sorting/filtering and fixed-height pagination. Original checkout contains separate user HTML edits.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/7"
     },
     {
       "id": "ledger",
       "title": "Roadmap and status reconciliation",
-      "status": "In Progress",
-      "phase": "Next",
-      "plannedDate": null,
-      "dateLabel": "Unscheduled",
-      "notes": "PR #4 is open with passing CI. Broader historical ledger entries still lag delivered code.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/4"
+      "status": "Complete",
+      "phase": "Delivered",
+      "dateLabel": "Sep 7, 2026",
+      "notes": "Current roadmap and ledger now separate tooling from paid acceptance. Historical Phase 0 PR #4 is superseded by this reconciliation.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/4042e3485b0e7a4ed17eedd4a7fcb3f1d80d435d/docs/PLAN.md",
+      "actualDate": "2026-09-07"
+    },
+    {
+      "id": "acceptance-runner",
+      "title": "Real model acceptance runner",
+      "status": "Complete",
+      "phase": "Delivered",
+      "actualDate": "2026-09-07",
+      "dateLabel": "Sep 7, 2026",
+      "notes": "Preflight and explicit two-run execution, gate validation, budget stops, cancellation and private reports. Twelve offline regressions pass; live acceptance remains pending.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/4042e3485b0e7a4ed17eedd4a7fcb3f1d80d435d/scripts/real-acceptance.ts"
     },
     {
       "id": "access",
       "title": "Provider access and spending limits",
-      "status": "Unverified",
+      "status": "Blocked",
       "phase": "Phase 0",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Verify credentials and current model/budget settings in the intended execution environment.",
+      "notes": "Sep 7 preflight: OPENAI_API_KEY, RUN_BUDGET_USD and LIFETIME_BUDGET_USD are missing from the runner environment. No paid requests made.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
     },
     {
@@ -93,8 +113,8 @@
       "phase": "M1",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Add smoke:real, transcripts and reports; prove two consecutive successful budgeted runs. Provider code exists.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+      "notes": "Runner and private transcripts/reports are implemented and tested offline. Two consecutive real OpenAI passes remain blocked by credentials and approved budget settings.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/4042e3485b0e7a4ed17eedd4a7fcb3f1d80d435d/docs/REAL_MODEL_ACCEPTANCE.md"
     },
     {
       "id": "budget",
