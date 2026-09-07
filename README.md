@@ -265,6 +265,13 @@ makes the story instant. Offline fixtures verify application behavior, not real 
 or account access. A paid OpenAI acceptance run and real Codex repository execution remain
 separate follow-ups. All workspace, shell, Git, test and PR tools remain simulated.
 
+## Real model acceptance
+
+Use `npm run smoke:real -- --check` for environment-only preflight. Explicit
+`--execute` performs two billable OpenAI runs and writes reports under `runs/`.
+See [the acceptance contract](docs/REAL_MODEL_ACCEPTANCE.md). The runner is
+implemented; paid model acceptance still requires credentials and approved budgets.
+
 ## Architecture
 
 ```
