@@ -5,3 +5,6 @@ dist-server
 *.local
 .env
 .DS_Store
+
+# Local acceptance transcripts may contain model output; review before sharing.
+runs/

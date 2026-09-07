@@ -1,5 +1,12 @@
 {
   "extends": "./tsconfig.server.json",
-  "compilerOptions": { "noEmit": true },
-  "include": ["server", "shared", "tests"]
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "server",
+    "shared",
+    "tests",
+    "scripts"
+  ]
 }

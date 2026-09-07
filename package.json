@@ -13,7 +13,8 @@
     "typecheck": "tsc -b --noEmit && tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.tests.json",
     "preview": "vite preview",
     "test": "node --import tsx --test tests/*.test.ts",
-    "smoke:openai": "node --import tsx tests/openai-smoke.ts"
+    "smoke:openai": "node --import tsx tests/openai-smoke.ts",
+    "smoke:real": "node --import tsx scripts/smoke-real.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
