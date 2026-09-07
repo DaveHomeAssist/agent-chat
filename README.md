@@ -1,5 +1,7 @@
 # Agent Chatroom
 
+[Visual project progress](project-progress/index.html) · [Update contract](project-progress/README.md)
+
 A multi-agent run console: five model-driven agents ship a feature together while a human
 operator watches the room, messages agents, holds the merge gate, and pauses the run.
 
