@@ -11,7 +11,11 @@ The **Light mode** toggle follows your system preference on first visit and reme
 3. Set `verifiedAt`, `verifiedLabel` (ET) and `codeRevision` to the actual evidence sweep, not the render time. The HTML is a dated snapshot, never an automatic live monitor. Do not refresh an entire snapshot timestamp while silently retaining stale volatile claims; recheck them or disclose their older evidence time in notes.
 4. Reconcile affected roadmap/ledger entries. Do not infer broader milestone completion from a smaller feature delivery. Keep product completion separate from documentation delivery.
 5. Run `node project-progress/render.mjs` and `git diff --check`. The generator rejects invalid statuses, duplicate IDs and missing completion evidence. Run relevant application checks when product code changes.
-6. View `index.html` at desktop and mobile widths. Check navigation, keyboard focus, readable tables, source links and print layout. Mobile tables intentionally scroll inside their labeled region.
+6. View `index.html` at desktop and mobile widths. Check navigation, keyboard focus, readable tables, source links and print layout. The screen uses fixed-height views with adaptive pagination and no vertical scrolling. Mobile tables may scroll horizontally inside their labeled region. Verify every filtered item is reachable through pagination, sorting and reset work, and Print / PDF includes all items.
 7. Commit source and generated HTML together, push, and complete the applicable CI/merge workflow. Report the resulting identifiers. Do not claim public deployment for a local/repository document.
 
-Change visual presentation in `render.mjs`, never directly in `index.html`. No secret values, private account data or transcript credentials belong in these files.
+The generator embeds `template.html`, `styles.css`, `controls.js` and `status.json` into one standalone HTML file. Change these sources, never directly edit `index.html`. No secret values, private account data or transcript credentials belong in these files.
+
+## Table controls
+
+Remaining and Completed have search, status/milestone filters, sort selection, clickable column headings, direction and reset controls. Undated items sort after dated items. Previous/Next pages automatically fit complete rows to the current viewport. Switching views resets filters. Print / PDF expands all work items, independent of current filters or page.
