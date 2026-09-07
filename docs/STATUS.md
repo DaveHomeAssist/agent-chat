@@ -50,3 +50,5 @@ _Ledger for overnight sessions. One section per phase of `docs/PLAN.md`. Update 
 ## Progress document presentation
 
 - 2026-09-06: Added a Light mode toggle with system preference initialization, remembered selection and keyboard support. Desktop/mobile browser checks verify switching, reload persistence and light print output. The browser automation tool blocks direct file URLs; local HTTP rendering was verified. Product milestone evidence remains dated Sep 6, 5:14 PM ET.
+
+- 2026-09-06: Progress document now uses fixed-height Remaining, Completed and Update Contract views. Search, status/milestone filters, sorting and adaptive pagination passed browser checks at 1440×900, 1280×720, 390×844, 375×667 and 844×390. All 14 remaining items reachable; print expands all 19 items. Product evidence timestamp is unchanged.
