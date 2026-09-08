@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 CLI = Path(__file__).resolve().parents[1] / 'queue.py'
 spec = importlib.util.spec_from_file_location('coordination_queue', CLI)
@@ -90,6 +91,25 @@ class ProtocolTests(unittest.TestCase):
                 self.q.report(worker, claim['task_id'], token, self.report(claim))
         self.assertGreater(self.q.renew('test-worker', 'task-1', claim['lease_token'], 120)['lease_until'], claim['lease_until'])
         self.assertNotIn('lease_token', self.q.next('test-worker', 60))
+
+    def test_cli_accepts_leading_dash_lease_token_as_joined_option(self):
+        self.enqueue()
+        with mock.patch.object(module.secrets, 'token_urlsafe', return_value='-' + 'x' * 31):
+            claim = self.q.next('test-worker', 60)
+
+        rejected = self.cli('renew', '--worker', 'test-worker', '--task', 'task-1',
+                            '--token', claim['lease_token'], '--lease', '120', expected=2)
+        self.assertFalse(rejected['ok'])
+        renewed = self.cli('renew', '--worker', 'test-worker', '--task', 'task-1',
+                           f"--token={claim['lease_token']}", '--lease', '120')
+        self.assertGreater(renewed['lease_until'], claim['lease_until'])
+
+        report_path = self.state / 'leading-dash-report.json'
+        report_path.write_text(json.dumps(self.report(claim)))
+        report_path.chmod(0o600)
+        reported = self.cli('report', '--worker', 'test-worker', '--task', 'task-1',
+                            f"--token={claim['lease_token']}", '--report-file', str(report_path))
+        self.assertEqual(reported['status'], 'ready_for_review')
 
     def test_report_validation_and_idempotency(self):
         claim = self.claim()
