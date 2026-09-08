@@ -112,7 +112,15 @@ Do not automatically retry failed or ambiguous billable requests.
 
 ## M2 details still outstanding
 
-- Wire the merged durable storage module with explicit private path/configuration,
+Recovery is on final-review hold; the merged storage module remains accepted.
+The private decision `persist-007-final-hold.md` identifies parent-provider revision
+binding, lossless legacy V1 rows and historical usage reference points as blockers.
+Original ordinal/type corrections passed. Two corrective assignments are exhausted;
+no third correction or runtime/history/resume implementation is authorized without
+Dave explicitly extending the correction limit. Proposed acceptance is UNEXECUTED.
+
+- After the recovery hold is resolved and implementation is separately authorized,
+  wire the merged durable storage module with explicit private path/configuration,
   open/close/failure handling and the required Node runtime floor. Append durable
   events and prove process-restart history/recovery behavior. Safe explicit resume
   needs separately reviewed runner/workspace/provider serializers; V1 does not
@@ -128,8 +136,11 @@ Do not automatically retry failed or ambiguous billable requests.
 - Preserve delivered Message/Interrupt refusals and draft retention from #18, and
   truthful activity/unavailable controls/token disclosure/dynamic PR labels from #19.
   Full task reassignment needs an atomic task-transfer contract; real auto-approval
-  needs an explicit tool-approval contract. Pending-action locks remain unfinished.
-- Complete separate console theme/responsiveness foundations: controls screenshots
+  needs an explicit tool-approval contract. Pending-command locks and edited-draft
+  safety remain unfinished: AC-VERIFY-008 is a private read-only design, with its
+  proposed tests UNEXECUTED. Coordinate later frontend ownership after AC-AUTH-007.
+- AC-AUTH-007 is implementing separate console theme/responsiveness foundations;
+  its work is not merged or included here. Delivered controls screenshots
   currently cover dark mode, with an inherited 1180px minimum width on mobile.
   Light/dark auth and responsive progress-page proof do not establish responsive
   or light-theme console acceptance. Do not mark fidelity Complete from those checks.

@@ -143,6 +143,39 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   Runtime persistence/history/resume, M1 paid acceptance, M3 real tools and M4
   hosting/remote acceptance remain pending. No paid calls or hosting changes occurred.
 
+## Recovery final-review hold and independent console work
+
+The proposed recovery contract is **held**, while the merged V1 SQLite module
+remains accepted. Final independent review resolved the original provider ordinal
+collision and numeric revision-type issues but found three blocking contradictions:
+
+- A response generated at workspace revision R must retain that parent authorization
+  revision; recapturing R+1 at child-tool execution must not authorize stale review.
+- Valid legacy V1 provider rows with null agent and no ordinals must survive migration
+  losslessly; the proposed non-null rule has no legacy exemption.
+- An old checkpoint needs a defined historical usage reference point. Later runs or
+  late settlements must not invalidate it, and dispatch must use current billing truth.
+
+Private coordinator decision **persist-007-final-hold.md** records the source review
+and required acceptance. All proposed recovery/runtime acceptance is **UNEXECUTED**.
+AC-PERSIST-006/007 exhausted the two corrective assignments for the same problem;
+further contract revision requires Dave's explicit authorization to extend that limit.
+No third correction, migration, runtime wiring or history/resume implementation is
+currently authorized. Persistence remains In Progress with this explicit design hold.
+
+Independent console responsive/light-dark work (AC-AUTH-007) is in progress and
+is not delivered by this status update. Existing console theme/mobile limits above
+still apply. The private **AC-VERIFY-008-command-pending-design.md** proposes client
+command exclusion and draft/context safety; it is design-only, with its acceptance
+matrix UNEXECUTED. Pending locks, edited-draft protection, atomic task transfer and
+a real approval contract remain incomplete. The coordinator owns future file/fixture
+allocation; independent work does not relax the recovery hold.
+
+This documentation sweep refreshed current Git/CI and the final review decision.
+Product code remains `78f84fc`; prior main CI at `5b841b1` passed 183 Node tests,
+17 queue tests, 42 simulator checks and 24 Chromium cases. No unchanged local
+product suite or fixture listener was launched for this documentation-only task.
+
 ## Executor coordination delivery
 
 - The private SQLite communication queue, worker bootstrap and coordinator runbook
@@ -173,7 +206,7 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Milestone | State | Next action / dependency |
 | --- | --- | --- |
 | M1 real-model acceptance | Partial | Provider access demonstrated; explicitly approved two-run budgets and runner environment still needed |
-| M2 unattended operation | Partial | Snapshot, auth, command refusals, truthful controls and browser CI delivered; runtime persistence/recovery, history, task transfer/approval contracts, pending locks and console theme/mobile work remain |
+| M2 unattended operation | Partial | Snapshot, auth, command refusals, truthful controls and browser CI delivered; recovery contract held, runtime/history unimplemented; command safety design-only, console theme/mobile work in progress; transfer/approval contracts pending |
 | M3 real repository | Not started | Isolated Git/command adapter and sandbox PR acceptance after M2 |
 | M4 remote deployment | Not started | Hosting decision, durable runtime, HTTPS and deployed auth/remote acceptance after M3 |
 

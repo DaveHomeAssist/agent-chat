@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-09-08T09:55:13-04:00",
-  "verifiedLabel": "Sep 8, 2026 · 9:55 AM ET",
+  "verifiedAt": "2026-09-08T10:16:24-04:00",
+  "verifiedLabel": "Sep 8, 2026 · 10:16 AM ET",
   "codeRevision": "78f84fc1ffb50afea3af54e5d710c1e24eb83cf4",
   "overall": "Partial",
-  "summary": "Reviewed Message/Interrupt acceptance and console improvements are merged in PRs #18–19. Integrated main 78f84fc passes build/typechecks, 183 Node, 17 queue, 42 simulator and 24 Chromium checks; its tree matches the locally tested combination. Refused messages retain drafts. Fidelity remains Partial: task transfer, approval contracts, pending locks and console theme/mobile work remain. Persistence runtime/history/resume and M1–M4 acceptance are unfinished; earlier paid/hosting evidence retains its original scope.",
+  "summary": "Recovery design is held after final review: parent model revision binding, lossless legacy rows and historical usage-cache reference points remain contradictory. The merged storage module remains accepted; runtime/history/resume are not authorized. Console theme/mobile work proceeds independently; pending-command/draft protection is design-only. Verified product remains 78f84fc with prior successful 183 Node/17 queue/42 simulator/24 Chromium main gates; this sweep verifies review status and documentation, not new runtime acceptance.",
   "items": [
     {
       "id": "console",
@@ -173,7 +173,7 @@
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Reviewed module PR #13 is merged; integrated main now passes 183 Node tests. Storage remains unwired. Runtime serialization, run history, process restart recovery and explicit resume remain pending; V1 checkpoints cannot restore runner/workspace/provider continuation.",
+      "notes": "Merged V1 storage module #13 remains accepted; runtime/history/resume are unwired. Final recovery design review is held on parent model revision binding, lossless V1 rows and historical usage-cache reference points. Two corrections are exhausted; further contract revision needs Dave’s explicit authorization. Private decision: persist-007-final-hold.md. Proposed runtime acceptance is UNEXECUTED.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/13"
     },
     {
@@ -193,7 +193,7 @@
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Historical run API, picker and historical transcript exports depend on persistent storage. Current-run Snapshot download is delivered separately.",
+      "notes": "Historical run API, picker and historical exports remain unimplemented and depend on the held recovery contract. Current-run Snapshot is delivered. Private final review decision persist-007-final-hold.md does not authorize runtime wiring or history/resume.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
     },
     {
@@ -213,7 +213,7 @@
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Merged #18 delivers explicit Message/Interrupt acceptance, no-effect 409 refusals and retained drafts. Merged #19 adds truthful activity, unavailable Reassign/auto-approve reasons, token disclosure and dynamic PR labels. Atomic task transfer, a real tool-approval contract and pending locks remain. Console evidence is dark mode and retains an 1180px mobile minimum; responsive/light console work is still pending.",
+      "notes": "Merged #18/#19 deliver command refusals/draft retention, truthful activity, unavailable controls, token disclosure and PR labels. Responsive/light-dark console work is in progress separately; delivered proof still has dark-only console images and an 1180px mobile minimum. Pending-command locks and edited-draft safety are design-only (AC-VERIFY-008); proposed tests UNEXECUTED. Task transfer and real tool approval remain pending.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/19"
     },
     {
