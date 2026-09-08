@@ -6,7 +6,7 @@ import { AGENT_IDS, API, type AgentId, type MessageTarget, type RunEvent } from 
 import type { AuthHeaderValue, AuthPrincipal, AuthService } from './auth.js'
 import { evaluateRequestSecurity, type RequestPolicy } from './request-security.js'
 import type { ServerConfig } from './config.js'
-import type { Orchestrator, RunStore } from './contracts.js'
+import type { CommandAcceptance, Orchestrator, RunStore } from './contracts.js'
 
 const MAX_BODY_BYTES = 64 * 1024
 const MAX_MESSAGE_CHARS = 4000
@@ -215,6 +215,13 @@ function buildRoutes(deps: Deps): Route[] {
   const interrupt = /^\/api\/agents\/([^/]+)\/interrupt$/
   const messageBucket = tokenBucket(MESSAGE_BURST, MESSAGE_PER_SEC)
   const lifetimeSpend = () => store.lifetimeCostUsd()
+  const requireAcceptance = (result: CommandAcceptance) => {
+    if (!result.accepted) throw new HttpError(409, {
+      run_unavailable: 'run is not active',
+      empty_message: 'message is empty',
+      no_active_operation: 'agent has no active operation',
+    }[result.reason])
+  }
 
   /** `guard` runs before the body is read, so refusals cost nothing. */
   const command = (fn: (body: unknown) => Promise<void> | void, guard?: (req: Req) => void): Route['handle'] => {
@@ -237,7 +244,7 @@ function buildRoutes(deps: Deps): Route[] {
       handle: command(
         async (body) => {
           const { text, target } = parseMessage(body)
-          await orchestrator.humanMessage(text, target)
+          requireAcceptance(await orchestrator.humanMessage(text, target))
         },
         (req) => {
           if (!isJsonRequest(req)) throw new HttpError(415, 'Content-Type must be application/json')
@@ -274,7 +281,7 @@ function buildRoutes(deps: Deps): Route[] {
         if (!isAgentId(params.id)) throw new HttpError(400, `unknown agent "${params.id}"`)
         await readJson(req)
         reauthorize(req)
-        orchestrator.interrupt(params.id)
+        requireAcceptance(orchestrator.interrupt(params.id))
         json(res, 200, { ok: true, seq: store.seq() })
       },
     },

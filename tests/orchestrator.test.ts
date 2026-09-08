@@ -6,6 +6,102 @@ import { createMockLLM } from '../server/llm/mock.js'
 import { createToolRegistry } from '../server/tools.js'
 import { assign, deferred, harness, ready, reply, settle, tool, until, usage } from './helpers.js'
 
+for (const status of ['idle', 'done', 'failed'] as const) {
+  test(`human commands reject ${status} runs without changing state or emitting events`, async (t) => {
+    const h = harness(t, async () => reply())
+    h.store.setRun({ status })
+    const before = h.store.snapshot()
+    const events: unknown[] = []
+    h.store.subscribe((event) => events.push(event))
+    assert.deepEqual(await h.orchestrator.humanMessage('Keep this draft', 'forge'), { accepted: false, reason: 'run_unavailable' })
+    assert.deepEqual(h.orchestrator.interrupt('atlas'), { accepted: false, reason: 'run_unavailable' })
+    await settle()
+    assert.deepEqual(h.store.snapshot(), before)
+    assert.deepEqual(events, [])
+    assert.deepEqual(h.store.tasks(), [])
+    assert.equal(h.requests.length, 0)
+  })
+}
+
+test('human commands reject a disposed active run without new logs, typing or task changes', async (t) => {
+  const pending = deferred<LLMResult>()
+  const h = harness(t, async () => pending.promise)
+  await h.orchestrator.start()
+  await until(() => h.requests.length === 1)
+  h.orchestrator.dispose()
+  pending.resolve(reply())
+  await settle()
+  const before = h.store.snapshot()
+  const tasks = h.store.tasks()
+  const events: unknown[] = []
+  h.store.subscribe((event) => events.push(event))
+  assert.deepEqual(await h.orchestrator.humanMessage('Keep disposed draft', 'forge'), { accepted: false, reason: 'run_unavailable' })
+  assert.deepEqual(h.orchestrator.interrupt('atlas'), { accepted: false, reason: 'run_unavailable' })
+  await settle()
+  assert.deepEqual(h.store.snapshot(), before)
+  assert.deepEqual(h.store.tasks(), tasks)
+  assert.deepEqual(events, [])
+  assert.equal(h.requests.length, 1)
+})
+
+test('message acceptance preserves live and paused wakes and recognized slash commands', async (t) => {
+  const h = harness(t, async () => reply())
+  await h.orchestrator.start()
+  await settle()
+  const before = h.store.snapshot()
+  assert.deepEqual(await h.orchestrator.humanMessage('  ', 'all'), { accepted: false, reason: 'empty_message' })
+  assert.deepEqual(h.store.snapshot(), before)
+  assert.deepEqual(await h.orchestrator.humanMessage('live acceptance', 'forge'), { accepted: true })
+  await until(() => h.requests.some((request) => request.agent === 'forge'))
+  await settle()
+  assert.deepEqual(await h.orchestrator.humanMessage('/pause', 'all'), { accepted: true })
+  assert.equal(h.store.snapshot().run.status, 'paused')
+  const count = h.requests.length
+  assert.deepEqual(await h.orchestrator.humanMessage('paused acceptance', 'vector'), { accepted: true })
+  await settle()
+  assert.equal(h.requests.length, count)
+  assert.equal(h.store.snapshot().thread.filter((item) => item.kind === 'human' && item.body === 'paused acceptance').length, 1)
+  assert.deepEqual(await h.orchestrator.humanMessage('/resume', 'all'), { accepted: true })
+  await until(() => h.requests.some((request) => request.agent === 'vector'))
+  assert.equal(h.store.snapshot().run.status, 'live')
+})
+
+test('interrupt acceptance aborts once and refuses absent, aborted and finished operations without effects', async (t) => {
+  const pending = deferred<LLMResult>()
+  let aborts = 0
+  const h = harness(t, async (request) => {
+    request.signal.addEventListener('abort', () => { aborts++ })
+    return pending.promise
+  })
+  await h.orchestrator.start()
+  await until(() => h.requests.length === 1)
+  const events: unknown[] = []
+  h.store.subscribe((event) => events.push(event))
+  const before = h.store.snapshot()
+  assert.deepEqual(h.orchestrator.interrupt('forge'), { accepted: false, reason: 'no_active_operation' })
+  assert.deepEqual(h.store.snapshot(), before)
+  assert.deepEqual(events, [])
+  assert.deepEqual(h.orchestrator.interrupt('atlas'), { accepted: true })
+  assert.equal(aborts, 1)
+  assert.equal(h.requests[0].signal.aborted, true)
+  assert.equal(h.store.snapshot().agents.find((agent) => agent.id === 'atlas')!.log.filter((line) => line.msg === 'interrupted by human').length, 1)
+  const interrupted = h.store.snapshot()
+  events.length = 0
+  assert.deepEqual(h.orchestrator.interrupt('atlas'), { accepted: false, reason: 'no_active_operation' })
+  assert.equal(aborts, 1)
+  assert.deepEqual(h.store.snapshot(), interrupted)
+  assert.deepEqual(events, [])
+  pending.resolve(reply())
+  await settle()
+  const finished = h.store.snapshot()
+  events.length = 0
+  assert.deepEqual(h.orchestrator.interrupt('atlas'), { accepted: false, reason: 'no_active_operation' })
+  assert.deepEqual(h.store.snapshot(), finished)
+  assert.deepEqual(events, [])
+  assert.equal(aborts, 1)
+  assert.deepEqual(h.store.tasks(), [])
+})
+
 for (const gate of [true, false]) {
   test(`run.finish never merges with gate ${gate ? 'on' : 'off'}`, async (t) => {
     let finish = false

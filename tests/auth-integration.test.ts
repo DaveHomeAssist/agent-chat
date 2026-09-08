@@ -277,13 +277,13 @@ for (const invalidation of ['logout', 'expiry'] as const) {
       const h = await serve(t, { authOptions: { runtime: time.runtime } })
       const session = await h.login()
       const effects: string[] = []
-      t.mock.method(h.orchestrator, 'humanMessage', async () => { effects.push('message') })
+      t.mock.method(h.orchestrator, 'humanMessage', async () => { effects.push('message'); return { accepted: true } })
       t.mock.method(h.orchestrator, 'start', async () => { effects.push('start') })
       t.mock.method(h.orchestrator, 'pause', () => { effects.push('pause') })
       t.mock.method(h.orchestrator, 'resume', () => { effects.push('resume') })
       t.mock.method(h.orchestrator, 'setGate', () => { effects.push('gate') })
       t.mock.method(h.orchestrator, 'approve', () => { effects.push('approve') })
-      t.mock.method(h.orchestrator, 'interrupt', () => { effects.push('interrupt') })
+      t.mock.method(h.orchestrator, 'interrupt', () => { effects.push('interrupt'); return { accepted: true } })
       const before = h.store.snapshot()
       const body = JSON.stringify(path === API.message ? { body: 'Held authenticated command', target: 'all' } : path === API.gate ? { enabled: true } : {})
       let incoming: http.IncomingMessage | undefined

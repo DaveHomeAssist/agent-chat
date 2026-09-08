@@ -931,20 +931,23 @@ export function createOrchestrator(deps: Deps): Orchestrator {
 
     async humanMessage(body, target) {
       const text = body.trim()
-      if (!text || !runActive() || disposed) return
-      if (text.startsWith('/') && slashCommand(text, target)) return
+      if (!runActive() || disposed) return { accepted: false, reason: 'run_unavailable' }
+      if (!text) return { accepted: false, reason: 'empty_message' }
+      if (text.startsWith('/') && slashCommand(text, target)) return { accepted: true }
       post({ kind: 'human', body: text, target })
       humanWake(target, text)
+      return { accepted: true }
     },
 
     interrupt(agent) {
-      if (!runActive() || disposed) return
+      if (!runActive() || disposed) return { accepted: false, reason: 'run_unavailable' }
       // Only a turn in progress can be interrupted; the log and the idle status would otherwise be a lie.
       const ac = runners.get(agent)?.abort
-      if (!ac || ac.signal.aborted) return
+      if (!ac || ac.signal.aborted) return { accepted: false, reason: 'no_active_operation' }
       ac.abort()
       store.agentLog(agent, 'WARN', 'interrupted by human')
       store.setAgent(agent, { status: 'idle' })
+      return { accepted: true }
     },
 
     dispose() {
