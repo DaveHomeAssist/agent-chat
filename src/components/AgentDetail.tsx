@@ -1,4 +1,5 @@
 import type { CSSVars } from '../lib/css'
+import { shouldAnimateAgentActivity, type AgentActivity } from '../lib/activity'
 import { levelColor, statusMeta, toolColor, tint } from '../lib/theme'
 import type { Agent, DetailTab } from '../types'
 
@@ -16,12 +17,13 @@ interface Props {
   onTab: (t: DetailTab) => void
   accent: string
   live: boolean
+  activity: AgentActivity
   onClose: () => void
   onMessage: () => void
   onInterrupt: () => void
 }
 
-export function AgentDetail({ agent, tab, onTab, accent, live, onClose, onMessage, onInterrupt }: Props) {
+export function AgentDetail({ agent, tab, onTab, accent, live, activity, onClose, onMessage, onInterrupt }: Props) {
   const status = statusMeta(agent.status, live)
   const identity: CSSVars = {
     '--c': agent.color,
@@ -78,7 +80,7 @@ export function AgentDetail({ agent, tab, onTab, accent, live, onClose, onMessag
             onInterrupt={onInterrupt}
           />
         ) : null}
-        {tab === 'output' ? <OutputTab agent={agent} live={live} /> : null}
+        {tab === 'output' ? <OutputTab agent={agent} live={live} activity={activity} /> : null}
         {tab === 'tools' ? <ToolsTab agent={agent} /> : null}
       </div>
     </div>
@@ -129,7 +131,13 @@ function SubtaskTab({
         <button className="ac-action" onClick={onInterrupt}>
           Interrupt
         </button>
-        <button className="ac-action">Reassign</button>
+        <button
+          className="ac-action ac-action--unavailable"
+          disabled
+          aria-describedby={`ac-reassign-reason-${agent.id}`}
+        >
+          Reassign
+        </button>
         <button
           className="ac-action ac-action--accent"
           style={
@@ -140,6 +148,9 @@ function SubtaskTab({
           Message
         </button>
       </div>
+      <p id={`ac-reassign-reason-${agent.id}`} className="ac-control-reason ac-control-reason--detail">
+        Reassign unavailable · Task transfer is not implemented.
+      </p>
 
       <div className="ac-queue">
         <div className="ac-card-eyebrow">QUEUE · {agent.queueCount}</div>
@@ -155,7 +166,8 @@ function SubtaskTab({
   )
 }
 
-function OutputTab({ agent, live }: { agent: Agent; live: boolean }) {
+function OutputTab({ agent, live, activity }: { agent: Agent; live: boolean; activity: AgentActivity }) {
+  const animate = shouldAnimateAgentActivity(activity, live)
   return (
     <div className="ac-log">
       {agent.log.map((l, i) => (
@@ -167,17 +179,24 @@ function OutputTab({ agent, live }: { agent: Agent; live: boolean }) {
           <span className="ac-log-msg">{l.msg}</span>
         </div>
       ))}
-      <div className="ac-log-foot">
+      <div
+        className={`ac-log-foot ac-log-foot--${activity.tone}`}
+        data-activity={activity.tone}
+        data-animated={animate}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         <span
           className="ac-cursor"
+          aria-hidden="true"
           style={
             {
-              '--c': agent.color,
-              animation: live ? 'blink 1.1s steps(1) infinite' : 'none',
+              animation: animate ? 'blink 1.1s steps(1) infinite' : 'none',
             } as CSSVars
           }
         />
-        <span className="ac-log-streaming">streaming</span>
+        <span className="ac-log-activity">{activity.label}</span>
       </div>
     </div>
   )
