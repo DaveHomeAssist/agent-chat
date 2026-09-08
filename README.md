@@ -16,6 +16,11 @@ The layout has a hard floor of 1180 × 700 — it is a desktop console, not a re
 
 Requires Node 22 or newer.
 
+The production browser regression gate runs in Chromium with scripted agents and
+no application API calls. After installation, run `npx playwright install chromium`,
+`npm run build`, then `npm run test:browser`. See [browser checks](docs/BROWSER_TESTS.md)
+for isolation, coverage and retained CI evidence.
+
 ```bash
 npm ci
 cp .env.example .env      # optional; the server also reads plain environment variables

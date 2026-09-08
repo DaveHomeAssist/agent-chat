@@ -140,6 +140,7 @@ export function ChatPanel({
 
           <input
             className="ac-input"
+            aria-label="Message the room"
             value={draft}
             onChange={(e) => onDraft(e.target.value)}
             onKeyDown={(e) => {

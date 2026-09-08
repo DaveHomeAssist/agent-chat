@@ -14,7 +14,9 @@
     "preview": "vite preview",
     "test": "node --import tsx --test tests/*.test.ts",
     "smoke:openai": "node --import tsx tests/openai-smoke.ts",
-    "smoke:real": "node --import tsx scripts/smoke-real.ts"
+    "smoke:real": "node --import tsx scripts/smoke-real.ts",
+    "test:browser": "playwright test",
+    "test:browser:report": "playwright show-report runs/browser-report"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
@@ -24,6 +26,7 @@
     "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@types/node": "^26.4.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

@@ -224,7 +224,7 @@ export function AgentChatroom({
         onSnapshot={exportSnapshot}
       />
 
-      {banner ? <div className={`ac-banner ac-banner--${banner.tone}`}>{banner.text}</div> : null}
+      {banner ? <div className={`ac-banner ac-banner--${banner.tone}`} role={banner.tone === 'error' ? 'alert' : 'status'}>{banner.text}</div> : null}
       {snapshotError ? (
         <div id="ac-snapshot-error" className="ac-banner ac-banner--error ac-snapshot-error" role="alert">
           Snapshot failed: {snapshotError}
