@@ -24,7 +24,7 @@ mock driver directly, and starts with an empty environment. It does not import t
 application entrypoint, load `.env`, read stored credentials or probe providers.
 Browser tests cannot select a real provider. Workspace commands remain simulated.
 
-Seventeen tests cover:
+Browser coverage includes:
 
 - Console load, pause/resume, agent selection, directed messages and detail control.
 - A complete scripted run reaching the human gate, fresh Snapshot JSON download
@@ -45,6 +45,11 @@ Seventeen tests cover:
   command/Snapshot 401 cleanup, no unauthenticated SSE churn and recovery after a
   network outage while the session remains valid.
 - Keyboard/focus and login light/dark rendering at the same three viewports.
+- Console light/dark layouts at 320/390/768/1024/1440/3440px, visibly unobscured
+  token labels/values through keyboard and touch, panel/resize focus destinations,
+  and contrast measured from actual activity text and focus indicators. Browser-local
+  synthetic LIVE/PAUSED/FAILED snapshots prove presentation only; these status cases
+  assert no application POSTs and make no provider calls.
 - The explicit HTTP loopback session exception and preserved default local mode.
 
 Auth cases select `session-https` or `session` through a fixture option. HTTPS
