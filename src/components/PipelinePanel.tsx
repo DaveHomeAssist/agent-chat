@@ -32,7 +32,7 @@ export function PipelinePanel({ mode, onMode, pipeline, accent, agents, onSelect
             className="ac-seg-btn"
             style={
               {
-                '--c': isBoard ? '#0A0C11' : '#8C95A9',
+                '--c': isBoard ? 'var(--on-accent)' : 'var(--ink-5)',
                 '--bg-c': isBoard ? accent : 'transparent',
               } as CSSVars
             }
@@ -44,7 +44,7 @@ export function PipelinePanel({ mode, onMode, pipeline, accent, agents, onSelect
             className="ac-seg-btn"
             style={
               {
-                '--c': !isBoard ? '#0A0C11' : '#8C95A9',
+                '--c': !isBoard ? 'var(--on-accent)' : 'var(--ink-5)',
                 '--bg-c': !isBoard ? accent : 'transparent',
               } as CSSVars
             }
@@ -85,8 +85,8 @@ function Board({
             className="ac-lane"
             style={
               {
-                '--ring': needsYou ? 'rgba(242,180,87,.30)' : 'rgba(255,255,255,.07)',
-                '--bg-c': needsYou ? 'rgba(242,180,87,.06)' : 'rgba(255,255,255,.018)',
+                '--ring': needsYou ? 'rgba(242,180,87,.30)' : 'var(--surface-7)',
+                '--bg-c': needsYou ? 'rgba(242,180,87,.06)' : 'var(--surface-2)',
               } as CSSVars
             }
           >
@@ -152,7 +152,7 @@ function Steps({ steps, accent }: { steps: Step[]; accent: string }) {
                 className="ac-step-dot"
                 style={
                   {
-                    '--ring': done ? COLOR.teal : active ? accent : 'rgba(255,255,255,.14)',
+                    '--ring': done ? COLOR.teal : active ? accent : 'var(--surface-14)',
                     '--bg-c': done ? COLOR.teal : active ? tint(accent, 0.35) : 'transparent',
                   } as CSSVars
                 }
@@ -167,7 +167,7 @@ function Steps({ steps, accent }: { steps: Step[]; accent: string }) {
                       ? 'transparent'
                       : done
                         ? 'rgba(62,216,196,.28)'
-                        : 'rgba(255,255,255,.08)',
+                        : 'var(--surface-8)',
                     '--h': last ? '0px' : '18px',
                   } as CSSVars
                 }
@@ -178,7 +178,7 @@ function Steps({ steps, accent }: { steps: Step[]; accent: string }) {
               <div className="ac-step-head">
                 <span
                   className="ac-step-title"
-                  style={{ '--c': done ? '#8C95A9' : '#E8EBF3' } as CSSVars}
+                  style={{ '--c': done ? 'var(--ink-5)' : 'var(--ink)' } as CSSVars}
                 >
                   {s.title}
                 </span>

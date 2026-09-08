@@ -9,8 +9,16 @@ import {
   notifyAuthLoss,
   subscribeAuthLoss,
 } from '../api/auth'
+import type { AppTheme } from '../lib/theme'
+import { ThemeControl } from './ThemeControl'
 
-export function AuthGate({ children }: { children: ReactNode }) {
+interface Props {
+  children: ReactNode
+  theme: AppTheme
+  onToggleTheme: () => void
+}
+
+export function AuthGate({ children, theme, onToggleTheme }: Props) {
   const [status, setStatus] = useState<AuthStatusPayload | null>(null)
   const [phase, setPhase] = useState<'checking' | 'ready' | 'unavailable'>('checking')
   const [busy, setBusy] = useState<'login' | 'logout' | null>(null)
@@ -18,7 +26,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [logoutPending, setLogoutPending] = useState(false)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
   const operation = useRef(0)
   const request = useRef<AbortController | null>(null)
   const keyInput = useRef<HTMLInputElement>(null)
@@ -139,7 +146,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (phase === 'ready' && status?.authenticated && (!status.expiresAt || Date.parse(status.expiresAt) > Date.now())) {
     if (status.mode === 'local') return <>{children}</>
     return (
-      <div className="ac-session-shell">
+      <div className="ac-session-shell" data-theme={theme}>
         <div className="ac-session-bar" aria-label="Operator session">
           <span><strong>Operator session</strong><span className="ac-session-expiry">{status.expiresAt ? ` · Ends ${new Date(status.expiresAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}</span></span>
           <button ref={signOutButton} type="button" onClick={() => { void signOut() }}>Sign out</button>
@@ -154,9 +161,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     <main className="ac-auth-screen" data-theme={theme}>
       <header className="ac-auth-topbar">
         <span className="ac-auth-brand">Agent Chatroom</span>
-        <button className="ac-auth-theme" type="button" aria-label="Dark mode" aria-pressed={theme === 'dark'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>
-          {theme === 'light' ? 'Dark mode' : 'Light mode'}
-        </button>
+        <ThemeControl theme={theme} onToggle={onToggleTheme} />
       </header>
       <section className="ac-auth-panel" aria-labelledby="auth-title" aria-busy={phase === 'checking' || busy !== null}>
         <p className="ac-auth-eyebrow">Operator access</p>

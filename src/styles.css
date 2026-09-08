@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------ *
- * Agent Chatroom — dark SaaS console.
+ * Agent Chatroom — dense operator console.
  * Static declarations live here; anything driven by agent colour, the
  * accent prop or a progress value arrives as a CSS custom property.
  * ------------------------------------------------------------------ */
@@ -8,13 +8,83 @@
   --mono: 'IBM Plex Mono', monospace;
   --sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
 
+  --bg: #f3f6fb;
+  --panel: #ffffff;
+  --card: #ffffff;
+  --card-alt: #f8faff;
+  --composer: #ffffff;
+  --header: rgba(255, 255, 255, 0.88);
+
+  --hairline: rgba(24, 36, 55, 0.13);
+  --surface-2: rgba(24, 36, 55, 0.025);
+  --surface-3: rgba(24, 36, 55, 0.035);
+  --surface-4: rgba(24, 36, 55, 0.045);
+  --surface-5: rgba(24, 36, 55, 0.055);
+  --surface-6: rgba(24, 36, 55, 0.07);
+  --surface-7: rgba(24, 36, 55, 0.08);
+  --surface-8: rgba(24, 36, 55, 0.1);
+  --surface-9: rgba(24, 36, 55, 0.12);
+  --surface-10: rgba(24, 36, 55, 0.14);
+  --surface-11: rgba(24, 36, 55, 0.16);
+  --surface-14: rgba(24, 36, 55, 0.2);
+  --surface-16: rgba(24, 36, 55, 0.24);
+  --surface-18: rgba(24, 36, 55, 0.28);
+  --surface-20: rgba(24, 36, 55, 0.32);
+  --sweep: rgba(255, 255, 255, 0.54);
+  --shadow: rgba(30, 48, 77, 0.16);
+  --shadow-heavy: rgba(30, 48, 77, 0.24);
+  --on-accent: #071323;
+  --focus: #145ee8;
+  --status-active: #087568;
+  --status-paused: #875100;
+  --status-failed: #b42359;
+
+  --ink: #172235;
+  --ink-2: #243149;
+  --ink-3: #344159;
+  --ink-4: #4b5870;
+  --ink-5: #59667d;
+  --ink-6: #66738a;
+  --ink-7: #6f7c92;
+  --ink-8: #77849a;
+  --ink-9: #7f8ca1;
+  --ink-10: #8a96aa;
+  --handoff: #6543a5;
+  --handoff-muted: #776397;
+}
+
+.ac-app[data-theme='dark'],
+.ac-session-shell[data-theme='dark'] {
   --bg: #0a0c11;
   --panel: #0d1016;
   --card: #111520;
   --card-alt: #101319;
   --composer: #141822;
+  --header: rgba(16, 19, 26, 0.72);
 
   --hairline: rgba(255, 255, 255, 0.07);
+  --surface-2: rgba(255, 255, 255, 0.022);
+  --surface-3: rgba(255, 255, 255, 0.03);
+  --surface-4: rgba(255, 255, 255, 0.04);
+  --surface-5: rgba(255, 255, 255, 0.05);
+  --surface-6: rgba(255, 255, 255, 0.06);
+  --surface-7: rgba(255, 255, 255, 0.07);
+  --surface-8: rgba(255, 255, 255, 0.08);
+  --surface-9: rgba(255, 255, 255, 0.09);
+  --surface-10: rgba(255, 255, 255, 0.1);
+  --surface-11: rgba(255, 255, 255, 0.11);
+  --surface-14: rgba(255, 255, 255, 0.14);
+  --surface-16: rgba(255, 255, 255, 0.16);
+  --surface-18: rgba(255, 255, 255, 0.18);
+  --surface-20: rgba(255, 255, 255, 0.2);
+  --sweep: rgba(255, 255, 255, 0.32);
+  --shadow: rgba(0, 0, 0, 0.35);
+  --shadow-heavy: rgba(0, 0, 0, 0.48);
+  --on-accent: #0a0c11;
+  --focus: #92baff;
+  --status-active: #3ed8c4;
+  --status-paused: #f2b457;
+  --status-failed: #f472b6;
 
   --ink: #e8ebf3;
   --ink-2: #d8dde9;
@@ -26,6 +96,9 @@
   --ink-8: #5e6779;
   --ink-9: #4c5568;
   --ink-10: #3f485a;
+  --handoff: #b9aee8;
+  --handoff-muted: #6b5f92;
+  color-scheme: dark;
 }
 
 html,
@@ -36,6 +109,15 @@ body {
   color: var(--ink);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
+  min-width: 0;
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+#root {
+  width: 100%;
+  min-height: 100%;
 }
 
 * {
@@ -64,8 +146,13 @@ button {
 }
 
 .ac-app :is(button, summary):focus-visible {
-  outline: 2px solid #92baff;
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+.ac-detail:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -4px;
 }
 
 ::-webkit-scrollbar {
@@ -73,7 +160,7 @@ button {
   height: 9px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--surface-9);
   border-radius: 9px;
 }
 ::-webkit-scrollbar-track {
@@ -222,7 +309,7 @@ button {
   position: relative;
   height: 3px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--surface-7);
   overflow: hidden;
 }
 .ac-track > .ac-track-fill {
@@ -239,18 +326,24 @@ button {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  min-height: 700px;
-  min-width: 1180px;
+  height: 100dvh;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  color: var(--ink);
   background:
     radial-gradient(1200px 420px at 18% -8%, rgba(124, 155, 255, 0.1), transparent 70%),
     radial-gradient(900px 380px at 88% -6%, rgba(139, 92, 246, 0.1), transparent 70%), var(--bg);
   font-size: 13px;
+  color-scheme: light;
 }
 
 .ac-body {
   flex: 1;
   display: flex;
   min-height: 0;
+  min-width: 0;
 }
 
 /* --- header ------------------------------------------------------- */
@@ -263,7 +356,7 @@ button {
   height: 58px;
   padding: 0 16px 0 14px;
   border-bottom: 1px solid var(--hairline);
-  background: rgba(16, 19, 26, 0.72);
+  background: var(--header);
   backdrop-filter: blur(8px);
 }
 
@@ -310,7 +403,7 @@ button {
 .ac-vrule {
   width: 1px;
   height: 26px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--surface-8);
 }
 
 .ac-run {
@@ -372,7 +465,7 @@ button {
 .ac-token-disclosure[open] summary,
 .ac-token-disclosure summary:hover {
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-5);
 }
 .ac-token-popover {
   position: absolute;
@@ -382,10 +475,10 @@ button {
   width: 224px;
   padding: 11px 12px;
   transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--surface-14);
   border-radius: 9px;
   background: var(--card);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.48);
+  box-shadow: 0 14px 36px var(--shadow-heavy);
   color: var(--ink-3);
 }
 .ac-token-title {
@@ -420,12 +513,40 @@ button {
   gap: 8px;
 }
 
+.ac-theme-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--surface-11);
+  border-radius: 8px;
+  background: var(--surface-4);
+  color: var(--ink-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ac-theme-control:hover {
+  background: var(--surface-7);
+}
+.ac-theme-control svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
 .ac-btn {
   height: 30px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--surface-11);
+  background: var(--surface-4);
   font-size: 12px;
   font-weight: 500;
   color: var(--ink-3);
@@ -499,7 +620,7 @@ button {
   background: var(--row-bg);
 }
 .ac-agent-row:hover {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--surface-4);
 }
 
 .ac-agent-bar {
@@ -601,7 +722,7 @@ button {
   border: 1px solid rgba(242, 180, 87, 0.3);
   border-radius: 5px;
   background: rgba(242, 180, 87, 0.08);
-  color: #f2b457;
+  color: var(--status-paused);
   font-family: var(--mono);
   font-size: 8.5px;
   letter-spacing: 0.04em;
@@ -633,7 +754,7 @@ button {
   display: flex;
   gap: 14px;
   padding-top: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--surface-6);
   font-family: var(--mono);
   font-size: 10px;
   color: var(--ink-8);
@@ -723,8 +844,8 @@ button {
   gap: 8px;
   padding: 3px 10px;
   border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--surface-9);
+  background: var(--surface-3);
 }
 .ac-divider-label {
   font-family: var(--mono);
@@ -735,7 +856,7 @@ button {
 .ac-divider-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.1), transparent);
+  background: linear-gradient(90deg, var(--surface-10), transparent);
 }
 .ac-divider-time {
   font-family: var(--mono);
@@ -751,7 +872,7 @@ button {
   border-radius: 12px;
 }
 .ac-msg:hover {
-  background: rgba(255, 255, 255, 0.022);
+  background: var(--surface-2);
 }
 .ac-msg-body {
   flex: 1;
@@ -814,7 +935,7 @@ button {
   font-family: var(--mono);
   font-size: 10px;
   color: var(--ink-5);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-4);
   border: 1px solid var(--hairline);
 }
 
@@ -822,7 +943,7 @@ button {
 .ac-tool {
   margin: 4px 0 4px 51px;
   border-radius: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--surface-8);
   background: var(--card-alt);
   overflow: hidden;
 }
@@ -866,7 +987,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--surface-6);
   margin-top: 1px;
 }
 .ac-tool-line {
@@ -896,12 +1017,12 @@ button {
 }
 .ac-handoff-body {
   font-size: 11.5px;
-  color: #b9aee8;
+  color: var(--handoff);
 }
 .ac-handoff-time {
   font-family: var(--mono);
   font-size: 10px;
-  color: #6b5f92;
+  color: var(--handoff-muted);
 }
 
 /* human broadcast */
@@ -924,7 +1045,7 @@ button {
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  color: var(--bg);
+  color: var(--on-accent);
   background: linear-gradient(140deg, #e8ebf3, #9ba4b8);
 }
 .ac-human-name {
@@ -981,28 +1102,29 @@ button {
   align-items: center;
   gap: 7px;
   padding-bottom: 9px;
+  min-width: 0;
 }
 .ac-quick-btn {
   height: 25px;
   padding: 0 9px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--surface-9);
+  background: var(--surface-3);
   font-family: var(--mono);
   font-size: 10.5px;
   color: var(--ink-5);
 }
 .ac-quick-btn:hover {
   color: var(--ink);
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: var(--surface-18);
 }
 .ac-quick-btn:disabled {
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: var(--surface-6);
   color: var(--ink-8);
   cursor: not-allowed;
 }
 .ac-quick-btn:disabled:hover {
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: var(--surface-6);
   color: var(--ink-8);
 }
 .ac-input-bar {
@@ -1011,9 +1133,9 @@ button {
   gap: 10px;
   padding: 8px 10px 8px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.11);
+  border: 1px solid var(--surface-11);
   background: var(--composer);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 22px var(--shadow);
 }
 .ac-target {
   display: flex;
@@ -1023,8 +1145,8 @@ button {
   height: 26px;
   padding: 0 9px;
   border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--surface-10);
+  background: var(--surface-4);
 }
 .ac-target-label {
   font-family: var(--mono);
@@ -1057,7 +1179,7 @@ button {
   border-radius: 8px;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--bg);
+  color: var(--on-accent);
   background: var(--accent);
 }
 
@@ -1096,7 +1218,7 @@ button {
   display: flex;
   padding: 2px;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-5);
 }
 .ac-seg-btn {
   height: 21px;
@@ -1166,7 +1288,7 @@ button {
   background: var(--card);
 }
 .ac-task:hover {
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: var(--surface-16);
 }
 .ac-task-owner {
   flex: none;
@@ -1221,7 +1343,7 @@ button {
   justify-content: center;
   font-size: 8.5px;
   font-weight: 700;
-  color: var(--bg);
+  color: var(--on-accent);
 }
 .ac-step-line {
   flex: 1;
@@ -1295,7 +1417,7 @@ button {
   width: 24px;
   height: 24px;
   border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--surface-9);
   color: var(--ink-6);
   font-size: 10px;
 }
@@ -1330,7 +1452,7 @@ button {
 }
 .ac-card {
   border-radius: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--surface-8);
   background: var(--card);
   padding: 11px 12px;
   display: flex;
@@ -1360,7 +1482,7 @@ button {
   position: relative;
   height: 5px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--surface-7);
   overflow: hidden;
 }
 .ac-track--5 > .ac-track-fill {
@@ -1375,7 +1497,7 @@ button {
   top: 0;
   bottom: 0;
   width: 28px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+  background: linear-gradient(90deg, transparent, var(--sweep), transparent);
 }
 .ac-pct {
   font-family: var(--mono);
@@ -1398,7 +1520,7 @@ button {
   font-family: var(--mono);
   font-size: 9.5px;
   color: var(--ink-5);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-4);
   border: 1px solid var(--hairline);
 }
 
@@ -1410,14 +1532,14 @@ button {
   flex: 1;
   height: 30px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--surface-11);
+  background: var(--surface-4);
   font-size: 11.5px;
   font-weight: 600;
   color: var(--ink-3);
 }
 .ac-action:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--surface-20);
 }
 .ac-action:disabled,
 .ac-action--unavailable {
@@ -1451,8 +1573,8 @@ button {
   gap: 8px;
   padding: 7px 9px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-5);
 }
 .ac-queue-title {
   flex: 1;
@@ -1467,7 +1589,7 @@ button {
 
 .ac-log {
   border-radius: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--surface-8);
   background: var(--bg);
   padding: 10px 11px;
   display: flex;
@@ -1503,14 +1625,14 @@ button {
   padding-top: 5px;
 }
 .ac-log-foot--active {
-  --activity-color: #3ed8c4;
+  --activity-color: var(--status-active);
 }
 .ac-log-foot--paused,
 .ac-log-foot--blocked {
-  --activity-color: #f2b457;
+  --activity-color: var(--status-paused);
 }
 .ac-log-foot--failed {
-  --activity-color: #f472b6;
+  --activity-color: var(--status-failed);
 }
 .ac-log-foot--complete,
 .ac-log-foot--disconnected {
@@ -1584,8 +1706,8 @@ button {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--surface-10);
+  background: var(--surface-4);
   color: var(--ink-4);
   font-size: 11px;
 }
@@ -1614,11 +1736,11 @@ button {
   background: var(--tint);
 }
 .ac-banner--warn {
-  --c: #f2b457;
+  --c: var(--status-paused);
   --tint: rgba(242, 180, 87, 0.08);
 }
 .ac-banner--error {
-  --c: #f472b6;
+  --c: var(--status-failed);
   --tint: rgba(244, 114, 182, 0.08);
 }
 .ac-banner--info {
@@ -1633,7 +1755,347 @@ button {
   overflow-wrap: anywhere;
 }
 
-/* Authentication extends the console's type and accent without changing its palette. */
+/* --- compact console navigation ---------------------------------- */
+
+.ac-mobile-nav {
+  display: none;
+}
+
+@media (max-width: 1120px) {
+  .ac-app {
+    background:
+      radial-gradient(540px 220px at 15% -4%, rgba(124, 155, 255, 0.11), transparent 72%),
+      var(--bg);
+    font-size: 12.5px;
+  }
+
+  .ac-header {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-areas:
+      'brand run'
+      'stats stats'
+      'actions actions';
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px 10px;
+    height: auto;
+    min-height: 116px;
+    padding: 9px 10px 8px;
+  }
+  .ac-brand {
+    grid-area: brand;
+    min-width: 0;
+  }
+  .ac-brand-text {
+    min-width: 0;
+  }
+  .ac-brand-sub {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ac-vrule,
+  .ac-header > .ac-spacer {
+    display: none;
+  }
+  .ac-run {
+    display: contents;
+  }
+  .ac-run-pill {
+    grid-area: run;
+    max-width: 46vw;
+  }
+  .ac-run-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ac-run-stats {
+    grid-area: stats;
+    gap: 12px;
+    min-width: 0;
+    flex-wrap: wrap;
+    overflow: visible;
+    padding: 1px 2px;
+    white-space: nowrap;
+  }
+  .ac-actions {
+    grid-area: actions;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .ac-actions :is(.ac-btn, .ac-theme-control) {
+    min-width: 0;
+    height: 36px;
+    padding-inline: 6px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .ac-actions .ac-theme-control {
+    gap: 5px;
+  }
+  .ac-actions .ac-theme-control svg {
+    width: 12px;
+    height: 12px;
+  }
+  .ac-btn--pause {
+    justify-content: center;
+  }
+
+  .ac-banner {
+    min-height: 32px;
+    height: auto;
+    padding-block: 7px;
+  }
+  .ac-body {
+    position: relative;
+    overflow: hidden;
+  }
+  .ac-sidebar,
+  .ac-main,
+  .ac-detail,
+  .ac-rail {
+    display: none;
+  }
+  .ac-app[data-mobile-panel='agents'] .ac-sidebar,
+  .ac-app[data-mobile-panel='room'] .ac-main,
+  .ac-app[data-mobile-panel='context'] .ac-detail {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    border: 0;
+  }
+
+  .ac-sidebar-head {
+    padding: 12px 12px 8px;
+  }
+  .ac-agent-list {
+    padding-inline: 7px;
+  }
+  .ac-agent-row {
+    min-height: 58px;
+  }
+  .ac-oversight {
+    padding: 10px 12px;
+  }
+  .ac-toggle-row {
+    min-height: 32px;
+  }
+
+  .ac-thread-head {
+    display: block;
+    padding: 9px 10px 8px;
+  }
+  .ac-channel-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ac-filters {
+    min-width: 0;
+    margin-top: 8px;
+    overflow-x: auto;
+    padding-bottom: 1px;
+    scrollbar-width: none;
+  }
+  .ac-filters::-webkit-scrollbar {
+    display: none;
+  }
+  .ac-filter {
+    flex: none;
+    min-height: 32px;
+  }
+  .ac-thread {
+    padding: 8px 8px 5px;
+  }
+  .ac-msg {
+    gap: 8px;
+    padding-inline: 5px;
+  }
+  .ac-msg-head {
+    flex-wrap: wrap;
+  }
+  .ac-msg-role {
+    display: none;
+  }
+  .ac-tool,
+  .ac-handoff {
+    margin-left: 38px;
+  }
+  .ac-handoff {
+    align-items: flex-start;
+    width: auto;
+  }
+  .ac-tool-head {
+    gap: 7px;
+  }
+  .ac-tool-arg {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ac-composer {
+    padding: 7px 8px 8px;
+  }
+  .ac-quick {
+    overflow-x: auto;
+    padding-bottom: 7px;
+    scrollbar-width: none;
+  }
+  .ac-quick::-webkit-scrollbar {
+    display: none;
+  }
+  .ac-quick-btn {
+    flex: none;
+    min-height: 34px;
+  }
+  .ac-input-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 5px 7px;
+    padding: 7px;
+  }
+  .ac-target {
+    grid-column: 1 / -1;
+    justify-self: start;
+    max-width: 100%;
+    min-height: 34px;
+  }
+  .ac-target-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ac-input {
+    min-height: 38px;
+  }
+  .ac-send-hint {
+    display: none;
+  }
+  .ac-send {
+    min-height: 38px;
+  }
+
+  .ac-pipeline {
+    height: 48%;
+  }
+  .ac-pipeline-head,
+  .ac-agentpane-head {
+    padding-inline: 11px;
+  }
+  .ac-pipeline-body,
+  .ac-tabbody {
+    padding-inline: 9px;
+  }
+  .ac-tabs {
+    overflow-x: auto;
+    padding-inline: 9px;
+  }
+  .ac-tab,
+  .ac-action,
+  .ac-close,
+  .ac-seg-btn {
+    min-height: 36px;
+  }
+  .ac-detail-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ac-mobile-nav {
+    flex: none;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    min-height: 58px;
+    padding: 5px max(6px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+    border-top: 1px solid var(--hairline);
+    background: var(--panel);
+  }
+  .ac-mobile-nav button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 48px;
+    border-radius: 9px;
+    color: var(--ink-6);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .ac-mobile-nav button[aria-current='page'] {
+    background: rgba(76, 140, 255, 0.12);
+    color: #326dcc;
+  }
+  .ac-app[data-theme='dark'] .ac-mobile-nav button[aria-current='page'] {
+    color: #92baff;
+  }
+  .ac-mobile-nav-icon {
+    position: relative;
+    display: block;
+    width: 17px;
+    height: 13px;
+    border: 1.5px solid currentColor;
+    border-radius: 4px;
+  }
+  .ac-mobile-nav-icon--room::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    bottom: -4px;
+    width: 5px;
+    height: 5px;
+    border-left: 1.5px solid currentColor;
+    transform: skewY(-35deg);
+  }
+  .ac-mobile-nav-icon--agents {
+    width: 16px;
+    border: 0;
+    border-bottom: 1.5px solid currentColor;
+    border-radius: 50%;
+  }
+  .ac-mobile-nav-icon--agents::before,
+  .ac-mobile-nav-icon--agents::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: 6px;
+    height: 6px;
+    border: 1.5px solid currentColor;
+    border-radius: 50%;
+  }
+  .ac-mobile-nav-icon--agents::before { left: 0; }
+  .ac-mobile-nav-icon--agents::after { right: 0; }
+  .ac-mobile-nav-icon--context {
+    border-radius: 2px;
+    box-shadow: inset 0 -4px 0 var(--surface-10);
+  }
+}
+
+@media (max-width: 350px) {
+  .ac-brand-title { font-size: 12px; }
+  .ac-brand-mark { width: 24px; height: 24px; }
+  .ac-actions :is(.ac-btn, .ac-theme-control) { font-size: 9px; }
+  .ac-actions .ac-theme-control span { display: none; }
+  .ac-tool,
+  .ac-handoff { margin-left: 0; }
+}
+
+@media (min-width: 2400px) {
+  .ac-sidebar { width: 344px; }
+  .ac-detail { width: 520px; }
+  .ac-thread { padding-inline: clamp(32px, 3.2vw, 110px); }
+  .ac-thread-head,
+  .ac-composer { padding-inline: clamp(24px, 2vw, 72px); }
+}
+
+/* Authentication shares the same explicit visual mode as the console. */
 .ac-auth-screen {
   --auth-bg: #f4f5f7;
   --auth-panel: #ffffff;
@@ -1670,7 +2132,7 @@ button {
 }
 .ac-auth-topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .ac-auth-brand { font-weight: 650; letter-spacing: -0.02em; }
-.ac-auth-theme,
+.ac-auth-screen .ac-theme-control,
 .ac-session-bar button {
   min-height: 44px;
   padding: 0.625rem 1rem;
@@ -1679,7 +2141,11 @@ button {
   font-size: 0.875rem;
   font-weight: 600;
 }
-.ac-auth-theme:hover { background: var(--auth-panel); }
+.ac-auth-screen .ac-theme-control {
+  background: transparent;
+  color: var(--auth-ink);
+}
+.ac-auth-screen .ac-theme-control:hover { background: var(--auth-panel); }
 .ac-auth-panel {
   align-self: center;
   justify-self: center;
@@ -1747,7 +2213,14 @@ button {
 .ac-auth-error { background: var(--auth-error-bg); color: var(--auth-error); }
 .ac-auth-notice { background: var(--auth-note-bg); color: var(--auth-ink); }
 .ac-auth-footer { text-align: center; color: var(--auth-muted); font-size: 0.75rem; }
-.ac-session-shell { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+.ac-session-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+}
 .ac-session-bar {
   display: flex;
   align-items: center;
@@ -1756,14 +2229,14 @@ button {
   flex: 0 0 auto;
   min-height: 56px;
   padding: 0.375rem 1rem;
-  border-bottom: 1px solid #465269;
-  background: #111520;
-  color: #e8ebf3;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--panel);
+  color: var(--ink);
   font-size: 0.8125rem;
 }
-.ac-session-expiry { color: #a9b3c6; }
+.ac-session-expiry { color: var(--ink-5); }
 .ac-session-bar button { flex-shrink: 0; }
-.ac-session-bar button:hover { background: #223149; }
+.ac-session-bar button:hover { background: var(--surface-7); }
 .ac-session-bar button:focus-visible { outline: 3px solid #92baff; outline-offset: 2px; }
 .ac-session-shell > .ac-app { height: calc(100vh - 56px); height: calc(100dvh - 56px); }
 @media (max-width: 480px) {
@@ -1771,7 +2244,7 @@ button {
   .ac-auth-panel { padding: 1.5rem 1.25rem; }
   .ac-auth-topbar { gap: 0.5rem; }
   .ac-auth-brand { font-size: 0.9375rem; }
-  .ac-auth-theme { padding-inline: 0.75rem; }
+  .ac-auth-screen .ac-theme-control { padding-inline: 0.75rem; }
   .ac-session-expiry { display: block; margin-top: 0.25rem; }
 }
 @media (min-width: 2400px) {

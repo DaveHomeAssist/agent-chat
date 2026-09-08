@@ -1,6 +1,7 @@
 import type { CSSVars } from '../lib/css'
-import { COLOR, tint } from '../lib/theme'
+import { colorForTheme, tint, type AppTheme, type ThemeColor } from '../lib/theme'
 import type { RunInfo, RunStats, RunStatus } from '../types'
+import { ThemeControl } from './ThemeControl'
 
 interface Props {
   accent: string
@@ -11,19 +12,21 @@ interface Props {
   snapshotAvailable: boolean
   snapshotPending: boolean
   snapshotError: string | null
+  theme: AppTheme
   /** The primary control: start / pause / resume / approve, depending on the run status. */
   onRunAction: () => void
   onToggleDetail: () => void
   onSnapshot: () => void
+  onToggleTheme: () => void
 }
 
-const STATUS_META: Record<RunStatus, { label: string; color: string; pulse: boolean }> = {
-  idle: { label: 'IDLE', color: COLOR.slate, pulse: false },
-  live: { label: 'LIVE', color: COLOR.teal, pulse: true },
-  paused: { label: 'PAUSED', color: COLOR.amber, pulse: false },
-  needs_approval: { label: 'NEEDS YOU', color: COLOR.amber, pulse: true },
-  done: { label: 'DONE', color: COLOR.slate, pulse: false },
-  failed: { label: 'FAILED', color: COLOR.pink, pulse: false },
+const STATUS_META: Record<RunStatus, { label: string; color: ThemeColor; pulse: boolean }> = {
+  idle: { label: 'IDLE', color: 'slate', pulse: false },
+  live: { label: 'LIVE', color: 'teal', pulse: true },
+  paused: { label: 'PAUSED', color: 'amber', pulse: false },
+  needs_approval: { label: 'NEEDS YOU', color: 'amber', pulse: true },
+  done: { label: 'DONE', color: 'slate', pulse: false },
+  failed: { label: 'FAILED', color: 'pink', pulse: false },
 }
 
 const ACTION_LABEL: Record<RunStatus, string> = {
@@ -57,13 +60,15 @@ export function RunHeader({
   snapshotAvailable,
   snapshotPending,
   snapshotError,
+  theme,
   onRunAction,
   onToggleDetail,
   onSnapshot,
+  onToggleTheme,
 }: Props) {
   const status: RunStatus = run?.status ?? 'idle'
   const meta = STATUS_META[status]
-  const runColor = meta.color
+  const runColor = colorForTheme(theme, meta.color)
 
   const pill: CSSVars = {
     '--ring': tint(runColor, 0.3),
@@ -124,6 +129,7 @@ export function RunHeader({
       <div className="ac-spacer" />
 
       <div className="ac-actions">
+        <ThemeControl theme={theme} onToggle={onToggleTheme} />
         <button className="ac-btn ac-btn--pause" onClick={onRunAction}>
           <span className="ac-btn-swatch" style={{ '--c': runColor } as CSSVars} />
           {ACTION_LABEL[status]}

@@ -15,6 +15,8 @@ async function openConsole(page: Page) {
 }
 
 async function selectAgent(page: Page, id: AgentId) {
+  const agentsPanel = page.getByRole('button', { name: 'Agents', exact: true })
+  if (await agentsPanel.isVisible()) await agentsPanel.click()
   await page.locator('.ac-agent-row').filter({ hasText: new RegExp(id, 'i') }).click()
 }
 
@@ -113,7 +115,14 @@ for (const viewport of [
     await openConsole(page)
     await selectAgent(page, 'forge')
     await expect(page.getByRole('button', { name: 'Reassign', exact: true })).toBeDisabled()
-    await expect(page.getByText('Unavailable', { exact: true })).toBeVisible()
+    const agentsPanel = page.getByRole('button', { name: 'Agents', exact: true })
+    if (await agentsPanel.isVisible()) {
+      await agentsPanel.click()
+      await expect(page.getByText('Unavailable', { exact: true })).toBeVisible()
+      await page.getByRole('button', { name: 'Context', exact: true }).click()
+    } else {
+      await expect(page.getByText('Unavailable', { exact: true })).toBeVisible()
+    }
     const tokenSummary = page.locator('.ac-token-disclosure summary')
     await expect(tokenSummary).toBeVisible()
     await tokenSummary.click()

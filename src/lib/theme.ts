@@ -1,5 +1,11 @@
 import type { AgentStatus, LogLevel, ToolStatus } from '../types'
 
+export type AppTheme = 'light' | 'dark'
+
+export function toggleTheme(theme: AppTheme): AppTheme {
+  return theme === 'light' ? 'dark' : 'light'
+}
+
 /** The four accent choices exposed as a design prop. */
 export const ACCENTS = ['#4C8CFF', '#8B5CF6', '#3ED8C4', '#F472B6'] as const
 
@@ -11,6 +17,21 @@ export const COLOR = {
   blue: '#7C9BFF',
   slate: '#5E6779',
 } as const
+
+export type ThemeColor = keyof typeof COLOR
+
+const LIGHT_COLOR: Record<ThemeColor, string> = {
+  teal: '#087568',
+  violet: '#6742A6',
+  amber: '#875100',
+  pink: '#B42359',
+  blue: '#3D5EBA',
+  slate: '#536078',
+}
+
+export function colorForTheme(theme: AppTheme, color: ThemeColor): string {
+  return theme === 'light' ? LIGHT_COLOR[color] : COLOR[color]
+}
 
 /** Fade a hex colour to an `rgba()` string at the given alpha. */
 export function tint(hex: string, alpha: number): string {
@@ -32,21 +53,22 @@ export interface StatusMeta {
   pulse: string
 }
 
-export function statusMeta(status: AgentStatus, live: boolean): StatusMeta {
+export function statusMeta(status: AgentStatus, live: boolean, theme: AppTheme = 'dark'): StatusMeta {
   const m = STATUS_META[status]
   const pulsing = live && (status === 'working' || status === 'thinking')
-  return { ...m, pulse: pulsing ? 'ring 1.8s ease-out infinite' : 'none' }
+  const colorName = status === 'working' ? 'teal' : status === 'thinking' ? 'violet' : status === 'blocked' ? 'amber' : 'slate'
+  return { ...m, color: colorForTheme(theme, colorName), pulse: pulsing ? 'ring 1.8s ease-out infinite' : 'none' }
 }
 
-export function levelColor(level: LogLevel): string {
-  if (level === 'FAIL' || level === 'RISK') return COLOR.pink
-  if (level === 'WARN') return COLOR.amber
-  return COLOR.slate
+export function levelColor(level: LogLevel, theme: AppTheme = 'dark'): string {
+  if (level === 'FAIL' || level === 'RISK') return colorForTheme(theme, 'pink')
+  if (level === 'WARN') return colorForTheme(theme, 'amber')
+  return colorForTheme(theme, 'slate')
 }
 
-export function toolColor(status: ToolStatus): string {
-  if (status === 'ok') return COLOR.teal
-  if (status === 'queued') return COLOR.slate
-  if (status === 'drafting' || status === 'running') return COLOR.amber
-  return COLOR.pink
+export function toolColor(status: ToolStatus, theme: AppTheme = 'dark'): string {
+  if (status === 'ok') return colorForTheme(theme, 'teal')
+  if (status === 'queued') return colorForTheme(theme, 'slate')
+  if (status === 'drafting' || status === 'running') return colorForTheme(theme, 'amber')
+  return colorForTheme(theme, 'pink')
 }
