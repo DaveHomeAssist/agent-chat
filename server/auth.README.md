@@ -54,7 +54,7 @@ The service hashes the configured operator token at construction and keeps only 
 
 Defaults are 16 active sessions and a fixed-memory global login bucket of five attempts, replenishing one attempt every 12 seconds. The throttle does not use `X-Forwarded-For` or allocate attacker-selected keys. `AuthServiceOptions` exposes deterministic clock, randomness and timer seams plus smaller bounds for tests; production callers should use the defaults.
 
-Sessions have an absolute, non-sliding expiry. `revoke`, expiry and `dispose` clear the timer and synchronously notify every registered listener once. The returned unsubscribe is idempotent. A new service instance has an empty map, so process restart invalidates every old session.
+Sessions have an absolute, non-sliding expiry. `revoke`, expiry and `dispose` clear the timer and synchronously notify every registered session listener once. Authenticated bearer and local principals may also register lifecycle listeners; they have no individual expiry or revocation, so those listeners fire only when the service is disposed. Listener errors are isolated, unsubscribe and repeated disposal are idempotent, and registration after disposal is invalidated immediately. A new service instance has an empty map, so process restart invalidates every old session.
 
 HTTPS Set-Cookie output is:
 
@@ -86,7 +86,7 @@ Rules:
 - `Sec-Fetch-Site: cross-site` and malformed Fetch Metadata fail.
 - Cookie-authenticated mutations require exact Origin. Valid bearer CLI mutations and intended local loopback curl may omit browser headers.
 - Login allows a headerless non-browser request to reach bearer validation, but rejects any supplied mismatched/cross-site Origin.
-- Logout has its own session/bearer and Origin policy; it is not an accidental public-route exception.
+- Logout has its own session/bearer and Origin policy. A session-mode logout with no authenticated principal is allowed only with exact Host and Origin plus valid non-cross-site Fetch Metadata, enabling safe cookie clearing after expiry or a repeated logout without creating an anonymous headerless exception.
 - The module grants no CORS response headers.
 
 Callers should map every request-policy failure to one generic 403 without echoing the received Host or Origin.
@@ -100,8 +100,8 @@ The later integration worker should make the following changes in existing share
 3. `server/http.ts`: add auth route metadata and route constants. Validate request policy before handler side effects/body reads. Protect every current state/SSE/command route in session mode.
 4. Login: evaluate the `login` request policy, then pass only the Authorization header to `issueSession`. Map `denied` to generic 401 plus `WWW-Authenticate: Bearer realm="Agent Chatroom"`, `rate_limited` to 429/`Retry-After`, and capacity/unavailable to a generic 503. Set the returned cookie only on success.
 5. Protected routes: call `authenticate`, pass the resulting principal kind into the appropriate request policy, then invoke the existing handler. A missing/invalid auth result is generic 401. Existing validation/budget/rate behavior applies only after auth.
-6. Logout: authenticate if possible, apply `logout` policy, revoke a session principal, clear the cookie and return an idempotent success. A direct bearer has no individual session to revoke; rotating the secret and restarting is the revoke-all operation.
-7. SSE: authenticate and apply `protected-read` before sending status 200 or a snapshot. Register `onInvalidated(principal, close)` and unsubscribe it during ordinary stream cleanup. Expiry/logout/disposal therefore closes the stream; every reconnect authenticates again.
+6. Logout: authenticate if possible, apply `logout` policy even when authentication returns no principal, revoke a session principal when present, clear the cookie and return an idempotent success. The null-principal path succeeds only with the strict same-origin browser policy above. A direct bearer has no individual session to revoke; rotating the secret and restarting is the revoke-all operation.
+7. SSE: authenticate and apply `protected-read` before sending status 200 or a snapshot. Register `onInvalidated(principal, close)` and unsubscribe it during ordinary stream cleanup. Session expiry/logout and service disposal close session streams; disposal also closes registered bearer and local streams. Every reconnect authenticates again.
 8. Request logging: log only the parsed pathname. Never log raw query strings, Authorization or Cookie.
 9. `shared/protocol.ts`: add only the auth route constants/error shape required by the wire; detailed browser-safe auth payload types already live in `shared/auth.ts`.
 10. Browser: add an auth-status/login/logout client and gate before mounting `useRun`. Keep the operator token only in component memory. On SSE failure, probe auth status; a lost session clears the snapshot and stops reconnect churn.

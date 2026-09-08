@@ -84,7 +84,10 @@ function validateCredential(
   }
 
   if (policy === 'login') return credential === null || credential === 'bearer' ? null : 'credential'
-  if (policy === 'logout' || policy === 'protected-read' || policy === 'protected-mutation') {
+  if (policy === 'logout') {
+    return credential === null || credential === 'session' || credential === 'bearer' ? null : 'credential'
+  }
+  if (policy === 'protected-read' || policy === 'protected-mutation') {
     return credential === 'session' || credential === 'bearer' ? null : 'credential'
   }
   return 'credential'

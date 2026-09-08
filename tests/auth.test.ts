@@ -8,6 +8,7 @@ import {
   REMOTE_SESSION_COOKIE,
   parseAuthConfig,
 } from '../server/auth-config.js'
+import { evaluateRequestSecurity } from '../server/request-security.js'
 
 const OPERATOR_TOKEN = Buffer.alloc(32, 0x41).toString('base64url')
 const WRONG_TOKEN = Buffer.alloc(32, 0x42).toString('base64url')
@@ -338,6 +339,78 @@ test('individual revocation preserves independent sessions and dispose closes th
   assert.equal(runtime.pendingTimers(), 0)
   assert.deepEqual(service.authenticate({ cookie: secondCookie }), { ok: false })
   assert.deepEqual(service.issueSession(`Bearer ${OPERATOR_TOKEN}`), { ok: false, code: 'unavailable' })
+})
+
+test('dispose closes bearer and local lifecycle listeners once despite cleanup errors', () => {
+  const service = createAuthService(httpsConfig(), { runtime: new FakeRuntime() })
+  const authenticated = service.authenticate({ authorization: `Bearer ${OPERATOR_TOKEN}` })
+  assert.equal(authenticated.ok, true)
+  if (!authenticated.ok) return
+
+  let throwingClosed = 0
+  let retainedClosed = 0
+  let unsubscribedClosed = 0
+  service.onInvalidated(authenticated.principal, () => {
+    throwingClosed += 1
+    throw new Error('synthetic stream cleanup failure')
+  })
+  service.onInvalidated(authenticated.principal, () => { retainedClosed += 1 })
+  const unsubscribe = service.onInvalidated(authenticated.principal, () => { unsubscribedClosed += 1 })
+  unsubscribe()
+  unsubscribe()
+  assert.equal(service.revoke(authenticated.principal), false)
+
+  service.dispose()
+  service.dispose()
+  assert.equal(throwingClosed, 1)
+  assert.equal(retainedClosed, 1)
+  assert.equal(unsubscribedClosed, 0)
+
+  let registeredAfterDisposal = 0
+  const lateUnsubscribe = service.onInvalidated(authenticated.principal, () => { registeredAfterDisposal += 1 })
+  lateUnsubscribe()
+  assert.equal(registeredAfterDisposal, 1)
+
+  const localService = createAuthService(parseAuthConfig({}), { runtime: new FakeRuntime() })
+  const localAuth = localService.authenticate()
+  assert.equal(localAuth.ok, true)
+  if (!localAuth.ok) return
+  let localClosed = 0
+  localService.onInvalidated(localAuth.principal, () => { localClosed += 1 })
+  localService.dispose()
+  localService.dispose()
+  assert.equal(localClosed, 1)
+})
+
+test('logout policy composes with authentication for first, repeated, expired, invalid and missing cookies', () => {
+  const runtime = new FakeRuntime()
+  const config = httpsConfig({ AUTH_SESSION_TTL_SECONDS: '300' })
+  const service = createAuthService(config, { runtime, loginBurst: 10 })
+  const requestPolicy = (cookie?: string) => {
+    const authenticated = service.authenticate(cookie === undefined ? {} : { cookie })
+    return evaluateRequestSecurity(config, 'logout', {
+      host: 'console.example',
+      origin: 'https://console.example',
+      secFetchSite: 'same-origin',
+      credentialKind: authenticated.ok ? authenticated.principal.kind : null,
+    })
+  }
+
+  const firstCookie = issuedCookie(service.issueSession(`Bearer ${OPERATOR_TOKEN}`))
+  const firstAuth = service.authenticate({ cookie: firstCookie })
+  assert.equal(firstAuth.ok, true)
+  if (!firstAuth.ok) return
+  assert.deepEqual(requestPolicy(firstCookie), { ok: true })
+  assert.equal(service.revoke(firstAuth.principal), true)
+  assert.deepEqual(requestPolicy(firstCookie), { ok: true })
+
+  const expiredCookie = issuedCookie(service.issueSession(`Bearer ${OPERATOR_TOKEN}`))
+  runtime.advance(300_000)
+  assert.deepEqual(service.authenticate({ cookie: expiredCookie }), { ok: false })
+  assert.deepEqual(requestPolicy(expiredCookie), { ok: true })
+  assert.deepEqual(requestPolicy(`${REMOTE_SESSION_COOKIE}=invalid`), { ok: true })
+  assert.deepEqual(requestPolicy(), { ok: true })
+  assert.match(service.clearSessionCookie() ?? '', /Max-Age=0$/)
 })
 
 test('a fresh service instance cannot authenticate a session from an earlier process', () => {

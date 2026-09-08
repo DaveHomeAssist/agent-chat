@@ -90,9 +90,6 @@ const defaultRuntime: AuthRuntime = {
   },
 }
 
-const localPrincipal: AuthPrincipal = Object.freeze({ kind: 'local', expiresAt: null })
-const bearerPrincipal: AuthPrincipal = Object.freeze({ kind: 'bearer', expiresAt: null })
-
 export function createAuthService(config: AuthConfig, options: AuthServiceOptions = {}): AuthService {
   const runtime: AuthRuntime = { ...defaultRuntime, ...options.runtime }
   const maxSessions = positiveInteger(options.maxSessions, DEFAULT_MAX_SESSIONS, 'maxSessions')
@@ -105,6 +102,9 @@ export function createAuthService(config: AuthConfig, options: AuthServiceOption
   const operatorDigest = config.operatorToken === null ? null : digest(config.operatorToken)
   const sessions = new Map<string, SessionRecord>()
   const principalHandles = new WeakMap<AuthPrincipal, string>()
+  const localPrincipal: AuthPrincipal = Object.freeze({ kind: 'local', expiresAt: null })
+  const bearerPrincipal: AuthPrincipal = Object.freeze({ kind: 'bearer', expiresAt: null })
+  const serviceListeners = new Set<() => void>()
   let disposed = false
   let loginTokens = loginBurst
   let loginUpdatedAt = runtime.now()
@@ -114,15 +114,7 @@ export function createAuthService(config: AuthConfig, options: AuthServiceOption
     if (!record) return false
     sessions.delete(key)
     runtime.clearTimer(record.timer)
-    const listeners = [...record.listeners]
-    record.listeners.clear()
-    for (const listener of listeners) {
-      try {
-        listener()
-      } catch {
-        // One stream cleanup must not prevent the remaining listeners from closing.
-      }
-    }
+    notifyListeners(record.listeners)
     return true
   }
 
@@ -249,21 +241,25 @@ export function createAuthService(config: AuthConfig, options: AuthServiceOption
     },
 
     onInvalidated(principal, listener) {
+      if (disposed) {
+        notifyListener(listener)
+        return () => undefined
+      }
+
+      const validServicePrincipal =
+        (mode === 'local' && principal === localPrincipal) ||
+        (mode === 'session' && principal === bearerPrincipal)
+      if (validServicePrincipal) return subscribe(serviceListeners, listener)
       if (principal.kind !== 'session') return () => undefined
+
       const key = principalHandles.get(principal)
       const record = key === undefined ? undefined : sessions.get(key)
       if (!record || record.expiresAt <= runtime.now()) {
         if (key !== undefined) invalidate(key)
-        listener()
+        notifyListener(listener)
         return () => undefined
       }
-      record.listeners.add(listener)
-      let active = true
-      return () => {
-        if (!active) return
-        active = false
-        record.listeners.delete(listener)
-      }
+      return subscribe(record.listeners, listener)
     },
 
     activeSessionCount() {
@@ -275,7 +271,32 @@ export function createAuthService(config: AuthConfig, options: AuthServiceOption
       if (disposed) return
       disposed = true
       for (const key of [...sessions.keys()]) invalidate(key)
+      notifyListeners(serviceListeners)
     },
+  }
+}
+
+function subscribe(listeners: Set<() => void>, listener: () => void): () => void {
+  listeners.add(listener)
+  let active = true
+  return () => {
+    if (!active) return
+    active = false
+    listeners.delete(listener)
+  }
+}
+
+function notifyListeners(listeners: Set<() => void>): void {
+  const pending = [...listeners]
+  listeners.clear()
+  for (const listener of pending) notifyListener(listener)
+}
+
+function notifyListener(listener: () => void): void {
+  try {
+    listener()
+  } catch {
+    // One stream cleanup must not prevent other listeners or disposal cleanup.
   }
 }
 

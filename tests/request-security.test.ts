@@ -128,9 +128,40 @@ test('login and logout have explicit mode, credential and Origin policies', () =
     ok: false,
     reason: 'origin_required',
   })
+  assert.deepEqual(check(remote, 'logout', {
+    credentialKind: null,
+    origin: 'https://console.example:9443',
+    secFetchSite: 'same-origin',
+  }), { ok: true })
   assert.deepEqual(check(remote, 'logout', { credentialKind: 'bearer' }), { ok: true })
   assert.deepEqual(check(local, 'login', { credentialKind: null }), { ok: false, reason: 'mode' })
   assert.deepEqual(check(local, 'logout', { credentialKind: 'local' }), { ok: false, reason: 'mode' })
+})
+
+test('unauthenticated session logout requires exact same-origin browser request metadata', () => {
+  assert.deepEqual(check(remote, 'logout', { credentialKind: null }), {
+    ok: false,
+    reason: 'origin_required',
+  })
+  for (const origin of ['null', 'https://other.example:9443', 'http://console.example:9443']) {
+    assert.deepEqual(check(remote, 'logout', { credentialKind: null, origin }), {
+      ok: false,
+      reason: 'origin',
+    })
+  }
+  for (const secFetchSite of ['cross-site', 'unexpected', ['same-origin']]) {
+    assert.deepEqual(check(remote, 'logout', {
+      credentialKind: null,
+      origin: 'https://console.example:9443',
+      secFetchSite,
+    }), { ok: false, reason: 'cross_site' })
+  }
+  assert.deepEqual(check(remote, 'logout', {
+    host: 'other.example:9443',
+    credentialKind: null,
+    origin: 'https://console.example:9443',
+    secFetchSite: 'same-origin',
+  }), { ok: false, reason: 'host' })
 })
 
 test('auth status is public but still enforces Host and supplied Origin', () => {
