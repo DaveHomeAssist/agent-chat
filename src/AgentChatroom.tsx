@@ -121,16 +121,40 @@ export function AgentChatroom({
   const roomNavRef = useRef<HTMLButtonElement>(null)
   const pendingFocus = useRef<'context' | 'composer' | 'room-nav' | 'restore' | null>(null)
   const lastPanelFocus = useRef<{ panel: MobilePanel; element: HTMLElement } | null>(null)
+  const stableFocus = useRef<HTMLElement | null>(null)
   const restoreTarget = useRef<HTMLElement | null>(null)
+  const mobilePanelRef = useRef(mobilePanel)
+  mobilePanelRef.current = mobilePanel
 
   useEffect(() => () => { snapshotRequest.current?.abort() }, [])
 
   useEffect(() => {
     const query = window.matchMedia(COMPACT_VIEWPORT)
+    let stableFocusFrame: number | null = null
     const preserveVisiblePanel = (event: MediaQueryListEvent) => {
       if (!event.matches) return
+      const stable = stableFocus.current
+      if (stable) {
+        stableFocusFrame = window.requestAnimationFrame(() => {
+          stableFocusFrame = null
+          const rect = stable.getBoundingClientRect()
+          const style = getComputedStyle(stable)
+          if (
+            stableFocus.current === stable
+            && stable.isConnected
+            && style.display !== 'none'
+            && style.visibility !== 'hidden'
+            && rect.width > 0
+            && rect.height > 0
+            && document.activeElement !== stable
+          ) {
+            stable.focus({ preventScroll: true })
+          }
+        })
+        return
+      }
       const remembered = lastPanelFocus.current
-      if (!remembered) return
+      if (!remembered || remembered.panel === mobilePanelRef.current) return
       restoreTarget.current = remembered.element
       pendingFocus.current = 'restore'
       if (remembered.panel === 'agents') setMobilePanel('agents')
@@ -140,7 +164,25 @@ export function AgentChatroom({
       } else setMobilePanel('room')
     }
     query.addEventListener('change', preserveVisiblePanel)
-    return () => query.removeEventListener('change', preserveVisiblePanel)
+    return () => {
+      query.removeEventListener('change', preserveVisiblePanel)
+      if (stableFocusFrame !== null) window.cancelAnimationFrame(stableFocusFrame)
+    }
+  }, [])
+
+  useEffect(() => {
+    const rememberStableFocus = (event: FocusEvent) => {
+      const element = event.target
+      if (!(element instanceof HTMLElement)) return
+      if (element.closest('.ac-header, .ac-session-bar')) {
+        stableFocus.current = element
+        lastPanelFocus.current = null
+        restoreTarget.current = null
+        if (pendingFocus.current === 'restore') pendingFocus.current = null
+      }
+    }
+    document.addEventListener('focusin', rememberStableFocus)
+    return () => document.removeEventListener('focusin', rememberStableFocus)
   }, [])
 
   useEffect(() => {
@@ -160,6 +202,7 @@ export function AgentChatroom({
   const rememberPanelFocus = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
     const element = event.target
     if (!(element instanceof HTMLElement)) return
+    stableFocus.current = null
     if (element.closest('.ac-sidebar')) lastPanelFocus.current = { panel: 'agents', element }
     else if (element.closest('.ac-detail')) lastPanelFocus.current = { panel: 'context', element }
     else if (element.closest('.ac-main')) lastPanelFocus.current = { panel: 'room', element }

@@ -1770,6 +1770,8 @@ button {
   }
 
   .ac-header {
+    position: relative;
+    z-index: 2;
     display: grid;
     grid-template-areas:
       'brand run'

@@ -61,23 +61,34 @@ async function expectVisibleTokenDisclosure(
       }
       ancestor = ancestor.parentElement
     }
-    const points = [
-      [rect.left + 4, rect.top + 4],
-      [rect.right - 4, rect.top + 4],
-      [rect.left + 4, rect.bottom - 4],
-      [rect.right - 4, rect.bottom - 4],
-      [rect.left + rect.width / 2, rect.top + rect.height / 2],
-    ]
+    const occludedTargets = Array.from(element.querySelectorAll('dt, dd')).flatMap((target) => {
+      const targetRect = target.getBoundingClientRect()
+      const inset = Math.min(2, targetRect.width / 4)
+      const y = targetRect.top + targetRect.height / 2
+      return [targetRect.left + inset, targetRect.left + targetRect.width / 2, targetRect.right - inset]
+        .flatMap((x) => {
+          const topmost = document.elementFromPoint(x, y)
+          const targetIsTopmost = topmost !== null
+            && element.contains(topmost)
+            && (topmost === target || target.contains(topmost) || topmost.contains(target))
+          return targetIsTopmost ? [] : [{
+            target: target.textContent?.trim() ?? target.tagName,
+            topmost: topmost?.className || topmost?.tagName || null,
+            x,
+            y,
+          }]
+        })
+    })
     return {
       clippedBy,
       insideViewport: rect.left >= 0 && rect.top >= 0 && rect.right <= innerWidth && rect.bottom <= innerHeight,
-      hitTestable: points.every(([x, y]) => document.elementsFromPoint(x, y).some((node) => element.contains(node))),
+      occludedTargets,
     }
   })
+  if (testInfo && screenshotName) await attachConsole(page, testInfo, screenshotName)
   expect(inspection.clippedBy).toEqual([])
   expect(inspection.insideViewport).toBe(true)
-  expect(inspection.hitTestable).toBe(true)
-  if (testInfo && screenshotName) await attachConsole(page, testInfo, screenshotName)
+  expect(inspection.occludedTargets).toEqual([])
 
   if (activation === 'touch') await summary.tap()
   else await summary.press('Enter')
@@ -266,6 +277,9 @@ for (const viewport of [
     })
     await expectNoPageOverflow(page)
     if (mobile) {
+      if (viewport.width <= 390) {
+        await expectVisibleTokenDisclosure(page, 'keyboard', testInfo, `${viewport.name}-dark-tokens`)
+      }
       await page.getByRole('button', { name: 'Context', exact: true }).click()
       await expect(page.locator('.ac-agentpane-name')).toHaveText('Forge')
       await expectNoPageOverflow(page)
@@ -284,11 +298,18 @@ for (const viewport of [
 test.describe('compact accessibility corrections', () => {
   test.use({ hasTouch: true })
 
-  test('token counters are readable and hit-testable after touch disclosure at 390px', async ({ page }, testInfo) => {
-    await page.setViewportSize({ width: 390, height: 844 })
-    await openConsole(page)
-    await expectVisibleTokenDisclosure(page, 'touch', testInfo, 'phone-390-touch-tokens')
-  })
+  for (const viewport of [
+    { name: 'phone-320', width: 320, height: 720 },
+    { name: 'phone-390', width: 390, height: 844 },
+  ]) {
+    test(`token counters are topmost after touch disclosure at ${viewport.name} in both themes`, async ({ page }, testInfo) => {
+      await page.setViewportSize(viewport)
+      await openConsole(page)
+      await expectVisibleTokenDisclosure(page, 'touch', testInfo, `${viewport.name}-light-touch-tokens`)
+      await page.getByRole('button', { name: 'Dark mode', exact: true }).click()
+      await expectVisibleTokenDisclosure(page, 'touch', testInfo, `${viewport.name}-dark-touch-tokens`)
+    })
+  }
 })
 
 test('compact keyboard transitions keep focus in the visible destination', async ({ page }) => {
@@ -352,6 +373,24 @@ test('focus remains visible when a desktop panel becomes compact', async ({ page
   await expectNoPageOverflow(page)
 })
 
+for (const controlName of ['Snapshot', 'Dark mode'] as const) {
+  test(`${controlName} focus is not replaced by stale Context focus at the compact breakpoint`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    await openConsole(page)
+    const interrupt = page.getByRole('button', { name: 'Interrupt', exact: true })
+    await interrupt.focus()
+    await expect(interrupt).toBeFocused()
+
+    const persistentControl = page.getByRole('button', { name: controlName, exact: true })
+    await persistentControl.focus()
+    await expect(persistentControl).toBeFocused()
+    await page.setViewportSize({ width: 1024, height: 768 })
+    await expect(persistentControl).toBeVisible()
+    await expect(persistentControl).toBeFocused()
+    await expectNoPageOverflow(page)
+  })
+}
+
 for (const status of ['live', 'paused', 'failed'] as const) {
   test(`${status} status and focus indicators meet contrast targets in both themes`, async ({ page }, testInfo) => {
     const posts: string[] = []
@@ -364,6 +403,7 @@ for (const status of ['live', 'paused', 'failed'] as const) {
     const subtaskTab = page.getByRole('button', { name: 'Subtask', exact: true })
     const outputTab = page.getByRole('button', { name: 'Output log', exact: true })
     const footer = page.locator('.ac-log-foot')
+    const activityText = page.locator('.ac-log-activity')
     await expect(page.getByRole('button', { name: 'Reassign', exact: true })).toBeDisabled()
     await expect(page.locator('.ac-control-reason--detail')).toBeVisible()
 
@@ -375,7 +415,7 @@ for (const status of ['live', 'paused', 'failed'] as const) {
       expect(controlReasonContrast).toBeGreaterThanOrEqual(4.5)
       await outputTab.click()
       await expect(footer).toHaveAttribute('data-activity', status === 'live' ? 'active' : status)
-      const statusContrast = await contrastRatio(footer, '.ac-log')
+      const statusContrast = await contrastRatio(activityText, '.ac-log')
       const runLabelContrast = await contrastRatio(page.locator('.ac-run-label'), '.ac-run-pill')
       expect(statusContrast).toBeGreaterThanOrEqual(4.5)
       expect(runLabelContrast).toBeGreaterThanOrEqual(4.5)
@@ -411,5 +451,25 @@ test.describe('shared authenticated theme', () => {
     await page.getByRole('button', { name: 'Sign out', exact: true }).click()
     await expect(page.getByLabel('Operator key', { exact: true })).toBeVisible()
     await expect(page.locator('.ac-auth-screen')).toHaveAttribute('data-theme', 'dark')
+  })
+
+  test('session-bar focus is not replaced by stale Context focus at the compact breakpoint', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    await page.goto('/')
+    await page.getByLabel('Operator key', { exact: true }).fill(OPERATOR_TOKEN)
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Snapshot', exact: true })).toBeEnabled()
+
+    const interrupt = page.getByRole('button', { name: 'Interrupt', exact: true })
+    await interrupt.focus()
+    await expect(interrupt).toBeFocused()
+    const signOut = page.getByRole('button', { name: 'Sign out', exact: true })
+    await signOut.focus()
+    await expect(signOut).toBeFocused()
+
+    await page.setViewportSize({ width: 1024, height: 768 })
+    await expect(signOut).toBeVisible()
+    await expect(signOut).toBeFocused()
+    await expectNoPageOverflow(page)
   })
 })
