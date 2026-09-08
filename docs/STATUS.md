@@ -19,7 +19,8 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Queue lease caller correction | [PR #16](https://github.com/DaveHomeAssist/agent-chat/pull/16), merged Sep 8 as `e48bc17`; 17 protocol checks pass |
 | Production browser regression CI | [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), merged Sep 8, `9ed160c`; seven Chromium checks and retained evidence |
 | Explicit Message/Interrupt acceptance | [PR #18](https://github.com/DaveHomeAssist/agent-chat/pull/18), merged Sep 8 as `1a7819f`; actual 409 draft retention and no-effect refusals verified |
-| Truthful console controls and activity | [PR #19](https://github.com/DaveHomeAssist/agent-chat/pull/19), merged Sep 8 as `78f84fc`; token disclosure and dynamic PR labels, with theme/mobile limits below |
+| Truthful console controls and activity | [PR #19](https://github.com/DaveHomeAssist/agent-chat/pull/19), merged Sep 8 as `78f84fc`; token disclosure and dynamic PR labels; presentation extended by PR #22 below |
+| Responsive light/dark console | [PR #22](https://github.com/DaveHomeAssist/agent-chat/pull/22), merged Sep 8 as `8419cb9`; 41 Chromium cases and independent presentation review pass |
 
 ## Snapshot delivery evidence (earlier Sep 8 checks)
 
@@ -133,17 +134,15 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   passes the same gates at product revision `78f84fc`; all agent/tool work is mocked.
   Shared browser port 18787 was free before launch and after teardown.
 - Fidelity remains **Partial**. Atomic task transfer, a real tool-approval contract
-  and pending-action locks remain unimplemented. Console control images show dark
-  mode and the inherited **1180px minimum width on mobile**. Auth-screen light/dark
-  tests do not prove console theme support or a responsive phone console. Those
-  presentation foundations remain separate work; the progress page's responsive
-  light/dark checks are a different surface.
+  and pending-action locks remain unimplemented. The earlier dark-only images and
+  1180px minimum-width limitation are superseded by delivered PR #22 below.
+  Progress-page checks remain a separate surface from console acceptance.
 - Status retains **14 Complete / 11 Remaining**, 25 stable IDs and historical dates.
   Code revision identifies the verified product merge, not a metadata commit.
   Runtime persistence/history/resume, M1 paid acceptance, M3 real tools and M4
   hosting/remote acceptance remain pending. No paid calls or hosting changes occurred.
 
-## Recovery final-review hold and independent console work
+## Recovery final-review hold and pending command design
 
 The proposed recovery contract is **held**, while the merged V1 SQLite module
 remains accepted. Final independent review resolved the original provider ordinal
@@ -163,18 +162,51 @@ further contract revision requires Dave's explicit authorization to extend that 
 No third correction, migration, runtime wiring or history/resume implementation is
 currently authorized. Persistence remains In Progress with this explicit design hold.
 
-Independent console responsive/light-dark work (AC-AUTH-007) is in progress and
-is not delivered by this status update. Existing console theme/mobile limits above
-still apply. The private **AC-VERIFY-008-command-pending-design.md** proposes client
-command exclusion and draft/context safety; it is design-only, with its acceptance
-matrix UNEXECUTED. Pending locks, edited-draft protection, atomic task transfer and
-a real approval contract remain incomplete. The coordinator owns future file/fixture
-allocation; independent work does not relax the recovery hold.
+The pending-command and draft-safety design is independently accepted through the
+private **AC-VERIFY-009-command-contract.md** supplement and correction matrix.
+It specifies strict acknowledgements, contiguous/full-snapshot synchronization,
+bounded refresh and caller-rendered context/intent admission. All proposed
+implementation acceptance remains **UNEXECUTED**. Pending locks, edited-draft
+protection, atomic task transfer and a real approval contract remain incomplete.
+Implementation needs its own executor assignment; this does not relax recovery.
 
-This documentation sweep refreshed current Git/CI and the final review decision.
-Product code remains `78f84fc`; prior main CI at `5b841b1` passed 183 Node tests,
-17 queue tests, 42 simulator checks and 24 Chromium cases. No unchanged local
-product suite or fixture listener was launched for this documentation-only task.
+## Delivered responsive console and both themes — PR #22
+
+- Independently accepted [PR #22](https://github.com/DaveHomeAssist/agent-chat/pull/22)
+  merged September 8 at 15:16:19 UTC as `8419cb9f8e0f536b1b34d1f6a6618b8f76c2567b`.
+  Its product tree matches accepted head `80f26498986364eda3b9aebaa235cce8c118fef6`;
+  only previously delivered status documents differ. No unreviewed product changes
+  entered this integration.
+- The local and authenticated console defaults to light and exposes a shared theme
+  control. Room/Agents/Context navigation preserves usable phone/tablet width;
+  desktop and ultrawide retain multiple panels. Actual console layouts cover
+  320/390/768/1024/1440/3440px, superseding the inherited mobile floor.
+- Every mobile token label/value is visibly above Room in both themes, with native
+  keyboard/touch disclosure. Panel navigation moves focus to visible destinations;
+  resize preserves stable Snapshot/theme/session focus. Activity text and focus
+  indicators meet the tested contrast thresholds in both themes.
+- Authentication executed 17 targeted layout and 41 full Chromium cases at the
+  accepted source. The independent reviewer inspected corrected source/assertions
+  and final images; integration also inspected decisive phone/tablet/status images.
+  Preserved pre-fix failures distinguish actual occlusion/focus issues and a stale
+  local bundle from the final passing production evidence.
+- [Exact product main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34243674321)
+  passes clean installation, build/typechecks, **183 Node tests, 17 queue tests,
+  42 simulator checks and 41 Chromium cases**. No unchanged broad local product
+  suite or fixture listener was launched again for this documentation closeout.
+- LIVE/PAUSED/FAILED contrast snapshots are browser-local synthetic presentation
+  inputs; agent/tool operations in application checks remain mocked. This proves
+  neither provider acceptance nor real repository work. Authentication, Snapshot,
+  command refusal and unavailable-control regressions remain strict.
+- Fidelity remains **Partial**, with **14 Complete / 11 Remaining**, all 25 IDs and
+  historical dates preserved. Pending-command safety is accepted design only;
+  Reassign and real tool auto-approval are still unavailable. Recovery retains the
+  three-issue hold above. M1 budgets/runner, M3 real tools and M4 hosting/remote
+  acceptance remain incomplete. Earlier paid/hosting observations keep their dates.
+- Status-file rendering is checked separately at 1440 × 1000, 390 × 844 and
+  3440 × 968 in both themes, including pagination/controls and all 25 print rows.
+  This is a local/repository document, not a deployment or proof of the user's
+  existing browser tab. Code revision records the product merge, not a docs SHA.
 
 ## Executor coordination delivery
 
@@ -206,7 +238,7 @@ product suite or fixture listener was launched for this documentation-only task.
 | Milestone | State | Next action / dependency |
 | --- | --- | --- |
 | M1 real-model acceptance | Partial | Provider access demonstrated; explicitly approved two-run budgets and runner environment still needed |
-| M2 unattended operation | Partial | Snapshot, auth, command refusals, truthful controls and browser CI delivered; recovery contract held, runtime/history unimplemented; command safety design-only, console theme/mobile work in progress; transfer/approval contracts pending |
+| M2 unattended operation | Partial | Snapshot, auth, command refusals, truthful controls and browser CI delivered; recovery contract held, runtime/history unimplemented; console themes/responsiveness delivered; command safety accepted but unexecuted; transfer/approval contracts pending |
 | M3 real repository | Not started | Isolated Git/command adapter and sandbox PR acceptance after M2 |
 | M4 remote deployment | Not started | Hosting decision, durable runtime, HTTPS and deployed auth/remote acceptance after M3 |
 
@@ -235,6 +267,9 @@ before sharing. No application real-repository run or hosting change was perform
   pre-merge auth status is superseded by the integrated authentication delivery above.
 - Sep 8: Command acceptance PR #18 and console improvements PR #19 merged; their
   combined product passes all offline gates. Fidelity remains Partial.
+
+- Sep 8: Reviewed responsive/light-dark console PR #22 merged with successful main
+  CI and 41 browser cases; command safety remains unexecuted and fidelity Partial.
 
 Future delivery dates are unscheduled. Update this file and structured visual
 status after meaningful changes under the root AGENTS.md contract.
