@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type {
   Agent,
   AgentId,
@@ -101,16 +101,25 @@ export function useRun(): RunState {
   const [snapshot, dispatch] = useReducer(reduce, null)
   const [connection, setConnection] = useState<ConnectionStatus>('connecting')
   const [lastError, setLastError] = useState<string | null>(null)
+  const mounted = useRef(false)
 
-  useEffect(() => connectEvents(dispatch, setConnection), [])
+  useEffect(() => {
+    mounted.current = true
+    const disconnect = connectEvents(dispatch, setConnection)
+    return () => {
+      mounted.current = false
+      disconnect()
+    }
+  }, [])
 
   const run = useCallback(async (command: () => Promise<CommandResult>): Promise<boolean> => {
     try {
       await command()
+      if (!mounted.current) return false
       setLastError(null)
       return true
     } catch (err) {
-      setLastError(err instanceof Error ? err.message : String(err))
+      if (mounted.current) setLastError(err instanceof Error ? err.message : String(err))
       return false
     }
   }, [])
