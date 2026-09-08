@@ -717,16 +717,20 @@ export interface RunStore {
 // Orchestrator
 // ---------------------------------------------------------------------------
 
+export type CommandAcceptance =
+  | { accepted: true }
+  | { accepted: false; reason: 'run_unavailable' | 'empty_message' | 'no_active_operation' }
+
 export interface Orchestrator {
   start(): Promise<void>
   pause(): void
   resume(): void
   setGate(enabled: boolean): void
   approve(): void
-  /** Parses slash commands; otherwise posts the message and wakes the target. */
-  humanMessage(body: string, target: MessageTarget): Promise<void>
-  /** Abort the agent's in-flight model call and mark them idle. */
-  interrupt(agent: AgentId): void
+  /** Accepts a recognized slash command or posts a message and queues its wake; refusals have no effects. */
+  humanMessage(body: string, target: MessageTarget): Promise<CommandAcceptance>
+  /** Accepts only a live, non-aborted operation; refusals have no effects. */
+  interrupt(agent: AgentId): CommandAcceptance
   dispose(): void
 }
 

@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-09-08T09:10:13-04:00",
-  "verifiedLabel": "Sep 8, 2026 · 9:10 AM ET",
-  "codeRevision": "e48bc1744caf035056cf64178563951674a39dd5",
+  "verifiedAt": "2026-09-08T09:35:21-04:00",
+  "verifiedLabel": "Sep 8, 2026 · 9:35 AM ET",
+  "codeRevision": "55e4dbd1f8228bceb6d9f178bc14270367e522c3",
   "overall": "Partial",
-  "summary": "Authentication PR #15, persistence module #13 and queue repair #16 are merged. Integrated main e48bc17 passes Linux build/typechecks, 167 Node tests, 17 queue tests, 42 simulator checks and 17 Chromium checks. Auth is Complete; persistence remains In Progress because runtime storage/history/resume are not wired. Paid-model evidence retains its earlier Sep 8 single-call scope; hosting remains unverified and M1–M4 remain incomplete.",
+  "summary": "Delivered main ca97d42 includes reviewed auth, storage module and queue repair with passing CI. PR #18 at 55e4dbd stages explicit Message/Interrupt acceptance: 177 Node, 17 queue, 42 simulator and 18 Chromium checks pass in Linux CI, including real 409 draft preservation. Independent review/merge remains required. Fidelity stays Partial; persistence runtime/history/resume, other controls and M1–M4 acceptance remain unfinished. Earlier paid/hosting evidence retains its stated scope.",
   "items": [
     {
       "id": "console",
@@ -43,8 +43,8 @@
       "phase": "Delivered",
       "actualDate": "2026-09-05",
       "dateLabel": "Sep 5 · reverified Sep 8",
-      "notes": "Integrated main e48bc17 passes Linux CI: production build/typechecks, 167 Node tests, 17 queue tests, 42 simulator checks and 17 Chromium checks. Combined auth/storage candidate also passed all offline gates locally; PR #16 fixes the earlier leading-dash lease caller failure.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34230108153"
+      "notes": "Delivered main ca97d42 passes 167 Node/17 browser checks. Staged PR #18 at 55e4dbd passes build/typechecks, 177 Node, 17 queue, 42 simulator and 18 browser checks in CI. New regressions prove explicit command refusal and preserve strict held-body logout/expiry authorization. Review/merge remains pending.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34232539938"
     },
     {
       "id": "browser",
@@ -53,8 +53,8 @@
       "phase": "Delivered",
       "actualDate": "2026-09-06",
       "dateLabel": "Sep 6 · reverified Sep 8",
-      "notes": "Seventeen production Chromium checks pass on integrated main with mock agents: approval to Done, Snapshot, SSE reconnect/replay, auth logout/expiry and loopback HTTPS cookies, plus desktop/mobile/ultrawide login and progress views. No paid calls or remote deployment proof.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34230108153"
+      "notes": "Delivered main has 17 production Chromium checks with mock agents. Staged PR #18 adds a real backend 409 case proving exact draft retention, visible error, no human append or automatic retry, then a later explicit accepted send. All 18 pass in CI; no paid or deployed acceptance.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34232539938"
     },
     {
       "id": "progress-document",
@@ -63,8 +63,8 @@
       "phase": "Delivered",
       "actualDate": "2026-09-06",
       "dateLabel": "Sep 6, 2026",
-      "notes": "Standalone source/generated records now distinguish delivered auth and queue fixes from the merged storage module and pending runtime/history/resume. Desktop/mobile/ultrawide pagination, filters, theme and all-item print checks verify the document.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/project-progress/README.md"
+      "notes": "Standalone records preserve delivered auth and queue fixes, the module-only storage boundary and pending command-acceptance PR #18. Stable IDs, dates and 14 Complete/11 Remaining counts are retained; canonical page refresh awaits separate review/merge.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/18"
     },
     {
       "id": "ledger",
@@ -202,8 +202,8 @@
       "status": "Complete",
       "phase": "M2",
       "dateLabel": "Sep 8 · 8:10 AM ET",
-      "notes": "PR #11 delivered seven baseline Chromium checks; merged #15 adds ten auth/HTTPS/login checks. All 17 pass in integrated main CI with retained browser evidence. History/recovery browser coverage remains pending runtime integration.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34230108153",
+      "notes": "Main has 17 delivered Chromium checks. PR #18 stages an additional real Message refusal/draft test; all 18 pass in its isolated Linux CI. History/recovery and separate controls coverage remain pending; this runtime PR is not merged.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34232539938",
       "actualDate": "2026-09-08"
     },
     {
@@ -213,8 +213,8 @@
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Snapshot is wired and browser verified. Reassign, activity footer and remaining fidelity checklist are still outstanding.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+      "notes": "Snapshot is delivered. PR #18 stages explicit Message/Interrupt acceptance and 409 errors, with backend no-effect/paused/abort tests and browser draft preservation passing. Review/merge and separate frontend controls work remain pending; full reassignment and pending-action locks are not implemented.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/18"
     },
     {
       "id": "workspace",
