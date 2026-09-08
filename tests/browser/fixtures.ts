@@ -2,7 +2,7 @@ import { fork } from 'node:child_process'
 import { once } from 'node:events'
 import { test as base, expect } from '@playwright/test'
 
-interface MockServer { command(name: 'disconnect' | 'replay'): Promise<void> }
+interface MockServer { command(name: 'disconnect' | 'replay'): Promise<Record<string, unknown>> }
 
 export const test = base.extend<{ mockServer: MockServer }>({
   mockServer: [async ({}, use, testInfo) => {
@@ -31,12 +31,13 @@ export const test = base.extend<{ mockServer: MockServer }>({
         child.send({ id, command })
         const result = await response
         if (result.error) throw new Error(String(result.error))
+        return result
       } })
     } finally {
       if (testInfo.status !== testInfo.expectedStatus) {
         await testInfo.attach('mock-server.log', { body: output, contentType: 'text/plain' })
       }
-      if (child.exitCode === null) {
+      if (child.exitCode === null && child.signalCode === null) {
         const exited = once(child, 'exit')
         child.kill('SIGTERM')
         const timer = setTimeout(() => child.kill('SIGKILL'), 3000)

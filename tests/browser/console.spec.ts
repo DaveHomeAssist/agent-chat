@@ -83,7 +83,7 @@ test('dropped SSE reconnects with fresh state and ignores replayed thread frames
   expect(response.ok()).toBeTruthy()
   await expect(page.getByRole('button', { name: 'Snapshot', exact: true })).toBeEnabled()
   await expect(page.getByText(body, { exact: true })).toHaveCount(1)
-  await mockServer.command('replay')
+  expect((await mockServer.command('replay')).replayedBody).toBe(body)
   // A fresh command is an ordering barrier: its event follows both replay frames.
   await page.getByRole('textbox', { name: 'Message the room' }).fill('After replay ordering barrier.')
   await page.getByRole('button', { name: 'Send', exact: true }).click()

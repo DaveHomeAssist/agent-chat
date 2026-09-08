@@ -38,7 +38,7 @@ process.on('message', ({ id, command }) => {
       const frame = `event: ${lastAppend.type}\ndata: ${JSON.stringify(lastAppend)}\nid: ${lastAppend.seq}\n\n`
       for (const stream of streams) stream.write(frame + frame)
     } else throw new Error('Unknown fixture command')
-    process.send({ id, ok: true })
+    process.send({ id, ok: true, replayedBody: command === 'replay' ? lastAppend.item.body : undefined })
   } catch (error) { process.send({ id, error: error.message }) }
 })
 server.once('error', (error) => { console.error(error); process.exit(1) })
