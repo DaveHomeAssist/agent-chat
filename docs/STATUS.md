@@ -14,6 +14,7 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Visual progress document, light mode, filters and pagination | PRs #5–7, merged |
 | Real-model acceptance runner | PR #8, merged; implementation `4042e34`; offline validation complete |
 | Useful paid model probe and Snapshot export | [PR #9](https://github.com/DaveHomeAssist/agent-chat/pull/9), code `0fc51ca`; [receipt and browser evidence](USEFUL_MODEL_PROBE.md) |
+| Production browser regression CI | [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), merged Sep 8, `9ed160c`; seven Chromium checks and retained evidence |
 
 ## Snapshot delivery evidence (earlier Sep 8 checks)
 
@@ -35,10 +36,10 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 - Hosting remains Unknown. GitHub returned no deployment records on Sep 8; that
   does not establish absence of hosting elsewhere.
 
-## Browser regression proposal — PR #11, not merged
+## Browser regression delivery — PR #11 merged
 
-- [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), product code
-  `dc89a1d39420f410f874b6b19343cbca6a4a797d`, adds seven Chromium tests to normal
+- [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), merged September 8
+  as `9ed160cab42685de1120b409060f07cb6669fe64`, adds seven Chromium tests to normal
   PR/main CI while retaining all existing gates. See [browser checks](BROWSER_TESTS.md).
 - Local clean installation, production build/typechecks, 105 Node tests, 16 queue
   tests, 42 simulator selfchecks and all seven browser tests pass.
@@ -48,12 +49,13 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   repository operations are mocked/simulated; there are no paid application calls.
 - The refreshed progress document is checked at 1440 × 1000, 390 × 844 and
   3440 × 968, including every item through pagination and all items in print mode.
-- [Linux Node 22 CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34223758973)
-  passes at `dc89a1d`. Browser report/failure artifacts retain for 14 days;
-  production bundles retain for seven days. Retention is not permanent evidence.
-- Coordinator review and merge remain required. Authentication, persisted history,
-  recovery, remaining controls and real repository execution are not completed by
-  this browser foundation.
+- [Main Linux Node 22 CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34224608943)
+  passes at merge `9ed160c`, including all seven browser tests and existing gates.
+  Its [browser evidence](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34224608943/artifacts/10055179925)
+  expires September 22 and production bundle September 15, unless removed earlier.
+- Authentication/persistence module PRs remain under review and correction before
+  their separate merge/integration. Runtime wiring, historical runs, crash recovery,
+  remaining controls and real repository execution remain incomplete.
 
 ## Executor coordination delivery
 
@@ -66,8 +68,9 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   executor registrations and assignments, not fixtures. Live state remains outside
   Git, with directory mode 0700 and DB mode 0600. No model API calls are made by
   this communication system.
-- The Sep 8 local queue now shows persistence/authentication design reports and
-  claimed module follow-ups. Verification is a registered local Codex subagent.
+- Native Codex claim/report/follow-up cycles are verified. Local verification also
+  completed a browser implementation report, then claimed the coordinator's merge
+  follow-up through the optional [subagent transport](../coordination/README.md#optional-local-codex-subagent-transport).
   Claude's cloud review reported but could not reach the Mac-local queue; its lack
   of local registration did not mean it had not launched. The coordinator routes
   local execution through supported task/subagent messages. Sleeping external
@@ -75,15 +78,15 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 - Implementation workers own isolated PRs; the verification/integration executor
   owns shared wiring, progress records, sequential merges and final acceptance.
   This infrastructure does not complete product persistence, auth or real Git work.
-- Earlier product runtime/browser and hosting claims above retain their original
-  evidence dates. This coordination change does not reverify the entire application.
+- Earlier paid-model and hosting claims above retain their original evidence dates.
+  Fresh main CI proves the offline build/runtime/browser scope only.
 
 ## Remaining milestones
 
 | Milestone | State | Next action / dependency |
 | --- | --- | --- |
 | M1 real-model acceptance | Partial | Provider access demonstrated; explicitly approved two-run budgets and runner environment still needed |
-| M2 unattended operation | Partial | Current-run Snapshot delivered; persistence/recovery, auth, historical runs, browser CI and remaining console controls |
+| M2 unattended operation | Partial | Current-run Snapshot and browser CI delivered; persistence/recovery, auth, historical runs and remaining console controls |
 | M3 real repository | Not started | Isolated Git/command adapter and sandbox PR acceptance after M2 |
 | M4 remote deployment | Not started | Hosting decision, persistence, auth, HTTPS and deployed acceptance after M3 |
 
@@ -105,6 +108,8 @@ before sharing. No application real-repository run or hosting change was perform
 - Sep 8: Durable external executor coordination added, with offline process tests.
   Local workers subsequently registered and claimed product module/browser work;
   implementation PRs and integration remain separate acceptance.
+- Sep 8: PR #11 browser regression CI merged and main checks passed. Native task
+  and local subagent follow-up transport are verified; no Claude cloud bridge is implied.
 
 Future delivery dates are unscheduled. Update this file and structured visual
 status after meaningful changes under the root AGENTS.md contract.

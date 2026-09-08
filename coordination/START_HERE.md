@@ -5,6 +5,20 @@ three separate sessions. The initial assignments are design/baseline work only;
 the coordinator supplies implementation assignments after reviewing those results.
 The coordinator must enqueue the matching starter task before it can be claimed.
 
+These are initial bootstrap prompts, not instructions to rerun completed tasks.
+Existing workers use their current queued assignment. On September 8, native
+Codex workers completed claim/report/follow-up cycles, and verification completed
+browser CI through the optional local subagent transport documented in
+[README.md](README.md#optional-local-codex-subagent-transport). Such a subagent
+registers its actual local worktree but omits `--thread`; the inherited thread ID
+belongs to the coordinator. Its recorded collaboration identity receives follow-ups
+through `collaboration.followup_task`, after the next queue assignment is created.
+
+A Claude cloud container may not reach this Mac-local queue. Its absence from the
+local registry does not mean it was never launched. Report the access limitation
+and available review evidence; do not create another live database or forge a
+registration. No automatic cloud bridge or sleeping external launcher is supplied.
+
 ## Persistence
 
 ```text

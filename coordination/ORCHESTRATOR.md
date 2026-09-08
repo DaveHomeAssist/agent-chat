@@ -14,6 +14,21 @@ For registered Codex workers, use native `send_message_to_thread` with their ver
 
 A five-minute thread heartbeat provides recovery if a notification is missed or the coordinator becomes idle. It should stay quiet while nothing changes. It does not create an always-running external server. A closed/offline client, unavailable host or exhausted account allowance can delay work; preserve pending assignments and surface actionable access problems once. Do not claim automatic wakeup of inactive external Claude/browser conversations. An active Claude Code worker can use the queue's bounded wait command; an inactive external worker needs a supported launcher or user restart before it can receive work.
 
+For an authorized local Codex subagent, the verified alternative is queue delivery
+plus collaboration tools; see [the transport contract](README.md#optional-local-codex-subagent-transport).
+Require the real exclusive checkout, `platform=codex`, `host=local` and no `thread`
+registration. An inherited `CODEX_THREAD_ID` belongs to the parent. Persist its
+actual collaboration task name and returned agent ID in a coordinator decision.
+Enqueue before `collaboration.followup_task`; use `collaboration.send_message` for
+active steering and `collaboration.list_agents` to reconcile uncertain delivery.
+Reports still go to the queue first. A missing subagent or stale lease requires
+ownership/effects reconciliation before replacement, never blind replay.
+
+Claude cloud sessions cannot be assumed to share the Mac-local queue. An absent
+local registration is not evidence that the external session never launched.
+Classify its reported review separately and route local execution explicitly;
+never invent a cloud bridge, duplicate the live database or forge a local report.
+
 ## Coordinator cycle
 
 1. Read Dave's newest instructions first. A stop or pause takes precedence over assignments. Pause dispatch in the queue, message active registered workers to stop at a safe checkpoint and preserve their changes; never assume a queue pause cancels already executing work.

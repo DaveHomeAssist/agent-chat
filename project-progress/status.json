@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-09-08T08:03:24-04:00",
-  "verifiedLabel": "Sep 8, 2026 · 8:03 AM ET",
-  "codeRevision": "dc89a1d39420f410f874b6b19343cbca6a4a797d",
+  "verifiedAt": "2026-09-08T08:12:59-04:00",
+  "verifiedLabel": "Sep 8, 2026 · 8:12 AM ET",
+  "codeRevision": "9ed160cab42685de1120b409060f07cb6669fe64",
   "overall": "Partial",
-  "summary": "Seven production browser checks pass locally and in Linux Node 22 CI with mock agents; PR #11 awaits review/merge. Clean-install build, 105 Node tests, 16 queue tests and 42 simulator checks pass. Persistence and authentication executors are working on isolated modules. Earlier paid-model and hosting evidence retains its original Sep 8 scope; M1–M4 remain incomplete.",
+  "summary": "Browser regression CI is delivered: PR #11 merged and main Linux Node 22 CI passes seven Chromium checks, 105 Node tests, 16 queue tests and 42 simulator checks. Native executor and local subagent follow-up cycles are verified. Persistence/authentication modules remain under review before integration. Paid-model and hosting evidence retains its earlier Sep 8 scope; M1–M4 are incomplete.",
   "items": [
     {
       "id": "console",
@@ -43,8 +43,8 @@
       "phase": "Delivered",
       "actualDate": "2026-09-05",
       "dateLabel": "Sep 5 · reverified Sep 8",
-      "notes": "Fresh local and Linux Node 22 CI clean install, production build/typechecks, 105 Node tests and 42 simulator checks pass at dc89a1d. The prior local Vite stall was not reproduced in the isolated verification checkout. PR #11 remains unmerged.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34223758973"
+      "notes": "Main Linux Node 22 CI passes clean install, production build/typechecks, 105 Node tests, 16 queue tests, 42 simulator checks and seven Chromium regressions at merge 9ed160c. The earlier local Vite stall was not reproduced after clean installation in the isolated verification checkout.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34224608943"
     },
     {
       "id": "browser",
@@ -53,7 +53,7 @@
       "phase": "Delivered",
       "actualDate": "2026-09-06",
       "dateLabel": "Sep 6 · reverified Sep 8",
-      "notes": "Seven automated Chromium checks pass locally and in Linux CI against production code with mock agents, including explicit approval to Done, real SSE reconnection/deduplication, Snapshot JSON/error retry and progress-page views. PR #11 awaits review/merge; no paid calls.",
+      "notes": "Seven Chromium checks pass locally and in main CI against production code with mock agents, including explicit approval to Done, native SSE reconnect/deduplication, Snapshot JSON/error retry and progress views. PR #11 is merged; no paid application calls.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/11"
     },
     {
@@ -63,7 +63,7 @@
       "phase": "Delivered",
       "actualDate": "2026-09-06",
       "dateLabel": "Sep 6, 2026",
-      "notes": "PRs #5–7 delivered standalone status, theme and table controls. Sep 8 browser CI proposal refresh records pending merge and actual executor registrations; screenshots, pagination and print are checked at desktop/mobile/ultrawide.",
+      "notes": "PRs #5–7 delivered standalone status, theme and table controls. Current records reflect merged browser CI, verified local follow-ups and pending auth/persistence integration. Desktop/mobile/ultrawide pagination, theme and all-item print checks pass.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/7"
     },
     {
@@ -119,12 +119,12 @@
     {
       "id": "executor-wakeup",
       "title": "Registered executor wakeup acceptance",
-      "status": "Partial",
+      "status": "Complete",
       "phase": "Coordination",
-      "plannedDate": null,
-      "dateLabel": "Sep 8 · local workers active",
-      "notes": "Local queue confirms persistence/authentication initial reports and claimed follow-up module tasks. Verification is registered as a local Codex subagent. Claude cloud review reported but could not access the Mac-local queue; no automatic external launcher or cloud bridge is claimed. End-to-end delivery acceptance remains separate.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/28bd3c0d1ad6ab9a001fc278203fe05b2335f8bf/coordination/START_HERE.md"
+      "dateLabel": "Sep 8, 2026",
+      "notes": "Native Codex claim/report/follow-up cycles and local verification subagent report/follow-up claim are verified. The optional local transport records collaboration identity and omits inherited native thread IDs. Claude cloud cannot access this Mac-local queue; no cloud bridge or sleeping external launcher is provided.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/coordination/README.md#optional-local-codex-subagent-transport",
+      "actualDate": "2026-09-08"
     },
     {
       "id": "access",
@@ -173,7 +173,7 @@
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Persistence executor has claimed its isolated storage-module implementation after design review. Product wiring, historical UI and crash/recovery acceptance are pending; current main still stores runs in memory.",
+      "notes": "Isolated persistence module PR is under review and correction before merge. Runtime wiring, historical UI and crash/recovery acceptance are pending; main still stores runs in memory.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
     },
     {
@@ -183,7 +183,7 @@
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Authentication executor has claimed its isolated session/auth-module implementation after design review. API/SSE wiring and browser authentication acceptance are pending; current main remains unauthenticated.",
+      "notes": "Isolated authentication module PR is under review and correction before merge. API/SSE wiring and browser authentication acceptance are pending; main remains unauthenticated.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
     },
     {
@@ -199,12 +199,12 @@
     {
       "id": "browser-ci",
       "title": "Browser regression tests in CI",
-      "status": "Partial",
+      "status": "Complete",
       "phase": "M2",
-      "plannedDate": null,
-      "dateLabel": "Unscheduled",
-      "notes": "PR #11 adds seven Chromium regressions to the existing PR/main gate; Linux Node 22 CI run 34223758973 passes at dc89a1d. Browser artifacts expire Sep 22 unless removed earlier. Coordinator review and merge are pending; auth/history/recovery coverage is still pending.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/11"
+      "dateLabel": "Sep 8 · 8:10 AM ET",
+      "notes": "PR #11 merged as 9ed160c. Main Linux Node 22 CI run 34224608943 passes all seven Chromium checks and existing gates. Browser artifacts expire Sep 22 unless removed earlier. Authentication/history/recovery coverage remains pending those integrations.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34224608943",
+      "actualDate": "2026-09-08"
     },
     {
       "id": "fidelity",
