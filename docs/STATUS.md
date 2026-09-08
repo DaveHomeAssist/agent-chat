@@ -18,6 +18,8 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Durable storage module | [PR #13](https://github.com/DaveHomeAssist/agent-chat/pull/13), merged Sep 8 as `6b984db`; runtime/history/resume remain pending |
 | Queue lease caller correction | [PR #16](https://github.com/DaveHomeAssist/agent-chat/pull/16), merged Sep 8 as `e48bc17`; 17 protocol checks pass |
 | Production browser regression CI | [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), merged Sep 8, `9ed160c`; seven Chromium checks and retained evidence |
+| Explicit Message/Interrupt acceptance | [PR #18](https://github.com/DaveHomeAssist/agent-chat/pull/18), merged Sep 8 as `1a7819f`; actual 409 draft retention and no-effect refusals verified |
+| Truthful console controls and activity | [PR #19](https://github.com/DaveHomeAssist/agent-chat/pull/19), merged Sep 8 as `78f84fc`; token disclosure and dynamic PR labels, with theme/mobile limits below |
 
 ## Snapshot delivery evidence (earlier Sep 8 checks)
 
@@ -103,34 +105,43 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   preserved historical completion dates. This evidence-only closeout uses integrated
   product revision `e48bc17`; documentation delivery does not create a new milestone.
 
-## Message and Interrupt acceptance — PR #18 staged for review
+## Integrated command acceptance and console improvements
 
-- Delivered main remains `ca97d42b937deaed11d0ef5c037fd80c4cf02527`, with
-  [passing main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34230602645).
-  [PR #18](https://github.com/DaveHomeAssist/agent-chat/pull/18) stages backend
-  acceptance at `55e4dbd1f8228bceb6d9f178bc14270367e522c3`; it is not merged.
-- Message and Interrupt return explicit accepted/refused results. HTTP 409 now
+- Independently reviewed [PR #18](https://github.com/DaveHomeAssist/agent-chat/pull/18)
+  merged as `1a7819f39589df1b1fc8f14600664b689a3b6101`; its
+  [main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34234303071) passed.
+  This supersedes the earlier staged/not-merged status for that work.
+- Message and Interrupt return explicit accepted/refused results. HTTP 409
   describes an unavailable run or non-interruptible operation; 200 follows only
-  accepted work. Refusals leave public state, events, logs, typing and tasks alone.
-  Existing live/paused messages, recognized slash commands and one-time active
-  aborts are retained. Eligibility and effects stay within the existing synchronous
-  command boundary, including state changes while an HTTP body is held.
-- Early authentication and post-body authorization/request policy remain intact.
-  Deterministic held-body logout/expiry tests still demand 401 and zero effects.
-  No frontend, shared protocol, persistence, provider or scheduling code changed.
-- [Product CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34232539938)
-  passes clean installation/build/typechecks, **177 Node tests, 17 queue tests,
-  42 simulator checks and 18 Chromium tests**. The real backend/browser case
-  proves a refused Message retains the exact draft, shows an error, appends no
-  human item and does not retry automatically; a later explicit accepted send
-  clears the draft. Local backend/build gates pass. Corrected local browser launch
-  initially hit shared-port contention before assertions; CI ran in isolation.
-- Ten new unit/HTTP regressions and the production browser case reproduced the
-  old undefined/HTTP-200 result before the fix. No assertions were weakened.
-  Independent review and merge remain required; fidelity stays **Partial**.
-  Separate frontend control work, full reassignment, pending-action locks,
-  persistence/history/resume and M1–M4 acceptance are not completed by this slice.
-  Canonical status refresh is held for its later integration assignment.
+  accepted work. Refusals leave state, events, logs, typing and tasks alone.
+  Live/paused messages, recognized slash commands and one-time active aborts remain.
+  Deterministic held-body state changes prove eligibility at the effect boundary;
+  early auth and strict post-body logout/expiry 401 checks remain intact.
+- The actual browser refusal preserves the exact original draft, shows an error,
+  appends no human item and does not retry automatically. A later manual accepted
+  send clears the draft. Baseline Node/browser failures were preserved. The prior
+  local shared-port collision was resolved through an exclusive reservation;
+  subsequent targeted and full browser suites passed without peer process changes.
+- Independently reviewed [PR #19](https://github.com/DaveHomeAssist/agent-chat/pull/19)
+  merged as `78f84fc1ffb50afea3af54e5d710c1e24eb83cf4`. Activity now reflects connection,
+  terminal, paused, tool and model-call state. Reassign and tool auto-approval are
+  visibly unavailable with reasons. Native token disclosure exposes input/output/
+  cache counters by keyboard, pointer and touch; merge shortcuts reflect the run PR.
+- The conflict-free combined candidate passed build/typechecks, **183 Node tests,
+  17 queue tests, 42 simulator checks and 24 Chromium cases** locally. The #19 merge
+  tree exactly matched that tested candidate. [Combined main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34234695533)
+  passes the same gates at product revision `78f84fc`; all agent/tool work is mocked.
+  Shared browser port 18787 was free before launch and after teardown.
+- Fidelity remains **Partial**. Atomic task transfer, a real tool-approval contract
+  and pending-action locks remain unimplemented. Console control images show dark
+  mode and the inherited **1180px minimum width on mobile**. Auth-screen light/dark
+  tests do not prove console theme support or a responsive phone console. Those
+  presentation foundations remain separate work; the progress page's responsive
+  light/dark checks are a different surface.
+- Status retains **14 Complete / 11 Remaining**, 25 stable IDs and historical dates.
+  Code revision identifies the verified product merge, not a metadata commit.
+  Runtime persistence/history/resume, M1 paid acceptance, M3 real tools and M4
+  hosting/remote acceptance remain pending. No paid calls or hosting changes occurred.
 
 ## Executor coordination delivery
 
@@ -162,7 +173,7 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Milestone | State | Next action / dependency |
 | --- | --- | --- |
 | M1 real-model acceptance | Partial | Provider access demonstrated; explicitly approved two-run budgets and runner environment still needed |
-| M2 unattended operation | Partial | Snapshot, auth and browser CI delivered; storage module merged; runtime persistence/recovery, history and remaining controls pending |
+| M2 unattended operation | Partial | Snapshot, auth, command refusals, truthful controls and browser CI delivered; runtime persistence/recovery, history, task transfer/approval contracts, pending locks and console theme/mobile work remain |
 | M3 real repository | Not started | Isolated Git/command adapter and sandbox PR acceptance after M2 |
 | M4 remote deployment | Not started | Hosting decision, durable runtime, HTTPS and deployed auth/remote acceptance after M3 |
 
@@ -187,8 +198,10 @@ before sharing. No application real-repository run or hosting change was perform
 - Sep 8: PR #11 browser regression CI merged and main checks passed. Native task
   and local subagent follow-up transport are verified; no Claude cloud bridge is implied.
 
-- Sep 8: Reviewed auth module PR #12 merged with passing main CI. Full runtime
-  integration is staged in PR #15 for independent review; auth is not yet Complete.
+- Earlier Sep 8: Auth module PR #12 merged while runtime PR #15 was staged. That
+  pre-merge auth status is superseded by the integrated authentication delivery above.
+- Sep 8: Command acceptance PR #18 and console improvements PR #19 merged; their
+  combined product passes all offline gates. Fidelity remains Partial.
 
 Future delivery dates are unscheduled. Update this file and structured visual
 status after meaningful changes under the root AGENTS.md contract.
