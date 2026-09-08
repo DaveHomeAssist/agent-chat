@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import type { CSSVars } from '../lib/css'
 import { tint } from '../lib/theme'
 import { FILTER_DEFS, quickCommands } from '../constants'
@@ -26,6 +26,7 @@ interface Props {
   targetLabel: string
   targetColor: string
   onCycleTarget: () => void
+  composerRef?: RefObject<HTMLInputElement>
 }
 
 export function ChatPanel({
@@ -47,6 +48,7 @@ export function ChatPanel({
   targetLabel,
   targetColor,
   onCycleTarget,
+  composerRef,
 }: Props) {
   const threadRef = useRef<HTMLDivElement>(null)
   // True while the user sits at the bottom; scrolling up releases the pin.
@@ -149,6 +151,7 @@ export function ChatPanel({
           </button>
 
           <input
+            ref={composerRef}
             className="ac-input"
             aria-label="Message the room"
             value={draft}

@@ -1,5 +1,5 @@
 import type { CSSVars } from '../lib/css'
-import { COLOR, tint, type AppTheme } from '../lib/theme'
+import { colorForTheme, tint, type AppTheme, type ThemeColor } from '../lib/theme'
 import type { RunInfo, RunStats, RunStatus } from '../types'
 import { ThemeControl } from './ThemeControl'
 
@@ -20,13 +20,13 @@ interface Props {
   onToggleTheme: () => void
 }
 
-const STATUS_META: Record<RunStatus, { label: string; color: string; pulse: boolean }> = {
-  idle: { label: 'IDLE', color: COLOR.slate, pulse: false },
-  live: { label: 'LIVE', color: COLOR.teal, pulse: true },
-  paused: { label: 'PAUSED', color: COLOR.amber, pulse: false },
-  needs_approval: { label: 'NEEDS YOU', color: COLOR.amber, pulse: true },
-  done: { label: 'DONE', color: COLOR.slate, pulse: false },
-  failed: { label: 'FAILED', color: COLOR.pink, pulse: false },
+const STATUS_META: Record<RunStatus, { label: string; color: ThemeColor; pulse: boolean }> = {
+  idle: { label: 'IDLE', color: 'slate', pulse: false },
+  live: { label: 'LIVE', color: 'teal', pulse: true },
+  paused: { label: 'PAUSED', color: 'amber', pulse: false },
+  needs_approval: { label: 'NEEDS YOU', color: 'amber', pulse: true },
+  done: { label: 'DONE', color: 'slate', pulse: false },
+  failed: { label: 'FAILED', color: 'pink', pulse: false },
 }
 
 const ACTION_LABEL: Record<RunStatus, string> = {
@@ -68,7 +68,7 @@ export function RunHeader({
 }: Props) {
   const status: RunStatus = run?.status ?? 'idle'
   const meta = STATUS_META[status]
-  const runColor = meta.color
+  const runColor = colorForTheme(theme, meta.color)
 
   const pill: CSSVars = {
     '--ring': tint(runColor, 0.3),

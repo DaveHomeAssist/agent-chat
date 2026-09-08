@@ -1,5 +1,5 @@
 import type { CSSVars } from '../lib/css'
-import { statusMeta, tint } from '../lib/theme'
+import { statusMeta, tint, type AppTheme } from '../lib/theme'
 import type { Agent, AgentId, RunStats } from '../types'
 
 interface Props {
@@ -9,11 +9,12 @@ interface Props {
   accent: string
   gate: boolean
   stats: RunStats | null
+  theme: AppTheme
   onSelect: (id: AgentId) => void
   onToggleGate: () => void
 }
 
-export function AgentSidebar({ agents, selected, live, accent, gate, stats, onSelect, onToggleGate }: Props) {
+export function AgentSidebar({ agents, selected, live, accent, gate, stats, theme, onSelect, onToggleGate }: Props) {
   return (
     <aside className="ac-sidebar">
       <div className="ac-sidebar-head">
@@ -28,6 +29,7 @@ export function AgentSidebar({ agents, selected, live, accent, gate, stats, onSe
             agent={a}
             selected={selected === a.id}
             live={live}
+            theme={theme}
             onSelect={() => onSelect(a.id)}
           />
         ))}
@@ -76,14 +78,16 @@ function AgentRow({
   agent,
   selected,
   live,
+  theme,
   onSelect,
 }: {
   agent: Agent
   selected: boolean
   live: boolean
+  theme: AppTheme
   onSelect: () => void
 }) {
-  const status = statusMeta(agent.status, live)
+  const status = statusMeta(agent.status, live, theme)
 
   const row: CSSVars = {
     '--row-ring': selected ? tint(agent.color, 0.26) : 'var(--surface-5)',

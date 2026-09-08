@@ -34,6 +34,10 @@
   --shadow: rgba(30, 48, 77, 0.16);
   --shadow-heavy: rgba(30, 48, 77, 0.24);
   --on-accent: #071323;
+  --focus: #145ee8;
+  --status-active: #087568;
+  --status-paused: #875100;
+  --status-failed: #b42359;
 
   --ink: #172235;
   --ink-2: #243149;
@@ -77,6 +81,10 @@
   --shadow: rgba(0, 0, 0, 0.35);
   --shadow-heavy: rgba(0, 0, 0, 0.48);
   --on-accent: #0a0c11;
+  --focus: #92baff;
+  --status-active: #3ed8c4;
+  --status-paused: #f2b457;
+  --status-failed: #f472b6;
 
   --ink: #e8ebf3;
   --ink-2: #d8dde9;
@@ -138,8 +146,13 @@ button {
 }
 
 .ac-app :is(button, summary):focus-visible {
-  outline: 2px solid #92baff;
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+.ac-detail:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -4px;
 }
 
 ::-webkit-scrollbar {
@@ -709,7 +722,7 @@ button {
   border: 1px solid rgba(242, 180, 87, 0.3);
   border-radius: 5px;
   background: rgba(242, 180, 87, 0.08);
-  color: #f2b457;
+  color: var(--status-paused);
   font-family: var(--mono);
   font-size: 8.5px;
   letter-spacing: 0.04em;
@@ -1612,14 +1625,14 @@ button {
   padding-top: 5px;
 }
 .ac-log-foot--active {
-  --activity-color: #3ed8c4;
+  --activity-color: var(--status-active);
 }
 .ac-log-foot--paused,
 .ac-log-foot--blocked {
-  --activity-color: #f2b457;
+  --activity-color: var(--status-paused);
 }
 .ac-log-foot--failed {
-  --activity-color: #f472b6;
+  --activity-color: var(--status-failed);
 }
 .ac-log-foot--complete,
 .ac-log-foot--disconnected {
@@ -1723,11 +1736,11 @@ button {
   background: var(--tint);
 }
 .ac-banner--warn {
-  --c: #f2b457;
+  --c: var(--status-paused);
   --tint: rgba(242, 180, 87, 0.08);
 }
 .ac-banner--error {
-  --c: #f472b6;
+  --c: var(--status-failed);
   --tint: rgba(244, 114, 182, 0.08);
 }
 .ac-banner--info {
@@ -1748,7 +1761,7 @@ button {
   display: none;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 1120px) {
   .ac-app {
     background:
       radial-gradient(540px 220px at 15% -4%, rgba(124, 155, 255, 0.11), transparent 72%),
@@ -1800,13 +1813,10 @@ button {
     grid-area: stats;
     gap: 12px;
     min-width: 0;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    overflow: visible;
     padding: 1px 2px;
-    scrollbar-width: none;
     white-space: nowrap;
-  }
-  .ac-run-stats::-webkit-scrollbar {
-    display: none;
   }
   .ac-actions {
     grid-area: actions;

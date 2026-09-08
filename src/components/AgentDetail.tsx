@@ -1,6 +1,6 @@
 import type { CSSVars } from '../lib/css'
 import { shouldAnimateAgentActivity, type AgentActivity } from '../lib/activity'
-import { levelColor, statusMeta, toolColor, tint } from '../lib/theme'
+import { levelColor, statusMeta, toolColor, tint, type AppTheme } from '../lib/theme'
 import type { Agent, DetailTab } from '../types'
 
 const TAB_LABEL: Record<DetailTab, string> = {
@@ -18,13 +18,14 @@ interface Props {
   accent: string
   live: boolean
   activity: AgentActivity
+  theme: AppTheme
   onClose: () => void
   onMessage: () => void
   onInterrupt: () => void
 }
 
-export function AgentDetail({ agent, tab, onTab, accent, live, activity, onClose, onMessage, onInterrupt }: Props) {
-  const status = statusMeta(agent.status, live)
+export function AgentDetail({ agent, tab, onTab, accent, live, activity, theme, onClose, onMessage, onInterrupt }: Props) {
+  const status = statusMeta(agent.status, live, theme)
   const identity: CSSVars = {
     '--c': agent.color,
     '--tint': tint(agent.color, 0.14),
@@ -80,8 +81,8 @@ export function AgentDetail({ agent, tab, onTab, accent, live, activity, onClose
             onInterrupt={onInterrupt}
           />
         ) : null}
-        {tab === 'output' ? <OutputTab agent={agent} live={live} activity={activity} /> : null}
-        {tab === 'tools' ? <ToolsTab agent={agent} /> : null}
+        {tab === 'output' ? <OutputTab agent={agent} live={live} activity={activity} theme={theme} /> : null}
+        {tab === 'tools' ? <ToolsTab agent={agent} theme={theme} /> : null}
       </div>
     </div>
   )
@@ -166,14 +167,14 @@ function SubtaskTab({
   )
 }
 
-function OutputTab({ agent, live, activity }: { agent: Agent; live: boolean; activity: AgentActivity }) {
+function OutputTab({ agent, live, activity, theme }: { agent: Agent; live: boolean; activity: AgentActivity; theme: AppTheme }) {
   const animate = shouldAnimateAgentActivity(activity, live)
   return (
     <div className="ac-log">
       {agent.log.map((l, i) => (
         <div className="ac-log-line" key={`${i}:${l.t}:${l.msg}`}>
           <span className="ac-log-t">{l.t}</span>
-          <span className="ac-log-level" style={{ '--c': levelColor(l.level) } as CSSVars}>
+          <span className="ac-log-level" style={{ '--c': levelColor(l.level, theme) } as CSSVars}>
             {l.level}
           </span>
           <span className="ac-log-msg">{l.msg}</span>
@@ -202,11 +203,11 @@ function OutputTab({ agent, live, activity }: { agent: Agent; live: boolean; act
   )
 }
 
-function ToolsTab({ agent }: { agent: Agent }) {
+function ToolsTab({ agent, theme }: { agent: Agent; theme: AppTheme }) {
   return (
     <div className="ac-toolcalls">
       {agent.tools.map((t) => {
-        const c = toolColor(t.status)
+        const c = toolColor(t.status, theme)
         return (
           <div
             className="ac-toolcall"

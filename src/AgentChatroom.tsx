@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent as ReactFocusEvent } from 'react'
 import { useRun } from './api/useRun'
 import { fetchState } from './api/client'
 import type { ConnectionStatus } from './api/client'
@@ -42,7 +42,12 @@ const MOBILE_PANELS: ReadonlyArray<readonly [MobilePanel, string]> = [
   ['context', 'Context'],
 ]
 
+const COMPACT_VIEWPORT = '(max-width: 1120px)'
 const noop = () => {}
+
+function isCompactViewport(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia(COMPACT_VIEWPORT).matches
+}
 
 /** Status badges are not decisions: test ratios like "22/24", and BLOCKED. PLAN / RISK / ACK are. */
 const isDecisionBadge = (badge: string) => badge !== 'BLOCKED' && !/^\d+\/\d+$/.test(badge)
@@ -111,8 +116,54 @@ export function AgentChatroom({
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('room')
   const snapshotExporting = useRef(false)
   const snapshotRequest = useRef<AbortController | null>(null)
+  const composerRef = useRef<HTMLInputElement>(null)
+  const contextPanelRef = useRef<HTMLElement>(null)
+  const roomNavRef = useRef<HTMLButtonElement>(null)
+  const pendingFocus = useRef<'context' | 'composer' | 'room-nav' | 'restore' | null>(null)
+  const lastPanelFocus = useRef<{ panel: MobilePanel; element: HTMLElement } | null>(null)
+  const restoreTarget = useRef<HTMLElement | null>(null)
 
   useEffect(() => () => { snapshotRequest.current?.abort() }, [])
+
+  useEffect(() => {
+    const query = window.matchMedia(COMPACT_VIEWPORT)
+    const preserveVisiblePanel = (event: MediaQueryListEvent) => {
+      if (!event.matches) return
+      const remembered = lastPanelFocus.current
+      if (!remembered) return
+      restoreTarget.current = remembered.element
+      pendingFocus.current = 'restore'
+      if (remembered.panel === 'agents') setMobilePanel('agents')
+      else if (remembered.panel === 'context') {
+        setDetailOpen(true)
+        setMobilePanel('context')
+      } else setMobilePanel('room')
+    }
+    query.addEventListener('change', preserveVisiblePanel)
+    return () => query.removeEventListener('change', preserveVisiblePanel)
+  }, [])
+
+  useEffect(() => {
+    const destination = pendingFocus.current
+    if (!destination || !isCompactViewport()) return
+    pendingFocus.current = null
+    const element = destination === 'context'
+      ? contextPanelRef.current
+      : destination === 'composer'
+        ? composerRef.current
+        : destination === 'room-nav'
+          ? roomNavRef.current
+          : restoreTarget.current
+    element?.focus({ preventScroll: true })
+  }, [detailOpen, mobilePanel, selectedId])
+
+  const rememberPanelFocus = useCallback((event: ReactFocusEvent<HTMLDivElement>) => {
+    const element = event.target
+    if (!(element instanceof HTMLElement)) return
+    if (element.closest('.ac-sidebar')) lastPanelFocus.current = { panel: 'agents', element }
+    else if (element.closest('.ac-detail')) lastPanelFocus.current = { panel: 'context', element }
+    else if (element.closest('.ac-main')) lastPanelFocus.current = { panel: 'room', element }
+  }, [])
 
   const run = snapshot?.run ?? null
   const stats = snapshot?.stats ?? null
@@ -133,6 +184,10 @@ export function AgentChatroom({
   const paused = run?.status === 'paused'
 
   const selectAgent = useCallback((id: AgentId) => {
+    const active = document.activeElement
+    if (isCompactViewport() && active instanceof HTMLElement && active.closest('.ac-sidebar')) {
+      pendingFocus.current = 'context'
+    }
     setSelectedId(id)
     setDetailOpen(true)
     setMobilePanel('context')
@@ -271,7 +326,7 @@ export function AgentChatroom({
         </div>
       ) : null}
 
-      <div className="ac-body">
+      <div className="ac-body" onFocusCapture={rememberPanelFocus}>
         <AgentSidebar
           agents={agents}
           selected={selectedAgent?.id ?? null}
@@ -279,6 +334,7 @@ export function AgentChatroom({
           accent={accent}
           gate={gate}
           stats={stats}
+          theme={theme}
           onSelect={selectAgent}
           onToggleGate={() => actions.setGate(!gate)}
         />
@@ -304,10 +360,11 @@ export function AgentChatroom({
           onCycleTarget={() =>
             setTarget((t) => targets[(targets.indexOf(t) + 1) % targets.length])
           }
+          composerRef={composerRef}
         />
 
         {detailOpen ? (
-          <aside className="ac-detail">
+          <aside ref={contextPanelRef} className="ac-detail" tabIndex={-1} aria-label="Pipeline and agent context">
             <PipelinePanel
               mode={tracker}
               onMode={setTracker}
@@ -324,11 +381,14 @@ export function AgentChatroom({
                 accent={accent}
                 live={liveMotion}
                 activity={selectedActivity}
+                theme={theme}
                 onClose={() => {
+                  if (isCompactViewport()) pendingFocus.current = 'room-nav'
                   setDetailOpen(false)
                   setMobilePanel('room')
                 }}
                 onMessage={() => {
+                  if (isCompactViewport()) pendingFocus.current = 'composer'
                   setTarget(selectedAgent.id)
                   setDraft(`@${selectedAgent.name} `)
                   setMobilePanel('room')
@@ -356,6 +416,7 @@ export function AgentChatroom({
         {MOBILE_PANELS.map(([panel, label]) => (
           <button
             key={panel}
+            ref={panel === 'room' ? roomNavRef : undefined}
             type="button"
             aria-current={mobilePanel === panel ? 'page' : undefined}
             onClick={() => showMobilePanel(panel)}
