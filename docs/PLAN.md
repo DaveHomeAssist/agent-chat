@@ -1,6 +1,6 @@
 # Agent Chatroom roadmap
 
-Current plan reconciled September 7, 2026. Read `docs/STATUS.md` and the
+Current plan reconciled September 8, 2026. Read `docs/STATUS.md` and the
 [visual progress record](../project-progress/index.html) for evidence and blockers.
 Historical execution prompts and timing estimates from the
 [September 5 plan](https://github.com/DaveHomeAssist/agent-chat/blob/a346ef090aca2fa6d1d6b197b61a2110dc88a5ee/docs/PLAN.md)
@@ -24,7 +24,9 @@ console. Reported-usage limits are not a guarantee of zero billing overshoot.
   fixed-height pagination. These are documentation capabilities, not M1 acceptance.
 - Acceptance tooling: `npm run smoke:real` now performs environment preflight and
   an explicitly requested pair of real OpenAI runs. Offline regression tests prove
-  the runner; they do not prove account access or live model quality.
+  the runner; the separate Sep 8 single-call probe proves provider access only.
+- Snapshot: current-run public JSON export is implemented and browser verified.
+  A useful paid proposal cost $0.113582; see [probe evidence](USEFUL_MODEL_PROBE.md).
 
 ## Milestones, in dependency order
 
@@ -42,6 +44,9 @@ All future completion dates are unscheduled.
 See [Real model acceptance](REAL_MODEL_ACCEPTANCE.md) for commands and report format.
 The initial runner targets the already-supported OpenAI provider/model. It does not
 change the application's default provider or add a Codex repository execution adapter.
+
+Provider access was demonstrated by one separately authorized useful request on
+Sep 8. It does not authorize additional calls or replace the following two-run gate.
 
 1. Run `npm run smoke:real -- --check`. This checks exported environment only;
    it makes no network requests and does not load `.env`.
@@ -66,9 +71,11 @@ Do not automatically retry failed or ambiguous billable requests.
 - Append durable events and prove replay/resume after process termination.
 - Require authentication before remote binding; verify API and SSE authorization.
 - Add historical run listing, snapshot retrieval, picker and transcript export.
+  The current-run Snapshot download is delivered; historical exports still depend
+  on persistent storage.
 - Add mock browser workflow coverage to CI. Existing Node regressions, typechecks,
   build and simulator checks already run in CI; no test-framework migration is needed.
-- Wire Snapshot and Reassign, correct activity-footer state and reconcile the
+- Wire Reassign, correct activity-footer state and reconcile the
   remaining fidelity checklist. Provider/model labels and cache counters exist.
 
 ## M3 and M4 boundaries

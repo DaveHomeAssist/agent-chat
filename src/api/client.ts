@@ -49,8 +49,8 @@ async function post(path: string, body?: unknown): Promise<CommandResult> {
   return data
 }
 
-export async function fetchState(): Promise<RunSnapshot> {
-  const res = await request(API.state)
+export async function fetchState(signal?: AbortSignal): Promise<RunSnapshot> {
+  const res = await request(API.state, { signal, cache: 'no-store' })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText || 'request failed'}`)
   return (await res.json()) as RunSnapshot
 }

@@ -1,11 +1,13 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useRun } from './api/useRun'
+import { fetchState } from './api/client'
 import type { ConnectionStatus } from './api/client'
 import { AgentDetail } from './components/AgentDetail'
 import { AgentSidebar } from './components/AgentSidebar'
 import { ChatPanel } from './components/ChatPanel'
 import { PipelinePanel } from './components/PipelinePanel'
 import { RunHeader } from './components/RunHeader'
+import { serializeSnapshot, snapshotFilename } from './lib/snapshot'
 import type {
   Agent,
   AgentId,
@@ -87,6 +89,9 @@ export function AgentChatroom({
   const [target, setTarget] = useState<MessageTarget>('all')
   const [draft, setDraft] = useState('')
   const [openTools, setOpenTools] = useState<Record<string, boolean>>({})
+  const [snapshotPending, setSnapshotPending] = useState(false)
+  const [snapshotError, setSnapshotError] = useState<string | null>(null)
+  const snapshotExporting = useRef(false)
 
   const run = snapshot?.run ?? null
   const stats = snapshot?.stats ?? null
@@ -133,6 +138,45 @@ export function AgentChatroom({
     }
   }, [run?.status, actions])
 
+  const exportSnapshot = useCallback(async () => {
+    if (!snapshot || snapshotExporting.current) return
+    snapshotExporting.current = true
+    setSnapshotPending(true)
+    setSnapshotError(null)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15_000)
+    try {
+      const freshSnapshot = await fetchState(controller.signal)
+      const exportedAt = new Date()
+      const filename = snapshotFilename(freshSnapshot.run.id, exportedAt)
+      const blob = new Blob([serializeSnapshot(freshSnapshot, exportedAt)], {
+        type: 'application/json;charset=utf-8',
+      })
+      const anchor = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      let clicked = false
+      try {
+        anchor.href = url
+        anchor.download = filename
+        anchor.hidden = true
+        document.body.appendChild(anchor)
+        anchor.click()
+        clicked = true
+      } finally {
+        anchor.remove()
+        // Leave time for the browser to accept the download before revoking it.
+        if (clicked) setTimeout(() => URL.revokeObjectURL(url), 1000)
+        else URL.revokeObjectURL(url)
+      }
+    } catch (err) {
+      setSnapshotError(controller.signal.aborted ? 'Request timed out. Try again.' : err instanceof Error ? err.message : 'Download could not be started.')
+    } finally {
+      clearTimeout(timeout)
+      snapshotExporting.current = false
+      setSnapshotPending(false)
+    }
+  }, [snapshot])
+
   // Items whose author is not in the roster cannot be drawn; the server never emits them.
   const known = useCallback(
     (m: ThreadItem) => !('who' in m) || m.who in agentsById,
@@ -172,11 +216,20 @@ export function AgentChatroom({
         stats={stats}
         live={liveMotion}
         detailOpen={detailOpen}
+        snapshotAvailable={snapshot !== null && connection === 'live'}
+        snapshotPending={snapshotPending}
+        snapshotError={snapshotError}
         onRunAction={runAction}
         onToggleDetail={() => setDetailOpen((d) => !d)}
+        onSnapshot={exportSnapshot}
       />
 
       {banner ? <div className={`ac-banner ac-banner--${banner.tone}`}>{banner.text}</div> : null}
+      {snapshotError ? (
+        <div id="ac-snapshot-error" className="ac-banner ac-banner--error ac-snapshot-error" role="alert">
+          Snapshot failed: {snapshotError}
+        </div>
+      ) : null}
 
       <div className="ac-body">
         <AgentSidebar
