@@ -12,7 +12,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import test, { type TestContext } from 'node:test'
@@ -21,6 +21,7 @@ import type { RunEvent, RunSnapshot } from '../shared/protocol.js'
 import {
   PersistenceConflictError,
   PersistenceCorruptError,
+  PersistenceError,
   PersistenceLockError,
   PersistenceSchemaError,
   PersistenceValidationError,
@@ -597,6 +598,64 @@ test('writer ownership serializes stale takeover, blocks a live peer and preserv
   const restarted = openSqliteRunRepository({ databasePath: crashPath, writerId: 'after-crash' })
   t.after(() => restarted.close())
   assert.equal(preservedWriterLocks(crashPath).length, 1)
+})
+
+test('close retries only writer-lock cleanup after deterministic guard contention', async (t) => {
+  const { databasePath } = fixture(t, 'close-retry')
+  const repository = openSqliteRunRepository({ databasePath, writerId: 'close-retry-one', busyTimeoutMs: 0 })
+  const lockPath = `${databasePath}.writer.lock`
+  const guardPath = `${databasePath}.writer.guard`
+  const lockEvidence = readFileSync(lockPath)
+  const guardHolder = spawn(process.execPath, [
+    '--input-type=module',
+    '-e',
+    `import { mkdirSync, rmdirSync } from 'node:fs'; const path = ${JSON.stringify(guardPath)}; mkdirSync(path, { mode: 0o700 }); process.stdout.write('ready\\n'); process.stdin.once('data', () => { rmdirSync(path); process.exit(0) }); process.stdin.resume()`,
+  ], { cwd: process.cwd(), stdio: ['pipe', 'pipe', 'pipe'] })
+  if (!guardHolder.stdout || !guardHolder.stdin || !guardHolder.stderr) throw new Error('guard holder pipes unavailable')
+  let guardError = ''
+  guardHolder.stderr.on('data', (chunk) => { guardError += String(chunk) })
+  const [ready] = await once(guardHolder.stdout, 'data')
+  assert.equal(String(ready), 'ready\n')
+
+  try {
+    assert.throws(() => repository.close(), PersistenceLockError)
+    assert.deepEqual(readFileSync(lockPath), lockEvidence)
+    assert.equal(existsSync(guardPath), true)
+    assert.throws(() => repository.listPublic(), PersistenceError)
+  } finally {
+    guardHolder.stdin.write('release\n')
+    const [exitCode] = await once(guardHolder, 'exit')
+    assert.equal(exitCode, 0, guardError)
+  }
+
+  repository.close()
+  assert.equal(existsSync(lockPath), false)
+  assert.doesNotThrow(() => repository.close())
+
+  const reopened = openSqliteRunRepository({ databasePath, writerId: 'close-retry-two', busyTimeoutMs: 0 })
+  reopened.close()
+  assert.doesNotThrow(() => reopened.close())
+})
+
+test('close never removes or hides a differently owned writer lock', (t) => {
+  const { databasePath } = fixture(t, 'close-foreign-owner')
+  const repository = openSqliteRunRepository({ databasePath, writerId: 'original-owner', busyTimeoutMs: 0 })
+  const lockPath = `${databasePath}.writer.lock`
+  const original = JSON.parse(readFileSync(lockPath, 'utf8')) as Record<string, unknown>
+  const foreign = {
+    ...original,
+    writerId: 'different-owner',
+    pid: process.pid,
+    host: hostname(),
+  }
+  writeFileSync(lockPath, `${JSON.stringify(foreign)}\n`, { mode: 0o600 })
+  const foreignEvidence = readFileSync(lockPath)
+
+  assert.throws(() => repository.close(), PersistenceLockError)
+  assert.deepEqual(readFileSync(lockPath), foreignEvidence)
+  assert.throws(() => repository.listPublic(), PersistenceError)
+  assert.throws(() => repository.close(), PersistenceLockError)
+  assert.deepEqual(readFileSync(lockPath), foreignEvidence)
 })
 
 test('rejects repository-contained and direct symlink storage paths without creating data', (t) => {

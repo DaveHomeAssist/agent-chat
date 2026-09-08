@@ -33,7 +33,9 @@ also rejects an ancestor symlink whose actual target is inside a Git checkout.
 - `usageTotals(runId?)` preserves per-run or lifetime reported/unknown usage.
 - `classifyRecovery()` returns `none`, `readable_only`, `held_incomplete`,
   `held_unknown` or `held_corrupt`. It executes no effect.
-- `close()` releases only this handle's verified writer lock.
+- `close()` closes SQLite once, then releases only this handle's verified writer
+  lock. If guard contention prevents cleanup, the error remains visible and a
+  later `close()` retries only lock release; all normal operations stay closed.
 
 Version 1 checkpoints explicitly mark runner state, workspace state, provider
 continuation and automatic resume as unsupported. Therefore a nonterminal run
@@ -58,7 +60,9 @@ identity-checked release; a second contender cannot move a newly acquired live
 lock. A second live or ambiguous owner fails closed. A confirmed dead same-host
 PID can be replaced, but its lock is renamed and preserved as evidence. A guard
 left by a crash, malformed lock, remote-host lock or permission-ambiguous lock
-is never automatically deleted.
+is never automatically deleted. A malformed or differently owned lock also
+keeps each cleanup attempt failed and visible instead of being removed or
+silently marked released. Repeated close after verified cleanup is idempotent.
 
 The repository runs `PRAGMA quick_check`, rejects unsupported or unversioned
 non-empty schemas, and never replaces a corrupt database. Structurally valid

@@ -389,15 +389,14 @@ function releaseWriterLock(handle: WriterLockHandle): void {
   try {
     if (!existsSync(handle.path)) return
     const stat = lstatSync(handle.path)
-    if (!stat.isFile() || stat.isSymbolicLink()) return
-    let current: LockRecord
-    try {
-      current = parseLock(readFileSync(handle.path, 'utf8'))
-    } catch {
-      return
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new PersistenceLockError('writer lock changed type during release and was preserved')
     }
+    const current = parseLock(readFileSync(handle.path, 'utf8'))
     if (current.writerId !== handle.lock.writerId || current.pid !== handle.lock.pid || current.host !== handle.lock.host
-      || current.createdAtMs !== handle.lock.createdAtMs) return
+      || current.createdAtMs !== handle.lock.createdAtMs) {
+      throw new PersistenceLockError('writer lock ownership changed during release and was preserved')
+    }
     unlinkSync(handle.path)
   } finally {
     releaseOwnershipGuard(guardPath)
@@ -538,7 +537,8 @@ class SqliteRunRepository implements DurableRunRepository {
   readonly #directory: string
   readonly #lock: WriterLockHandle
   readonly #db: DatabaseSync
-  #closed = false
+  #databaseClosed = false
+  #lockReleased = false
 
   constructor(options: Required<SqliteRepositoryOptions>) {
     this.databasePath = options.databasePath
@@ -567,7 +567,7 @@ class SqliteRunRepository implements DurableRunRepository {
   }
 
   #assertOpen(): void {
-    if (this.#closed) throw new PersistenceError('persistence repository is closed')
+    if (this.#databaseClosed) throw new PersistenceError('persistence repository is closed')
   }
 
   commit(value: DurableCommit): void {
@@ -927,16 +927,14 @@ class SqliteRunRepository implements DurableRunRepository {
   }
 
   close(): void {
-    if (this.#closed) return
-    let closed = false
-    try {
+    if (this.#lockReleased) return
+    if (!this.#databaseClosed) {
       hardenSidecars(this.databasePath)
       this.#db.close()
-      closed = true
-      this.#closed = true
-    } finally {
-      if (closed) releaseWriterLock(this.#lock)
+      this.#databaseClosed = true
     }
+    releaseWriterLock(this.#lock)
+    this.#lockReleased = true
   }
 }
 
