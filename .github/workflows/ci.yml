@@ -19,6 +19,8 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+      - name: Check executor communication protocol
+        run: python3 -m unittest discover -s coordination/tests -p 'test_*.py' -v
       - run: node dist-server/server/seed/selfcheck.js
       - name: Save verified production bundle
         uses: actions/upload-artifact@v4
