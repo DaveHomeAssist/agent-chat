@@ -14,7 +14,9 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Visual progress document, light mode, filters and pagination | PRs #5–7, merged |
 | Real-model acceptance runner | PR #8, merged; implementation `4042e34`; offline validation complete |
 | Useful paid model probe and Snapshot export | [PR #9](https://github.com/DaveHomeAssist/agent-chat/pull/9), code `0fc51ca`; [receipt and browser evidence](USEFUL_MODEL_PROBE.md) |
-| Reviewed authentication module | [PR #12](https://github.com/DaveHomeAssist/agent-chat/pull/12), merged Sep 8 as `ecd1fc6`; runtime integration remains staged |
+| API/SSE/browser authentication | Module [PR #12](https://github.com/DaveHomeAssist/agent-chat/pull/12) (`ecd1fc6`) and runtime [PR #15](https://github.com/DaveHomeAssist/agent-chat/pull/15) (`e5dc358`), merged Sep 8; main CI and independent review pass |
+| Durable storage module | [PR #13](https://github.com/DaveHomeAssist/agent-chat/pull/13), merged Sep 8 as `6b984db`; runtime/history/resume remain pending |
+| Queue lease caller correction | [PR #16](https://github.com/DaveHomeAssist/agent-chat/pull/16), merged Sep 8 as `e48bc17`; 17 protocol checks pass |
 | Production browser regression CI | [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), merged Sep 8, `9ed160c`; seven Chromium checks and retained evidence |
 
 ## Snapshot delivery evidence (earlier Sep 8 checks)
@@ -54,56 +56,61 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   passes at merge `9ed160c`, including all seven browser tests and existing gates.
   Its [browser evidence](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34224608943/artifacts/10055179925)
   expires September 22 and production bundle September 15, unless removed earlier.
-- Authentication module PR #12 is now merged; its runtime integration is staged
-  separately below. Persistence PR #13 remains held outside this assignment.
-  Historical runs, crash recovery, remaining controls and real repository
-  execution remain incomplete.
+- Later auth, storage-module and queue integrations are delivered below. Historical
+  runs, crash recovery, remaining controls and real repository execution remain incomplete.
 
-## Authentication integration — PR #15 staged for review
+## Integrated authentication, storage module and queue delivery
 
-- The independently reviewed module [PR #12](https://github.com/DaveHomeAssist/agent-chat/pull/12)
-  merged as `ecd1fc6f4bf7ba7fa64ace38bd044b7a25658fdc`.
-  [Main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34225897025)
-  passes all inherited gates (133 Node tests and seven browser tests).
-- [PR #15](https://github.com/DaveHomeAssist/agent-chat/pull/15) implements full
-  config/HTTP/SSE/browser integration at product revision
-  `183797ed986dc831c9c9079af6525f8a58dd8f19`. Local production build/typechecks,
-  142 Node tests, 16 coordination tests, 42 simulator checks and 17 Chromium
-  tests pass. [Integration CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34228176386)
-  passes at that exact revision, including all 17 browser checks. Independent
-  review and merge remain required. [Browser evidence](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34228176386/artifacts/10056664181)
-  expires September 22; the production bundle expires September 15, unless removed earlier.
+- Independently reviewed auth [PR #15](https://github.com/DaveHomeAssist/agent-chat/pull/15)
+  merged September 8 at 13:01:53 UTC as `e5dc358a7652d7401a7378af5949fd47b56f14ca`.
+  [Auth main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34229496889)
+  passed at 13:03:36 UTC. API authentication is **Complete** for this local/session
+  software scope; remote deployment and accounts/roles remain separate.
 - Default local mode rejects non-loopback binding. Session mode validates the
-  operator key/public origin before listen, protects every run API before
-  effects, and closes streams on expiry/revocation/disposal. Browser access is
-  gated, key entry is transient, logout clears the old run view, and expired
-  or 401 access stops reconnect churn. Ordinary outages recover after probing.
-- Actual Chromium TLS checks verify HttpOnly/SameSite/ Secure `__Host-` cookies
-  over loopback using temporary synthetic OpenSSL certificates. Tests also
-  verify protected Snapshot, stale-view removal, existing local console flows,
-  and login/progress rendering at desktop, mobile and ultrawide sizes.
-  This is software proof, not certificate-trust, remote or deployed acceptance.
-- Independent review found a held-body authorization race in the first candidate.
-  Correction `183797e` rechecks authorization after parsing and immediately before
-  command effects. Deterministic logout/expiry tests cover all seven command
-  routes including interrupt, prove no denied effects and retain fresh-session
-  positive controls. Both regressions fail against the original HTTP source.
-  Frontend source is unchanged; backend correction review is still pending.
-- A [documentation-head CI run](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34227820287)
-  exposed an existing queue CLI caller issue when a synthetic lease begins with
-  a dash. The corrected auth revision passes all queue tests, but that separate
-  caller issue remains a coordinator follow-up; this auth change does not fix it.
-- Auth remains **In Progress**. Canonical main runtime is still unwired until
-  PR #15 is reviewed and merged. Persistence #13 is not merged or wired here.
-  No stored credentials, paid application calls or hosting changes are involved.
+  operator key/public origin before listen, protects every run API before effects,
+  and closes streams on expiry/revocation/disposal. Browser access is gated, key
+  entry is transient, logout clears the old view, and auth loss stops reconnect churn.
+  Ordinary outages recover after a valid session probe.
+- The reviewed held-body correction revalidates authorization immediately before
+  command effects after asynchronous parsing. Deterministic logout/expiry regressions
+  cover all seven command paths, deny every effect and retain positive controls;
+  both fail against the original source. Frontend and corrected backend independent
+  reviews are accepted. Actual loopback TLS browser checks verify HttpOnly/SameSite/
+  Secure `__Host-` cookies using temporary synthetic certificates. This is local
+  software proof, not deployed TLS or remote/phone acceptance.
+- Reviewed storage module [PR #13](https://github.com/DaveHomeAssist/agent-chat/pull/13)
+  merged as `6b984dbc3a99dde9945da33e201b49d05fba74ae` after a conflict-free combined
+  auth/module candidate passed build/typechecks, 167 Node tests, 16 queue tests,
+  42 simulator checks and 17 Chromium tests locally. The merge tree exactly matched
+  that candidate; [module main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34229864740)
+  then passed the combined gates. Persistence remains **In Progress**: the module
+  is not wired into the runtime; history and explicit resume are not implemented.
+  V1 checkpoints cannot restore executable runner/workspace/provider continuation.
+  No automatic replay, retention/deletion or real application data initialization occurred.
+- [Earlier docs CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34227820287)
+  exposed a leading-dash lease argument failure in the queue caller. Accepted
+  [PR #16](https://github.com/DaveHomeAssist/agent-chat/pull/16) fixes the caller and
+  examples and adds a deterministic renew/report regression. Its combined candidate
+  passed all 17 protocol tests before guarded merge as `e48bc1744caf035056cf64178563951674a39dd5`.
+  Production token generation and validation are unchanged; no unchanged failure was retried.
+- [Integrated main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34230108153)
+  passes at `e48bc1744caf035056cf64178563951674a39dd5`: clean installation,
+  production build/typechecks, **167 Node tests, 17 queue tests, 42 simulator checks
+  and 17 Chromium checks**. Browser proof includes local console controls, auth,
+  Snapshot and desktop/mobile/ultrawide progress views; all agent/tool work is mocked.
+  No stored credentials, paid application calls or hosting changes were involved.
+- Progress now records **14 Complete / 11 Remaining** items with stable IDs and
+  preserved historical completion dates. This evidence-only closeout uses integrated
+  product revision `e48bc17`; documentation delivery does not create a new milestone.
 
 ## Executor coordination delivery
 
 - The private SQLite communication queue, worker bootstrap and coordinator runbook
   are implemented; see [coordination setup](../coordination/START_HERE.md).
-- Sixteen standard-library protocol tests pass, including eight concurrent claims
+- Seventeen standard-library protocol tests pass, including eight concurrent claims
   with one assignment delivery, two separate worker processes, interrupted-report
-  rollback, stale-lease quarantine, persisted decisions/cursors and quiet idle cycles.
+  rollback, stale-lease quarantine, persisted decisions/cursors, quiet idle cycles
+  and deterministic leading-dash lease renew/report.
 - The real queue initially contained coordinator metadata only. It now holds actual
   executor registrations and assignments, not fixtures. Live state remains outside
   Git, with directory mode 0700 and DB mode 0600. No model API calls are made by
@@ -126,9 +133,9 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Milestone | State | Next action / dependency |
 | --- | --- | --- |
 | M1 real-model acceptance | Partial | Provider access demonstrated; explicitly approved two-run budgets and runner environment still needed |
-| M2 unattended operation | Partial | Current-run Snapshot and browser CI delivered; persistence/recovery, auth, historical runs and remaining console controls |
+| M2 unattended operation | Partial | Snapshot, auth and browser CI delivered; storage module merged; runtime persistence/recovery, history and remaining controls pending |
 | M3 real repository | Not started | Isolated Git/command adapter and sandbox PR acceptance after M2 |
-| M4 remote deployment | Not started | Hosting decision, persistence, auth, HTTPS and deployed acceptance after M3 |
+| M4 remote deployment | Not started | Hosting decision, durable runtime, HTTPS and deployed auth/remote acceptance after M3 |
 
 Credentials remain in local secret storage. The single probe allowance is not
 permission for further billable calls. Budget accounting may overshoot with
