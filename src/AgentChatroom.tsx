@@ -178,7 +178,7 @@ export function AgentChatroom({
     const rememberStableFocus = (event: FocusEvent) => {
       const element = event.target
       if (!(element instanceof HTMLElement)) return
-      if (element.closest('.ac-header, .ac-session-bar')) {
+      if (element.closest('.ac-header, .ac-session-bar, .ac-command-state')) {
         stableFocus.current = element
         lastPanelFocus.current = null
         restoreTarget.current = null

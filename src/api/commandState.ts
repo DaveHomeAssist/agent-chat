@@ -401,7 +401,12 @@ export class CommandController {
     if (this.snapshot && full.seq < this.snapshot.seq && !(newRun && firstOnStream)) return
     if (newRun && !firstOnStream && full.seq === this.snapshot!.seq) return
     if (newRun) this.replaceContext()
-    if (full.seq < Math.max(this.gapFloor, this.ackFloor, firstOnStream && !newRun ? this.snapshot?.seq ?? 0 : 0)) return
+    // A gap-covering baseline and its valid contiguous suffix may jointly cover an ACK.
+    // Admission stays closed until maybeHeal checks their final ACK/high-water coverage.
+    // Reconnect authority still requires the initial snapshot to cover the prior source's ACK floor.
+    const sourceFloor = firstOnStream && !newRun ? Math.max(this.snapshot?.seq ?? 0, this.ackFloor) : 0
+    const baselineFloor = Math.max(this.gapFloor, sourceFloor)
+    if (full.seq < baselineFloor) return
     if (invalidGeneration < this.invalidGeneration) return
     this.replaceSnapshot(full)
     this.highWater = Math.max(this.highWater, full.seq)

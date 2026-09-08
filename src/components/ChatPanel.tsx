@@ -159,7 +159,7 @@ export function ChatPanel({
             value={draft}
             onChange={(e) => onDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !e.repeat) {
                 e.preventDefault()
                 onSend()
               }

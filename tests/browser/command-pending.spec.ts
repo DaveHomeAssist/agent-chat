@@ -168,6 +168,24 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     await screenshot(page, (name) => info.outputPath(name), `${viewport.width}-light-refresh-draft`)
     await page.getByRole('button', { name: 'Dark mode', exact: true }).click()
     await screenshot(page, (name) => info.outputPath(name), `${viewport.width}-dark-refresh-draft`)
+    if (viewport.width === 1440) {
+      const refresh = page.getByRole('button', { name: 'Refresh state', exact: true })
+      for (const theme of ['dark', 'light'] as const) {
+        if (theme === 'light') await page.getByRole('button', { name: 'Dark mode', exact: true }).click()
+        await page.getByRole('button', { name: 'Snapshot', exact: true }).focus()
+        await refresh.focus()
+        await expect(refresh).toBeFocused()
+        await page.setViewportSize({ width: 1024, height: 768 })
+        await page.clock.runFor(50)
+        await screenshot(page, (name) => info.outputPath(name), `correction-012-${theme}-compact-refresh-focus`)
+        await expect(refresh).toBeVisible()
+        await expect(refresh).toBeFocused()
+        await page.setViewportSize({ width: 1440, height: 1000 })
+        await page.clock.runFor(50)
+        await expect(refresh).toBeVisible()
+        await expect(refresh).toBeFocused()
+      }
+    }
     let failedProbes = 0
     await page.route('**/api/auth/status', async (route) => { failedProbes++; await route.fulfill({ status: 503, body: '{}' }) })
     await page.getByRole('button', { name: 'Refresh state', exact: true }).click()
@@ -216,3 +234,33 @@ test.describe('pending auth privacy', () => {
     await expect(page.locator('.ac-command-pending')).toHaveCount(0)
   })
 })
+
+for (const mode of ['composition', 'repeat', 'shift'] as const) {
+  test(`correction 012 ${mode} Enter preserves the draft without a POST before deliberate Enter`, async ({ page }, info) => {
+    await page.goto('/'); await pausedRun(page)
+    const input = page.getByRole('textbox', { name: 'Message the room' })
+    const raw = `  Retain the ${mode} draft  `
+    await input.fill(raw)
+    let posts = 0
+    page.on('request', (request) => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/message') posts++ })
+    const posted = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/message')
+    const prevented = await input.evaluate((node, mode) => {
+      const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, isComposing: mode === 'composition', repeat: mode === 'repeat', shiftKey: mode === 'shift' })
+      node.dispatchEvent(event)
+      return event.defaultPrevented
+    }, mode)
+    // Capture the old handler's actual accepted effect before its expected failure.
+    if (prevented) await posted
+    const afterIgnored = await (await page.request.get('/api/state')).json() as RunSnapshot
+    const evidence = { mode, prevented, posts, draft: await input.inputValue(), matchingHumanMessages: afterIgnored.thread.filter((item) => item.kind === 'human' && item.body === raw.trim()).length }
+    await info.attach('ignored-enter-result.json', { body: JSON.stringify(evidence), contentType: 'application/json' })
+    expect(evidence).toEqual({ mode, prevented: false, posts: 0, draft: raw, matchingHumanMessages: 0 })
+    if (mode === 'composition') await screenshot(page, (name) => info.outputPath(name), 'correction-012-composition-draft-retained')
+    await input.press('Enter')
+    expect((await posted).status()).toBe(200)
+    await expect(input).toHaveValue('')
+    expect(posts).toBe(1)
+    const afterAccepted = await (await page.request.get('/api/state')).json() as RunSnapshot
+    expect(afterAccepted.thread.filter((item) => item.kind === 'human' && item.body === raw.trim())).toHaveLength(1)
+  })
+}

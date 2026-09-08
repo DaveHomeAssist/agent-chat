@@ -385,3 +385,47 @@ test('09 an equal-sequence different-run GET is not forward replacement authorit
   assert.equal(h.controller.getView().snapshot?.run.id, 'proven-new-server')
   assert.equal(h.controller.getView().mutationAvailable, true); h.controller.dispose()
 })
+
+test('correction 012 snapshot at gap floor plus valid contiguous suffix jointly cover the ACK', async () => {
+  const h = harness()
+  const send = h.controller.perform(message, h.token())
+  h.event({ type: 'run', seq: 11, run: { approvalGate: true } })
+  h.event({ type: 'run', seq: 12, run: { status: 'paused' } })
+  h.requests[0].resolve({ ok: true, seq: 12 })
+  assert.equal((await send).kind, 'accepted')
+  assert.equal(h.controller.diagnostics().appliedSeq, 9)
+  const full = baseline(11); full.run.approvalGate = true
+  h.reads[0].resolve(full); await flush()
+  assert.equal(h.controller.diagnostics().appliedSeq, 12)
+  assert.equal(h.controller.getView().snapshot?.run.approvalGate, true)
+  assert.equal(h.controller.getView().snapshot?.run.status, 'paused')
+  assert.equal(h.controller.getView().mutationAvailable, true)
+  assert.equal(h.controller.getView().pending.length, 0)
+  assert.equal(h.controller.getView().synchronization, null)
+  assert.equal(h.reads[0].signal.aborted, true)
+  assert.equal(h.requests.length, 1); assert.equal(h.reads.length, 1)
+  h.controller.dispose()
+})
+
+test('correction 012 deficient baselines and missing, noncontiguous or malformed suffixes stay unavailable', async () => {
+  for (const variant of ['deficient-baseline', 'missing-suffix', 'noncontiguous', 'unknown-target', 'uncovered-ack'] as const) {
+    const h = harness()
+    const send = h.controller.perform(message, h.token())
+    h.event({ type: 'run', seq: 11, run: { approvalGate: true } })
+    if (variant === 'noncontiguous') h.event({ type: 'run', seq: 13, run: { status: 'paused' } })
+    else if (variant === 'unknown-target') h.event({ type: 'thread.patch', seq: 12, id: 'absent', patch: { body: 'unappliable' } })
+    else if (variant !== 'missing-suffix') h.event({ type: 'run', seq: 12, run: { status: 'paused' } })
+    h.requests[0].resolve({ ok: true, seq: variant === 'uncovered-ack' || variant === 'noncontiguous' ? 13 : 12 }); await send
+    const full = baseline(variant === 'deficient-baseline' ? 10 : 11); full.run.approvalGate = true
+    h.reads[0].resolve(full); await flush()
+    assert.equal(h.controller.getView().mutationAvailable, false, variant)
+    assert.equal(h.controller.getView().pending[0].phase, 'synchronizing', variant)
+    assert.equal(h.controller.getView().synchronization?.deadline, 15_000, variant)
+    assert.equal(h.requests.length, 1); assert.equal(h.reads.length, 1)
+    if (variant === 'deficient-baseline') assert.equal(h.controller.diagnostics().appliedSeq, 9)
+    h.advance(15_000)
+    assert.equal(h.controller.getView().coherence, 'needs_refresh', variant)
+    assert.equal(h.controller.getView().pending.length, 0, variant)
+    h.controller.dispose()
+  }
+})
