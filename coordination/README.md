@@ -166,6 +166,32 @@ end-to-end delivery requirement; a pushed PR alone is not completed delivery. Th
 coordinator never performs product edits, tests or merges. Scope changes and paid
 application model calls still require the applicable existing authorization.
 
+## Optional local Codex subagent transport
+
+The coordinator can delegate an authorized executor assignment to a local Codex
+subagent with the same filesystem access. This transport completed the verification
+worker's browser CI assignment and subsequent queue follow-up on September 8, 2026.
+Register its real isolated checkout with `--platform codex --host local` and omit
+`--thread`: an inherited `CODEX_THREAD_ID` identifies the parent, not the subagent.
+The coordinator records the returned collaboration agent ID and canonical task
+name in a durable decision instead of inventing a native task identity.
+
+The subagent still claims immutable prompts, renews leases and submits strict queue
+reports. It then uses `collaboration.send_message` to notify the coordinator.
+The coordinator enqueues the next assignment before using
+`collaboration.followup_task` to wake that idle subagent; use `send_message` for
+steering an active one. Before retrying a missing or interrupted worker, inspect
+`collaboration.list_agents`, the lease, checkout and prior effects. Reconcile lost
+ownership before a replacement claim; never replay uncertain work blindly.
+
+This is an optional supported local transport, not a change to the database or
+trust boundary. Claude's cloud review environment could not reach this Mac-local
+queue. A cloud worker that cannot access the canonical queue must report that
+limitation through its available channel; do not create a competing database,
+forge a local registration/report or infer that it never launched. The coordinator
+can use its review as external evidence and assign local execution separately.
+No automatic Claude cloud bridge or sleeping external-session launcher is provided.
+
 ## Verification
 
 ```sh

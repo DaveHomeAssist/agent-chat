@@ -32,6 +32,23 @@
    same registered task with a new assignment notification. Do not create your own
    task, start an unassigned phase or retain a shell loop just to keep Codex busy.
 
+## Local Codex subagents
+
+When explicitly assigned as a local subagent, use the same queue/lease/report
+procedure but omit `--thread` when registering. The inherited native thread ID is
+the coordinator's identity. Register the actual isolated checkout, platform
+`codex` and host `local`; the coordinator records your collaboration identity in
+its decision log. After the queue accepts your report, notify the parent through
+`collaboration.send_message` and end the turn. The parent enqueues the next task
+and wakes you with `collaboration.followup_task`. Do not register the parent's ID,
+message peer executors or execute a claimed/stale task again. A lost session,
+missing token or uncertain prior side effect requires coordinator reconciliation.
+
+This procedure was exercised locally; it does not connect a Claude cloud container
+to the Mac filesystem. If your host cannot access the canonical queue, report the
+access limitation through your available channel and preserve your evidence. Do
+not initialize a competing queue or claim to have registered/reported locally.
+
 ## Active Claude Code loop
 
 An active Claude Code session can continue after reporting by following this

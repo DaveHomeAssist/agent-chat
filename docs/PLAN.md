@@ -27,23 +27,26 @@ console. Reported-usage limits are not a guarantee of zero billing overshoot.
   the runner; the separate Sep 8 single-call probe proves provider access only.
 - Snapshot: current-run public JSON export is implemented and browser verified.
   A useful paid proposal cost $0.113582; see [probe evidence](USEFUL_MODEL_PROBE.md).
+- PR #11: seven production Chromium checks, mock-only fixtures and retained browser
+  evidence are merged as `9ed160c`; main CI passes. [Browser checks](BROWSER_TESTS.md)
+  cover console controls, approval, Snapshot, reconnect/replay and progress views.
 
 ## Parallel executor delivery
 
 Dave designated the current Codex session as orchestration only. The
 [coordination runbook](../coordination/ORCHESTRATOR.md) records ownership and the
 [starter prompts](../coordination/START_HERE.md) launch persistence, authentication
-and verification sessions. Persistence/authentication design reviews now have
-isolated module implementation assignments. Browser regression infrastructure is
-proposed in [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), awaiting
-review and merge after passing Linux Node 22 CI. Shared runtime wiring still
-requires the coordinator's sequential integration assignment.
+and verification sessions. Persistence/authentication module PRs remain in review
+and correction; shared runtime wiring requires a later sequential integration
+assignment. Browser infrastructure is delivered through merged
+[PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), with passing main CI.
 
 The durable local SQLite queue stores immutable assignments/reports, leases,
 reconciliation decisions and event cursors. Sixteen offline protocol tests pass,
 including two independent worker processes. Native Codex messages and an active
 five-minute coordinator heartbeat provide dispatch/recovery. The queue now records
-real local registrations, initial reports and follow-up claims. Claude's cloud
+verified native claim/report/follow-up cycles and a completed local verification
+subagent assignment followed by a new queue claim. Claude's cloud
 verification review could not access the Mac-local queue, so local verification is
 assigned through a supported Codex subagent transport. An active local Claude Code
 session can use bounded polling, but sleeping external chats have no verified
@@ -98,10 +101,9 @@ Do not automatically retry failed or ambiguous billable requests.
 - Add historical run listing, snapshot retrieval, picker and transcript export.
   The current-run Snapshot download is delivered; historical exports still depend
   on persistent storage.
-- Review and merge the seven Chromium checks proposed in PR #11; Linux CI passes.
-  The suite exercises the production mock console and progress document and retains
-  failure evidence; existing Node/Python regressions, typechecks, build and simulator
-  checks remain. Add auth/history/recovery coverage when those flows are wired.
+- Extend the delivered seven Chromium checks with auth/history/recovery coverage
+  when those flows are wired. Existing Node/Python regressions, typechecks, build,
+  simulator checks and the mock console/progress browser gate remain required.
 - Wire Reassign, correct activity-footer state and reconcile the
   remaining fidelity checklist. Provider/model labels and cache counters exist.
 
