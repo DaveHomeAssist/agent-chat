@@ -33,16 +33,21 @@ console. Reported-usage limits are not a guarantee of zero billing overshoot.
 Dave designated the current Codex session as orchestration only. The
 [coordination runbook](../coordination/ORCHESTRATOR.md) records ownership and the
 [starter prompts](../coordination/START_HERE.md) launch persistence, authentication
-and verification sessions. Initial tasks are read-only designs/baseline checks;
-implementation follows coordinator review of actual files and shared interfaces.
+and verification sessions. Persistence/authentication design reviews now have
+isolated module implementation assignments. Browser regression infrastructure is
+proposed in [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), awaiting
+review and merge after passing Linux Node 22 CI. Shared runtime wiring still
+requires the coordinator's sequential integration assignment.
 
 The durable local SQLite queue stores immutable assignments/reports, leases,
 reconciliation decisions and event cursors. Sixteen offline protocol tests pass,
 including two independent worker processes. Native Codex messages and an active
-five-minute coordinator heartbeat provide dispatch/recovery; real registered
-executor wakeup remains unverified until the first worker exchange. An active
-Claude Code session can use bounded polling, but sleeping external chats have no
-verified automatic launcher. No new application API allowance is included.
+five-minute coordinator heartbeat provide dispatch/recovery. The queue now records
+real local registrations, initial reports and follow-up claims. Claude's cloud
+verification review could not access the Mac-local queue, so local verification is
+assigned through a supported Codex subagent transport. An active local Claude Code
+session can use bounded polling, but sleeping external chats have no verified
+automatic launcher or cloud bridge. No new application API allowance is included.
 
 The verification worker later owns integration, shared wiring, status records and
 sequential merges. This communication infrastructure is separate from the product
@@ -93,8 +98,10 @@ Do not automatically retry failed or ambiguous billable requests.
 - Add historical run listing, snapshot retrieval, picker and transcript export.
   The current-run Snapshot download is delivered; historical exports still depend
   on persistent storage.
-- Add mock browser workflow coverage to CI. Existing Node regressions, typechecks,
-  build and simulator checks already run in CI; no test-framework migration is needed.
+- Review and merge the seven Chromium checks proposed in PR #11; Linux CI passes.
+  The suite exercises the production mock console and progress document and retains
+  failure evidence; existing Node/Python regressions, typechecks, build and simulator
+  checks remain. Add auth/history/recovery coverage when those flows are wired.
 - Wire Reassign, correct activity-footer state and reconcile the
   remaining fidelity checklist. Provider/model labels and cache counters exist.
 
