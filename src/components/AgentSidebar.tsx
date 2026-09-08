@@ -36,7 +36,7 @@ export function AgentSidebar({ agents, selected, live, accent, gate, stats, onSe
       <div className="ac-oversight">
         <div className="ac-eyebrow">HUMAN OVERSIGHT</div>
 
-        <button className="ac-toggle-row" onClick={onToggleGate}>
+        <button className="ac-toggle-row" onClick={onToggleGate} aria-pressed={gate}>
           <span className="ac-toggle-label">Approve before merge</span>
           <span
             className="ac-switch"

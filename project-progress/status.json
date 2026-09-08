@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-09-08T05:30:04-04:00",
-  "verifiedLabel": "Sep 8, 2026 · 5:30 AM ET",
-  "codeRevision": "28bd3c0d1ad6ab9a001fc278203fe05b2335f8bf",
+  "verifiedAt": "2026-09-08T08:03:24-04:00",
+  "verifiedLabel": "Sep 8, 2026 · 8:03 AM ET",
+  "codeRevision": "dc89a1d39420f410f874b6b19343cbca6a4a797d",
   "overall": "Partial",
-  "summary": "Executor communication infrastructure is verified offline: private queue, durable reports and three starter prompts. Native worker wakeup awaits the first registered executor. Earlier product checks retain their Sep 8 evidence; full model acceptance, durable operation and real repository delivery remain incomplete.",
+  "summary": "Seven production browser checks pass locally and in Linux Node 22 CI with mock agents; PR #11 awaits review/merge. Clean-install build, 105 Node tests, 16 queue tests and 42 simulator checks pass. Persistence and authentication executors are working on isolated modules. Earlier paid-model and hosting evidence retains its original Sep 8 scope; M1–M4 remain incomplete.",
   "items": [
     {
       "id": "console",
@@ -43,8 +43,8 @@
       "phase": "Delivered",
       "actualDate": "2026-09-05",
       "dateLabel": "Sep 5 · reverified Sep 8",
-      "notes": "105 Node tests, all typechecks and 42 simulator checks pass. Linux CI clean install and production build pass; local Mac Vite native loading stalls on both main and this branch.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34208042574"
+      "notes": "Fresh local and Linux Node 22 CI clean install, production build/typechecks, 105 Node tests and 42 simulator checks pass at dc89a1d. The prior local Vite stall was not reproduced in the isolated verification checkout. PR #11 remains unmerged.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34223758973"
     },
     {
       "id": "browser",
@@ -52,9 +52,9 @@
       "status": "Complete",
       "phase": "Delivered",
       "actualDate": "2026-09-06",
-      "dateLabel": "Sep 6 · reverified Sep 7",
-      "notes": "Sep 7 evidence: offline browser reached Done after explicit fixture approval. Sep 8 Snapshot checks reached the held gate with 59 tool calls; no paid calls during browser checks.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/tests/openai-smoke.ts"
+      "dateLabel": "Sep 6 · reverified Sep 8",
+      "notes": "Seven automated Chromium checks pass locally and in Linux CI against production code with mock agents, including explicit approval to Done, real SSE reconnection/deduplication, Snapshot JSON/error retry and progress-page views. PR #11 awaits review/merge; no paid calls.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/11"
     },
     {
       "id": "progress-document",
@@ -63,7 +63,7 @@
       "phase": "Delivered",
       "actualDate": "2026-09-06",
       "dateLabel": "Sep 6, 2026",
-      "notes": "PRs #5–7 delivered standalone status, theme and table controls. Sep 8 source and generated HTML now distinguish executor coordination from unfinished product milestones.",
+      "notes": "PRs #5–7 delivered standalone status, theme and table controls. Sep 8 browser CI proposal refresh records pending merge and actual executor registrations; screenshots, pagination and print are checked at desktop/mobile/ultrawide.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/7"
     },
     {
@@ -122,8 +122,8 @@
       "status": "Partial",
       "phase": "Coordination",
       "plannedDate": null,
-      "dateLabel": "Awaiting first executors",
-      "notes": "Native five-minute coordinator heartbeat is active; starter prompts and durable queue are ready. Initial Codex worker registration and wakeup are not yet exercised. Sleeping external Claude/browser chats have no verified launcher.",
+      "dateLabel": "Sep 8 · local workers active",
+      "notes": "Local queue confirms persistence/authentication initial reports and claimed follow-up module tasks. Verification is registered as a local Codex subagent. Claude cloud review reported but could not access the Mac-local queue; no automatic external launcher or cloud bridge is claimed. End-to-end delivery acceptance remains separate.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/28bd3c0d1ad6ab9a001fc278203fe05b2335f8bf/coordination/START_HERE.md"
     },
     {
@@ -169,21 +169,21 @@
     {
       "id": "persistence",
       "title": "Persistent runs and restart recovery",
-      "status": "Not Started",
+      "status": "In Progress",
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Durable events, replay/resume and mid-run crash recovery. Current state is in memory.",
+      "notes": "Persistence executor has claimed its isolated storage-module implementation after design review. Product wiring, historical UI and crash/recovery acceptance are pending; current main still stores runs in memory.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
     },
     {
       "id": "auth",
       "title": "API authentication",
-      "status": "Not Started",
+      "status": "In Progress",
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Token enforcement and protected API/SSE access before remote exposure.",
+      "notes": "Authentication executor has claimed its isolated session/auth-module implementation after design review. API/SSE wiring and browser authentication acceptance are pending; current main remains unauthenticated.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
     },
     {
@@ -203,8 +203,8 @@
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Unit tests/build/selfchecks exist; add browser workflow coverage.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+      "notes": "PR #11 adds seven Chromium regressions to the existing PR/main gate; Linux Node 22 CI run 34223758973 passes at dc89a1d. Browser artifacts expire Sep 22 unless removed earlier. Coordinator review and merge are pending; auth/history/recovery coverage is still pending.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/11"
     },
     {
       "id": "fidelity",

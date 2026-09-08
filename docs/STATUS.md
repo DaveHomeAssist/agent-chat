@@ -27,12 +27,33 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 - [Linux CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34208042574)
   passes clean installation and the standard production build/tests/selfchecks.
   Browser acceptance used its production bundle with the mock server.
-- Local Vite also stalls on unchanged main during native dependency loading.
-  Local production build remains environment limited; CI build is verified.
+- Those earlier local Vite checks stalled during native dependency loading.
+  A fresh isolated verification checkout now passes the standard build after
+  `npm ci` on Node 25.8.1; the earlier local blocker is not reproduced there.
 - Current mock browser run reaches `needs_approval` after 59 tool calls. Snapshot
   does not approve it. Earlier Sep 7 evidence separately covered approval to Done.
 - Hosting remains Unknown. GitHub returned no deployment records on Sep 8; that
   does not establish absence of hosting elsewhere.
+
+## Browser regression proposal — PR #11, not merged
+
+- [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), product code
+  `dc89a1d39420f410f874b6b19343cbca6a4a797d`, adds seven Chromium tests to normal
+  PR/main CI while retaining all existing gates. See [browser checks](BROWSER_TESTS.md).
+- Local clean installation, production build/typechecks, 105 Node tests, 16 queue
+  tests, 42 simulator selfchecks and all seven browser tests pass.
+- Browser proof includes directed messages, pause/resume, approval held then
+  released to Done, current-run Snapshot JSON, actual SSE disconnect/reconnect,
+  replay deduplication and visible failures recovered by retry. All agents and
+  repository operations are mocked/simulated; there are no paid application calls.
+- The refreshed progress document is checked at 1440 × 1000, 390 × 844 and
+  3440 × 968, including every item through pagination and all items in print mode.
+- [Linux Node 22 CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34223758973)
+  passes at `dc89a1d`. Browser report/failure artifacts retain for 14 days;
+  production bundles retain for seven days. Retention is not permanent evidence.
+- Coordinator review and merge remain required. Authentication, persisted history,
+  recovery, remaining controls and real repository execution are not completed by
+  this browser foundation.
 
 ## Executor coordination delivery
 
@@ -41,12 +62,16 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 - Sixteen standard-library protocol tests pass, including eight concurrent claims
   with one assignment delivery, two separate worker processes, interrupted-report
   rollback, stale-lease quarantine, persisted decisions/cursors and quiet idle cycles.
-- The real queue was initialized with coordinator metadata only: no fixture workers
-  or assignments. Live state remains outside Git, with directory mode 0700 and DB
-  mode 0600. No model API calls are made by this communication system.
-- The native five-minute coordinator heartbeat is active. Real registered executor
-  wakeup has not yet been exercised; starter prompts await initial executor sessions.
-  Sleeping external Claude/browser chats have no verified automatic launcher.
+- The real queue initially contained coordinator metadata only. It now holds actual
+  executor registrations and assignments, not fixtures. Live state remains outside
+  Git, with directory mode 0700 and DB mode 0600. No model API calls are made by
+  this communication system.
+- The Sep 8 local queue now shows persistence/authentication design reports and
+  claimed module follow-ups. Verification is a registered local Codex subagent.
+  Claude's cloud review reported but could not reach the Mac-local queue; its lack
+  of local registration did not mean it had not launched. The coordinator routes
+  local execution through supported task/subagent messages. Sleeping external
+  Claude/browser chats still have no verified automatic launcher or cloud bridge.
 - Implementation workers own isolated PRs; the verification/integration executor
   owns shared wiring, progress records, sequential merges and final acceptance.
   This infrastructure does not complete product persistence, auth or real Git work.
@@ -77,8 +102,9 @@ before sharing. No application real-repository run or hosting change was perform
 - Sep 8: Provider access proved with one useful paid proposal. Snapshot implemented
   and verified; the prior statement that no paid call had occurred is superseded.
 
-- Sep 8: Durable external executor coordination added, with offline process tests;
-  native worker wakeup and actual product assignments remain separate acceptance.
+- Sep 8: Durable external executor coordination added, with offline process tests.
+  Local workers subsequently registered and claimed product module/browser work;
+  implementation PRs and integration remain separate acceptance.
 
 Future delivery dates are unscheduled. Update this file and structured visual
 status after meaningful changes under the root AGENTS.md contract.
