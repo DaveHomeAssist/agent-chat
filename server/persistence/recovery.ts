@@ -15,10 +15,6 @@ export function classifyRunRecovery(record: PrivateRunRecord | null): RecoveryCl
   }
 
   const snapshot = structuredClone(record.snapshot)
-  if (snapshot.run.status === 'done' || snapshot.run.status === 'failed') {
-    return { kind: 'readable_only', runId: record.runId, snapshot }
-  }
-
   const unknown: UnknownOperation[] = record.operations
     .filter((operation): operation is typeof operation & { state: 'started'; startedAtMs: number } =>
       operation.state === 'started' && operation.startedAtMs !== null)
@@ -34,5 +30,8 @@ export function classifyRunRecovery(record: PrivateRunRecord | null): RecoveryCl
     }))
 
   if (unknown.length) return { kind: 'held_unknown', runId: record.runId, snapshot, operations: unknown }
+  if (snapshot.run.status === 'done' || snapshot.run.status === 'failed') {
+    return { kind: 'readable_only', runId: record.runId, snapshot }
+  }
   return { kind: 'held_incomplete', runId: record.runId, snapshot, reason: 'private_resume_unsupported' }
 }

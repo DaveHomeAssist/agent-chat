@@ -12,7 +12,9 @@ import {
   openSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   renameSync,
+  rmdirSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
@@ -63,6 +65,13 @@ interface LockRecord {
   createdAtMs: number
 }
 
+interface WriterLockHandle {
+  databasePath: string
+  path: string
+  lock: LockRecord
+  busyTimeoutMs: number
+}
+
 interface RunRow extends Record<string, unknown> {
   run_id: string
   label: string
@@ -80,7 +89,13 @@ interface RunRow extends Record<string, unknown> {
   updated_at_ms: number
 }
 
-interface EventRow extends Record<string, unknown> { event_json: string }
+interface EventRow extends Record<string, unknown> {
+  run_id: string
+  seq: number
+  type: RunEvent['type']
+  event_json: string
+  created_at_ms: number
+}
 interface OperationRow extends Record<string, unknown> {
   operation_id: string
   run_id: string
@@ -215,11 +230,17 @@ function prepareDirectory(databasePath: string): string {
     while (!existsSync(current)) current = dirname(current)
     return current
   })()
-  if (containsGitMetadata(nearest)) throw new PersistenceValidationError('live persistence storage cannot be inside a Git checkout')
+  const actualNearest = realpathSync(nearest)
+  if (containsGitMetadata(nearest) || containsGitMetadata(actualNearest)) {
+    throw new PersistenceValidationError('live persistence storage cannot be inside a Git checkout')
+  }
   mkdirSync(directory, { recursive: true, mode: 0o700 })
   const stat = lstatSync(directory)
   if (!stat.isDirectory() || stat.isSymbolicLink()) throw new PersistenceValidationError('database parent must be a real directory')
-  if (containsGitMetadata(directory)) throw new PersistenceValidationError('live persistence storage cannot be inside a Git checkout')
+  const actualDirectory = realpathSync(directory)
+  if (containsGitMetadata(directory) || containsGitMetadata(actualDirectory)) {
+    throw new PersistenceValidationError('live persistence storage cannot be inside a Git checkout')
+  }
   chmodSync(directory, 0o700)
   return directory
 }
@@ -295,52 +316,92 @@ function createLock(path: string, lock: LockRecord): void {
   }
 }
 
-function acquireWriterLock(databasePath: string, writerId: string): { path: string; lock: LockRecord } {
-  const path = `${databasePath}.writer.lock`
-  const lock: LockRecord = { version: LOCK_VERSION, writerId, pid: process.pid, host: hostname(), createdAtMs: Date.now() }
-  try {
-    createLock(path, lock)
-    return { path, lock }
-  } catch (error) {
-    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
-    if (code !== 'EEXIST') throw error
-  }
+const guardWait = new Int32Array(new SharedArrayBuffer(4))
 
-  const lockStat = lstatSync(path)
-  if (!lockStat.isFile() || lockStat.isSymbolicLink()) {
-    throw new PersistenceLockError('writer lock is not a regular file and was preserved')
+function acquireOwnershipGuard(databasePath: string, busyTimeoutMs: number): string {
+  const path = `${databasePath}.writer.guard`
+  const deadline = Date.now() + busyTimeoutMs
+  for (;;) {
+    try {
+      mkdirSync(path, { mode: 0o700 })
+      return path
+    } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
+      if (code !== 'EEXIST') throw error
+      if (Date.now() >= deadline) {
+        throw new PersistenceLockError('writer ownership transition is already in progress; lock evidence was preserved')
+      }
+      Atomics.wait(guardWait, 0, 0, Math.min(5, Math.max(1, deadline - Date.now())))
+    }
   }
-  const raw = readFileSync(path, 'utf8')
-  const previous = parseLock(raw)
-  if (previous.host !== hostname()) throw new PersistenceLockError('writer lock belongs to another host and was preserved')
-  const state = processState(previous.pid)
-  if (state !== 'dead') throw new PersistenceLockError(`writer lock owner is ${state}; lock was preserved`)
-
-  // A dead same-host PID is the only automatic takeover. Preserve the old lock
-  // as evidence; PID reuse produces a conservative false-positive, never a steal.
-  if (readFileSync(path, 'utf8') !== raw) throw new PersistenceLockError('writer lock changed during inspection and was preserved')
-  const archived = `${path}.stale-${Date.now()}-${previous.writerId}-${randomUUID()}`
-  renameSync(path, archived)
-  try {
-    createLock(path, lock)
-  } catch (error) {
-    throw new PersistenceLockError(`writer lock could not be acquired after preserving ${basename(archived)}`, { cause: error })
-  }
-  return { path, lock }
 }
 
-function releaseWriterLock(handle: { path: string; lock: LockRecord }): void {
-  if (!existsSync(handle.path)) return
-  const stat = lstatSync(handle.path)
-  if (!stat.isFile() || stat.isSymbolicLink()) return
-  let current: LockRecord
-  try {
-    current = parseLock(readFileSync(handle.path, 'utf8'))
-  } catch {
-    return
+function releaseOwnershipGuard(path: string): void {
+  const stat = lstatSync(path)
+  if (!stat.isDirectory() || stat.isSymbolicLink()) {
+    throw new PersistenceLockError('writer ownership guard changed unexpectedly and was preserved')
   }
-  if (current.writerId !== handle.lock.writerId || current.pid !== handle.lock.pid || current.host !== handle.lock.host) return
-  unlinkSync(handle.path)
+  rmdirSync(path)
+}
+
+function acquireWriterLock(databasePath: string, writerId: string, busyTimeoutMs: number): WriterLockHandle {
+  const path = `${databasePath}.writer.lock`
+  const guardPath = acquireOwnershipGuard(databasePath, busyTimeoutMs)
+  const lock: LockRecord = { version: LOCK_VERSION, writerId, pid: process.pid, host: hostname(), createdAtMs: Date.now() }
+  try {
+    try {
+      createLock(path, lock)
+      return { databasePath, path, lock, busyTimeoutMs }
+    } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : ''
+      if (code !== 'EEXIST') throw error
+    }
+
+    const lockStat = lstatSync(path)
+    if (!lockStat.isFile() || lockStat.isSymbolicLink()) {
+      throw new PersistenceLockError('writer lock is not a regular file and was preserved')
+    }
+    const raw = readFileSync(path, 'utf8')
+    const previous = parseLock(raw)
+    if (previous.host !== hostname()) throw new PersistenceLockError('writer lock belongs to another host and was preserved')
+    const state = processState(previous.pid)
+    if (state !== 'dead') throw new PersistenceLockError(`writer lock owner is ${state}; lock was preserved`)
+
+    // The ownership guard serializes this recheck, archive and replacement
+    // across compliant processes. A plain read/compare/rename is not atomic.
+    if (readFileSync(path, 'utf8') !== raw) throw new PersistenceLockError('writer lock changed during inspection and was preserved')
+    const archived = `${path}.stale-${Date.now()}-${previous.writerId}-${randomUUID()}`
+    renameSync(path, archived)
+    try {
+      createLock(path, lock)
+    } catch (error) {
+      throw new PersistenceLockError(`writer lock could not be acquired after preserving ${basename(archived)}`, { cause: error })
+    }
+    return { databasePath, path, lock, busyTimeoutMs }
+  } finally {
+    releaseOwnershipGuard(guardPath)
+  }
+}
+
+function releaseWriterLock(handle: WriterLockHandle): void {
+  if (!existsSync(dirname(handle.path))) return
+  const guardPath = acquireOwnershipGuard(handle.databasePath, handle.busyTimeoutMs)
+  try {
+    if (!existsSync(handle.path)) return
+    const stat = lstatSync(handle.path)
+    if (!stat.isFile() || stat.isSymbolicLink()) return
+    let current: LockRecord
+    try {
+      current = parseLock(readFileSync(handle.path, 'utf8'))
+    } catch {
+      return
+    }
+    if (current.writerId !== handle.lock.writerId || current.pid !== handle.lock.pid || current.host !== handle.lock.host
+      || current.createdAtMs !== handle.lock.createdAtMs) return
+    unlinkSync(handle.path)
+  } finally {
+    releaseOwnershipGuard(guardPath)
+  }
 }
 
 function userVersion(db: DatabaseSync): number {
@@ -410,6 +471,54 @@ function rowToUsage(row: UsageRow): UsageRecord {
   })
 }
 
+function assertSnapshotMatchesRow(row: RunRow, snapshot: RunSnapshot): void {
+  if (snapshot.run.id !== row.run_id || snapshot.seq !== row.last_seq
+    || snapshot.run.label !== row.label || snapshot.run.status !== row.status
+    || snapshot.run.llm !== row.provider || snapshot.run.repo !== row.repo
+    || snapshot.run.branch !== row.branch || snapshot.run.goal !== row.goal
+    || snapshot.run.startedAt !== row.started_at) {
+    throw new PersistenceCorruptError('stored public snapshot does not match its run row; database was preserved')
+  }
+}
+
+function assertCheckpointMatchesRow(row: RunRow, checkpoint: PrivateRunRecord['checkpoint']): void {
+  if (!checkpoint || checkpoint.runId !== row.run_id || checkpoint.seq !== row.last_seq
+    || checkpoint.capturedAtMs > row.updated_at_ms) {
+    throw new PersistenceCorruptError('stored private checkpoint does not match its run row; database was preserved')
+  }
+}
+
+function rowToEvent(row: EventRow, run: RunRow, latestSnapshot: RunSnapshot | null): RunEvent {
+  const event = parseStoredJson(row.event_json, parseEvent, 'stored event')
+  const eventRunId = event.type === 'snapshot' ? event.snapshot.run.id : event.type === 'run' ? event.run.id : undefined
+  if (row.run_id !== run.run_id || event.seq !== row.seq || event.type !== row.type
+    || row.seq > run.last_seq || !Number.isSafeInteger(row.created_at_ms)
+    || row.created_at_ms < run.created_at_ms || row.created_at_ms > run.updated_at_ms
+    || (eventRunId !== undefined && eventRunId !== row.run_id)
+    || (event.type === 'snapshot' && event.seq === run.last_seq && latestSnapshot !== null
+      && stableJson(event.snapshot) !== stableJson(latestSnapshot))) {
+    throw new PersistenceCorruptError('stored event does not match its event row; database was preserved')
+  }
+  return event
+}
+
+function assertOperationOwnership(operation: OperationRecord, run: RunRow | undefined): void {
+  const timestamps = [operation.createdAtMs, operation.startedAtMs, operation.completedAtMs]
+    .filter((value): value is number => value !== null)
+  if (!run || operation.runId !== run.run_id || timestamps.some((value) => value > run.updated_at_ms)) {
+    throw new PersistenceCorruptError('stored operation does not match its run; database was preserved')
+  }
+}
+
+function assertUsageOwnership(usage: UsageRecord, operation: OperationRecord | undefined, run: RunRow | undefined): void {
+  if (!operation || !run || operation.operationId !== usage.operationId || operation.runId !== usage.runId
+    || operation.kind !== 'provider' || operation.state === 'prepared'
+    || operation.startedAtMs === null || usage.recordedAtMs < operation.startedAtMs
+    || usage.recordedAtMs > run.updated_at_ms || run.provider !== usage.provider) {
+    throw new PersistenceCorruptError('stored usage does not match its provider operation; database was preserved')
+  }
+}
+
 function operationBase(operation: OperationRecord): object {
   return {
     operationId: operation.operationId,
@@ -427,7 +536,7 @@ class SqliteRunRepository implements DurableRunRepository {
   readonly databasePath: string
   readonly writerId: string
   readonly #directory: string
-  readonly #lock: { path: string; lock: LockRecord }
+  readonly #lock: WriterLockHandle
   readonly #db: DatabaseSync
   #closed = false
 
@@ -435,7 +544,7 @@ class SqliteRunRepository implements DurableRunRepository {
     this.databasePath = options.databasePath
     this.writerId = options.writerId
     this.#directory = prepareDirectory(this.databasePath)
-    this.#lock = acquireWriterLock(this.databasePath, this.writerId)
+    this.#lock = acquireWriterLock(this.databasePath, this.writerId, options.busyTimeoutMs)
     let db: DatabaseSync | null = null
     try {
       ensurePrivateRegularFile(this.databasePath)
@@ -609,6 +718,11 @@ class SqliteRunRepository implements DurableRunRepository {
       throw new PersistenceConflictError('usage must match a provider operation in the same run')
     }
     if (operation.state === 'prepared') throw new PersistenceConflictError('usage cannot be recorded before a provider operation starts')
+    if (operation.startedAtMs === null || usage.recordedAtMs < operation.startedAtMs) {
+      throw new PersistenceConflictError('usage cannot precede its provider operation start')
+    }
+    const run = this.#db.prepare('SELECT provider FROM runs WHERE run_id = ?').get(usage.runId) as { provider: RunRow['provider'] } | undefined
+    if (!run || run.provider !== usage.provider) throw new PersistenceConflictError('usage provider must match its run')
     const existingValue = this.#db.prepare('SELECT * FROM usage_ledger WHERE operation_id = ?').get(usage.operationId)
     if (existingValue) {
       const existing = rowToUsage(existingValue as UsageRow)
@@ -645,6 +759,7 @@ class SqliteRunRepository implements DurableRunRepository {
   #publicSummary(row: RunRow): PublicRunSummary {
     try {
       const snapshot = parseStoredJson(row.public_snapshot_json, parseSnapshot, 'stored public snapshot')
+      assertSnapshotMatchesRow(row, snapshot)
       return {
         runId: snapshot.run.id,
         label: snapshot.run.label,
@@ -683,10 +798,12 @@ class SqliteRunRepository implements DurableRunRepository {
   readPublic(runId: string): RunSnapshot | null {
     this.#assertOpen()
     if (!runId) throw new PersistenceValidationError('runId is required')
-    const row = this.#db.prepare('SELECT public_snapshot_json FROM runs WHERE run_id = ?').get(runId) as { public_snapshot_json: string } | undefined
+    const row = this.#db.prepare('SELECT * FROM runs WHERE run_id = ?').get(runId) as RunRow | undefined
     if (!row) return null
     try {
-      return structuredClone(parseStoredJson(row.public_snapshot_json, parseSnapshot, 'stored public snapshot'))
+      const snapshot = parseStoredJson(row.public_snapshot_json, parseSnapshot, 'stored public snapshot')
+      assertSnapshotMatchesRow(row, snapshot)
+      return structuredClone(snapshot)
     } catch {
       return null
     }
@@ -700,52 +817,91 @@ class SqliteRunRepository implements DurableRunRepository {
     const corrupt: PrivateRunRecord['corrupt'] = []
     let snapshot: RunSnapshot | null = null
     let checkpoint: PrivateRunRecord['checkpoint'] = null
-    try { snapshot = parseStoredJson(row.public_snapshot_json, parseSnapshot, 'stored public snapshot') } catch { corrupt.push('public_snapshot') }
-    try { checkpoint = parseStoredJson(row.private_checkpoint_json, parseCheckpoint, 'stored private checkpoint') } catch { corrupt.push('private_checkpoint') }
+    try {
+      snapshot = parseStoredJson(row.public_snapshot_json, parseSnapshot, 'stored public snapshot')
+      assertSnapshotMatchesRow(row, snapshot)
+    } catch { corrupt.push('public_snapshot') }
+    try {
+      checkpoint = parseStoredJson(row.private_checkpoint_json, parseCheckpoint, 'stored private checkpoint')
+      assertCheckpointMatchesRow(row, checkpoint)
+    } catch { corrupt.push('private_checkpoint') }
 
     const events: RunEvent[] = []
-    for (const event of this.#db.prepare('SELECT event_json FROM events WHERE run_id = ? ORDER BY seq').all(runId) as EventRow[]) {
-      try { events.push(parseStoredJson(event.event_json, parseEvent, 'stored event')) } catch { if (!corrupt.includes('event')) corrupt.push('event') }
+    for (const event of this.#db.prepare('SELECT run_id, seq, type, event_json, created_at_ms FROM events WHERE run_id = ? ORDER BY seq').all(runId) as EventRow[]) {
+      try { events.push(rowToEvent(event, row, snapshot)) } catch { if (!corrupt.includes('event')) corrupt.push('event') }
     }
     const operations: OperationRecord[] = []
     for (const operation of this.#db.prepare('SELECT * FROM operations WHERE run_id = ? ORDER BY created_at_ms, operation_id').all(runId) as OperationRow[]) {
-      try { operations.push(rowToOperation(operation)) } catch { if (!corrupt.includes('operation')) corrupt.push('operation') }
+      try {
+        const parsed = rowToOperation(operation)
+        assertOperationOwnership(parsed, row)
+        operations.push(parsed)
+      } catch { if (!corrupt.includes('operation')) corrupt.push('operation') }
     }
+    const operationMap = new Map(operations.map((operation) => [operation.operationId, operation]))
     const usage: UsageRecord[] = []
     for (const item of this.#db.prepare('SELECT * FROM usage_ledger WHERE run_id = ? ORDER BY recorded_at_ms, operation_id').all(runId) as UsageRow[]) {
-      try { usage.push(rowToUsage(item)) } catch { if (!corrupt.includes('usage')) corrupt.push('usage') }
+      try {
+        const parsed = rowToUsage(item)
+        assertUsageOwnership(parsed, operationMap.get(parsed.operationId), row)
+        usage.push(parsed)
+      } catch { if (!corrupt.includes('usage')) corrupt.push('usage') }
     }
     return { runId, snapshot: snapshot ? structuredClone(snapshot) : null, checkpoint: checkpoint ? structuredClone(checkpoint) : null, events, operations, usage, corrupt }
   }
 
   readEvents(runId: string): RunEvent[] {
     const record = this.inspectPrivate(runId)
+    if (record?.corrupt.includes('event')) {
+      throw new PersistenceCorruptError('stored event history is invalid; database was preserved')
+    }
     return record ? structuredClone(record.events) : []
   }
 
   usageTotals(runId?: string): UsageTotals {
     this.#assertOpen()
-    const whereUsage = runId ? 'WHERE run_id = ?' : ''
-    const usageArgs = runId ? [runId] : []
-    const usage = this.#db.prepare(`
-      SELECT
-        COALESCE(SUM(CASE WHEN usage_state = 'reported' THEN cost_usd ELSE 0 END), 0) AS reported_cost,
-        COALESCE(SUM(CASE WHEN usage_state = 'reported' THEN 1 ELSE 0 END), 0) AS reported_requests,
-        COALESCE(SUM(CASE WHEN usage_state = 'unknown' THEN 1 ELSE 0 END), 0) AS explicit_unknown
-      FROM usage_ledger ${whereUsage}
-    `).get(...usageArgs) as Record<string, unknown>
-    const missingArgs = runId ? [runId] : []
-    const missing = this.#db.prepare(`
-      SELECT COUNT(*) AS derived_unknown
-      FROM operations o
-      LEFT JOIN usage_ledger u ON u.operation_id = o.operation_id
-      WHERE o.kind = 'provider' AND o.state = 'started' AND u.operation_id IS NULL
-      ${runId ? 'AND o.run_id = ?' : ''}
-    `).get(...missingArgs) as Record<string, unknown>
-    return {
-      reportedCostUsd: Number(usage.reported_cost),
-      reportedRequests: Number(usage.reported_requests),
-      unknownRequests: Number(usage.explicit_unknown) + Number(missing.derived_unknown),
+    try {
+      const where = runId ? ' WHERE run_id = ?' : ''
+      const args = runId ? [runId] : []
+      const runRows = this.#db.prepare(`SELECT * FROM runs${where}`).all(...args) as RunRow[]
+      if (runRows.some((row) => !['anthropic', 'openai', 'mock'].includes(row.provider))) {
+        throw new PersistenceCorruptError('stored run provider is invalid; database was preserved')
+      }
+      const runs = new Map(runRows.map((row) => [row.run_id, row]))
+      const operationRows = this.#db.prepare(`SELECT * FROM operations${where}`).all(...args) as OperationRow[]
+      const operations = operationRows.map((row) => rowToOperation(row))
+      for (const operation of operations) assertOperationOwnership(operation, runs.get(operation.runId))
+      const operationMap = new Map(operations.map((operation) => [operation.operationId, operation]))
+      const usageRows = runId
+        ? this.#db.prepare(`
+          SELECT * FROM usage_ledger
+          WHERE run_id = ? OR operation_id IN (
+            SELECT operation_id FROM operations WHERE run_id = ?
+          )
+        `).all(runId, runId) as UsageRow[]
+        : this.#db.prepare('SELECT * FROM usage_ledger').all() as UsageRow[]
+      const usages = usageRows.map((row) => {
+        const usage = rowToUsage(row)
+        assertUsageOwnership(usage, operationMap.get(usage.operationId), runs.get(usage.runId))
+        return usage
+      })
+      const usageOperationIds = new Set(usages.map((usage) => usage.operationId))
+      const reported = usages.filter((usage) => usage.state === 'reported')
+      const explicitUnknown = usages.filter((usage) => usage.state === 'unknown').length
+      const derivedUnknown = operations.filter((operation) => operation.kind === 'provider'
+        && (operation.state === 'started' || operation.state === 'completed')
+        && !usageOperationIds.has(operation.operationId)).length
+      const reportedCostUsd = reported.reduce((total, usage) => total + (usage.costUsd ?? 0), 0)
+      const reportedRequests = reported.length
+      const unknownRequests = explicitUnknown + derivedUnknown
+      if (![reportedCostUsd, reportedRequests, unknownRequests].every(Number.isFinite)
+        || !Number.isSafeInteger(reportedRequests) || !Number.isSafeInteger(unknownRequests)) {
+        throw new PersistenceCorruptError('stored usage totals exceed supported numeric bounds; database was preserved')
+      }
+      return { reportedCostUsd, reportedRequests, unknownRequests }
+    } catch (error) {
+      if (error instanceof PersistenceCorruptError) throw error
+      throw new PersistenceCorruptError('stored usage accounting is invalid; database was preserved', { cause: error })
     }
   }
 
@@ -755,9 +911,16 @@ class SqliteRunRepository implements DurableRunRepository {
     // integration may enforce a single current run; the repository stays safe
     // when imported or partially migrated data contains more than one.
     const row = this.#db.prepare(`
-      SELECT run_id FROM runs
-      ORDER BY CASE WHEN status IN ('done', 'failed') THEN 1 ELSE 0 END,
-        updated_at_ms DESC, run_id DESC
+      SELECT r.run_id FROM runs r
+      ORDER BY CASE
+        WHEN EXISTS (
+          SELECT 1 FROM operations o
+          WHERE o.run_id = r.run_id AND o.state = 'started'
+        ) THEN 0
+        WHEN r.status NOT IN ('done', 'failed') THEN 1
+        ELSE 2
+      END,
+        r.updated_at_ms DESC, r.run_id DESC
       LIMIT 1
     `).get() as { run_id: string } | undefined
     return classifyRunRecovery(row ? this.inspectPrivate(row.run_id) : null)

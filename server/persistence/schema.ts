@@ -264,6 +264,12 @@ export const DurableCommitSchema = z.object({
 }).strict().superRefine((value, ctx) => {
   const ids = [value.snapshot.run.id, value.checkpoint.runId, value.operation?.runId, value.usage?.runId].filter(Boolean)
   if (ids.some((id) => id !== value.runId)) ctx.addIssue({ code: 'custom', message: 'run identity mismatch' })
+  const eventRunId = value.event?.type === 'snapshot'
+    ? value.event.snapshot.run.id
+    : value.event?.type === 'run'
+      ? value.event.run.id
+      : undefined
+  if (eventRunId !== undefined && eventRunId !== value.runId) ctx.addIssue({ code: 'custom', message: 'event run identity mismatch' })
   if (value.checkpoint.seq !== value.snapshot.seq) ctx.addIssue({ code: 'custom', message: 'checkpoint/snapshot sequence mismatch' })
   if (value.event && value.event.seq !== value.snapshot.seq) ctx.addIssue({ code: 'custom', message: 'event/snapshot sequence mismatch' })
   if (value.event?.type === 'snapshot' && stableJson(value.event.snapshot) !== stableJson(value.snapshot)) {
