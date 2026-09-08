@@ -44,6 +44,10 @@ export function formatTokens(n: number): string {
   return `${(n / 1000).toFixed(1)}k tok`
 }
 
+function tokenCount(n: number): string {
+  return n.toLocaleString('en-US')
+}
+
 export function RunHeader({
   accent,
   run,
@@ -98,7 +102,21 @@ export function RunHeader({
         </div>
         <div className="ac-run-stats">
           <span>{formatElapsed(stats?.elapsedSec ?? 0)} elapsed</span>
-          <span>{formatTokens(tokens)}</span>
+          <details className="ac-token-disclosure">
+            <summary>
+              {formatTokens(tokens)}
+              <span className="ac-sr-only"> token breakdown</span>
+            </summary>
+            <div className="ac-token-popover">
+              <div className="ac-token-title">Token breakdown</div>
+              <dl>
+                <div><dt>Input</dt><dd>{tokenCount(stats?.inputTokens ?? 0)}</dd></div>
+                <div><dt>Output</dt><dd>{tokenCount(stats?.outputTokens ?? 0)}</dd></div>
+                <div><dt>Cache read</dt><dd>{tokenCount(stats?.cacheReadTokens ?? 0)}</dd></div>
+                <div><dt>Cache write</dt><dd>{tokenCount(stats?.cacheWriteTokens ?? 0)}</dd></div>
+              </dl>
+            </div>
+          </details>
           <span title={stats?.lifetimeUnreportedRequests ? 'Some requests have unreported usage; shown spend is a lower bound. Lifetime budget uses reported spend only.' : 'Reported spend'}>{stats?.unreportedRequests ? '≥' : ''}${(stats?.costUsd ?? 0).toFixed(2)}{stats?.lifetimeUnreportedRequests ? ' · usage unknown' : ''}</span>
         </div>
       </div>

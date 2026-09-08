@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { CSSVars } from '../lib/css'
 import { tint } from '../lib/theme'
-import { FILTER_DEFS, QUICK_COMMANDS } from '../constants'
+import { FILTER_DEFS, quickCommands } from '../constants'
 import type { Agent, AgentId, ThreadFilter, ThreadItem } from '../types'
 import { ThreadItemView } from './ThreadItemView'
 
@@ -11,6 +11,7 @@ interface Props {
   accent: string
   channelName: string
   channelMeta: string
+  pipelinePr: string
   filter: ThreadFilter
   /** Live counts over the unfiltered thread, per filter. */
   counts: Record<ThreadFilter, number>
@@ -33,6 +34,7 @@ export function ChatPanel({
   accent,
   channelName,
   channelMeta,
+  pipelinePr,
   filter,
   counts,
   onFilter,
@@ -53,6 +55,7 @@ export function ChatPanel({
   const last = thread[thread.length - 1]
   const lastId = last?.id ?? ''
   const lastBodyLength = last?.body.length ?? 0
+  const commands = quickCommands(pipelinePr)
 
   // The room follows the newest message like a live console — but only while pinned,
   // and only when the thread itself changes (the server ticks a stats event every second).
@@ -124,8 +127,15 @@ export function ChatPanel({
 
       <div className="ac-composer">
         <div className="ac-quick">
-          {QUICK_COMMANDS.map((q) => (
-            <button key={q.label} className="ac-quick-btn" onClick={() => onDraft(q.draft)}>
+          {commands.map((q) => (
+            <button
+              key={q.draft}
+              className="ac-quick-btn"
+              onClick={() => onDraft(q.draft)}
+              disabled={q.disabled}
+              title={q.reason}
+              aria-label={q.reason ? `${q.label}. ${q.reason}` : q.label}
+            >
               {q.label}
             </button>
           ))}

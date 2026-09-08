@@ -7,6 +7,7 @@ import { AgentSidebar } from './components/AgentSidebar'
 import { ChatPanel } from './components/ChatPanel'
 import { PipelinePanel } from './components/PipelinePanel'
 import { RunHeader } from './components/RunHeader'
+import { deriveAgentActivity } from './lib/activity'
 import { serializeSnapshot, snapshotFilename } from './lib/snapshot'
 import type {
   Agent,
@@ -110,6 +111,7 @@ export function AgentChatroom({
   const targets = useMemo<MessageTarget[]>(() => ['all', ...agents.map((a) => a.id)], [agents])
 
   const selectedAgent: Agent | undefined = agentsById[selectedId] ?? agents[0]
+  const selectedActivity = deriveAgentActivity(connection, run, selectedAgent ?? null, typing)
   const gate = run?.approvalGate ?? true
   const paused = run?.status === 'paused'
 
@@ -255,6 +257,7 @@ export function AgentChatroom({
           accent={accent}
           channelName={run?.channel ?? ''}
           channelMeta={run ? `started ${run.startedAt} · ${agents.length} agents · ${run.toolServers} tool servers` : ''}
+          pipelinePr={pipeline.pr}
           filter={filter}
           counts={counts}
           onFilter={setFilter}
@@ -288,6 +291,7 @@ export function AgentChatroom({
                 onTab={setTab}
                 accent={accent}
                 live={liveMotion}
+                activity={selectedActivity}
                 onClose={() => setDetailOpen(false)}
                 onMessage={() => {
                   setTarget(selectedAgent.id)

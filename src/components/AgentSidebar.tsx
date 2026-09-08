@@ -52,20 +52,14 @@ export function AgentSidebar({ agents, selected, live, accent, gate, stats, onSe
           </span>
         </button>
 
-        <div className="ac-toggle-row">
-          <span className="ac-toggle-label">Auto-approve tool calls</span>
-          <span
-            className="ac-switch"
-            style={
-              {
-                '--track': 'rgba(255,255,255,.10)',
-                '--justify': 'flex-start',
-                '--knob': '#5E6779',
-              } as CSSVars
-            }
-          >
-            <i />
-          </span>
+        <div className="ac-unavailable-control" aria-describedby="ac-auto-approve-reason">
+          <div className="ac-toggle-row ac-toggle-row--unavailable">
+            <span className="ac-toggle-label">Auto-approve tool calls</span>
+            <span className="ac-unavailable-badge">Unavailable</span>
+          </div>
+          <p id="ac-auto-approve-reason" className="ac-control-reason">
+            Tool approval contract not implemented.
+          </p>
         </div>
 
         <div className="ac-oversight-stats">
