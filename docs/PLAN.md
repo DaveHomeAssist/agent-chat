@@ -37,7 +37,7 @@ Dave designated the current Codex session as orchestration only. The
 [coordination runbook](../coordination/ORCHESTRATOR.md) records ownership and the
 [starter prompts](../coordination/START_HERE.md) launch persistence, authentication
 and verification sessions. Reviewed authentication module PR #12 is merged as
-`ecd1fc6`; its full runtime integration is staged in PR #15 at `9520141`, pending
+`ecd1fc6`; its full runtime integration is staged in PR #15 at `183797e`, pending
 independent review/merge. Persistence PR #13 is held for separate integration.
 Browser infrastructure is delivered through merged
 [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), with passing main CI.
@@ -99,8 +99,8 @@ Do not automatically retry failed or ambiguous billable requests.
 
 - Append durable events and prove replay/resume after process termination.
 - Review and merge the staged auth integration [PR #15](https://github.com/DaveHomeAssist/agent-chat/pull/15).
-  Local 140 Node/17 Chromium checks pass, including real loopback TLS cookies,
-  API route denial, session loss and reconnect; [exact product CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34227496719) passes.
+  Local 142 Node/17 Chromium checks pass, including real loopback TLS cookies,
+  API route denial, session loss and reconnect; [exact product CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34228176386) passes.
   Module-only main remains runtime-unwired until that separate merge.
 - Add historical run listing, snapshot retrieval, picker and transcript export.
   The current-run Snapshot download is delivered; historical exports still depend

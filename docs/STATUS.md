@@ -67,11 +67,11 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   passes all inherited gates (133 Node tests and seven browser tests).
 - [PR #15](https://github.com/DaveHomeAssist/agent-chat/pull/15) implements full
   config/HTTP/SSE/browser integration at product revision
-  `95201419828760600fc2f048bc8f040c3fa5c31b`. Local production build/typechecks,
-  140 Node tests, 16 coordination tests, 42 simulator checks and 17 Chromium
-  tests pass. [Integration CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34227496719)
+  `183797ed986dc831c9c9079af6525f8a58dd8f19`. Local production build/typechecks,
+  142 Node tests, 16 coordination tests, 42 simulator checks and 17 Chromium
+  tests pass. [Integration CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34228176386)
   passes at that exact revision, including all 17 browser checks. Independent
-  review and merge remain required. [Browser evidence](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34227496719/artifacts/10056381681)
+  review and merge remain required. [Browser evidence](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34228176386/artifacts/10056664181)
   expires September 22; the production bundle expires September 15, unless removed earlier.
 - Default local mode rejects non-loopback binding. Session mode validates the
   operator key/public origin before listen, protects every run API before
@@ -83,6 +83,16 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   verify protected Snapshot, stale-view removal, existing local console flows,
   and login/progress rendering at desktop, mobile and ultrawide sizes.
   This is software proof, not certificate-trust, remote or deployed acceptance.
+- Independent review found a held-body authorization race in the first candidate.
+  Correction `183797e` rechecks authorization after parsing and immediately before
+  command effects. Deterministic logout/expiry tests cover all seven command
+  routes including interrupt, prove no denied effects and retain fresh-session
+  positive controls. Both regressions fail against the original HTTP source.
+  Frontend source is unchanged; backend correction review is still pending.
+- A [documentation-head CI run](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34227820287)
+  exposed an existing queue CLI caller issue when a synthetic lease begins with
+  a dash. The corrected auth revision passes all queue tests, but that separate
+  caller issue remains a coordinator follow-up; this auth change does not fix it.
 - Auth remains **In Progress**. Canonical main runtime is still unwired until
   PR #15 is reviewed and merged. Persistence #13 is not merged or wired here.
   No stored credentials, paid application calls or hosting changes are involved.
