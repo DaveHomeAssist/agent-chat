@@ -2,6 +2,7 @@ import { existsSync, statSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { AGENT_IDS, type AgentId } from '../shared/protocol.js'
+import { parseAuthConfig, type AuthConfig } from './auth-config.js'
 import type { Config, Effort, Provider } from './contracts.js'
 import { OPENAI_MODEL, validateOpenAIProfile } from './llm/openai-profile.js'
 
@@ -9,8 +10,9 @@ export const DEFAULT_MODEL = 'claude-opus-5'
 
 /** `Config` plus the knobs only the composition root and the HTTP layer read. */
 export interface ServerConfig extends Config {
-  /** HOST — interface to listen on. Default loopback; `0.0.0.0` is an explicit opt-in to the LAN. */
+  /** HOST — authenticated remote binding is validated before listen. */
   host: string
+  auth: AuthConfig
   /** LIFETIME_BUDGET_USD — cumulative spend across every run of this process; `/api/run/start` is refused once reached. */
   lifetimeBudgetUsd: number
 }
@@ -36,6 +38,7 @@ export function repoRoot(): string {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
+  const auth = parseAuthConfig(env)
   const llm = provider(env)
   const selectedModels = models(env, llm)
   const selectedEffort = effort(env, llm)
@@ -48,7 +51,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const budgetUsd = number('RUN_BUDGET_USD', env, 5, { minExclusive: 0 })
   return {
     port: integer('PORT', env, 8787, { min: 1, max: 65535 }),
-    host: raw('HOST', env) ?? '127.0.0.1',
+    host: auth.bindHost,
+    auth,
     llm,
     models: selectedModels,
     effort: selectedEffort,

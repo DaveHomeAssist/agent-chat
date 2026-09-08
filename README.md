@@ -10,7 +10,7 @@ a faithful port of the Claude Design prototype in
 [`project/Agent Chatroom.dc.html`](project/Agent%20Chatroom.dc.html) — see
 [`docs/HANDOFF.md`](docs/HANDOFF.md) and [`chats/`](chats) for the original brief.
 
-The layout has a hard floor of 1180 × 700 — it is a desktop console, not a responsive site.
+The run console has a hard floor of 1180 × 700. The sign-in screen adapts to phone, desktop and ultrawide viewports.
 
 ## Running it
 
@@ -26,8 +26,43 @@ npm ci
 cp .env.example .env      # optional; the server also reads plain environment variables
 ```
 
-The server listens on `127.0.0.1` only. There is no authentication, so `HOST=0.0.0.0` is an
-explicit opt-in: anyone who can reach the port can drive the run and spend your key.
+The default `AUTH_MODE=local` accepts only loopback binding and direct loopback
+Host requests. The console opens automatically after checking access. A remote
+bind fails at startup unless session authentication is explicitly configured.
+
+### Operator authentication
+
+For a single operator session, set `AUTH_MODE=session`, `PUBLIC_ORIGIN` to the
+exact HTTPS origin users will open, and `AGENT_CHAT_OPERATOR_TOKEN` in runtime
+secret storage. The operator key must be a cryptographically random value of at
+least 32 bytes encoded as canonical unpadded base64url (up to 128 characters).
+It is separate from model-provider API keys. Set `HOST` deliberately for the
+chosen binding; configuration is validated before the server listens.
+
+The browser asks for the operator key once and exchanges it for an HttpOnly,
+SameSite=Strict session cookie. HTTPS uses a Secure `__Host-` cookie. Keys are
+cleared from the form after submission and never saved in browser storage or
+URLs. Sessions expire after eight hours, are process-local, and are lost when
+the server restarts. Sign out revokes the current session, clears its cookie,
+and closes its event streams. Signing out does not cancel the server's run.
+There are no user accounts, roles or OAuth services.
+
+Every run API and SSE connection requires local or session authorization;
+command/Snapshot 401 responses and expired SSE sessions return the browser to
+sign-in and remove its old run view. Network interruptions retain the reconnect
+state and probe access before reopening the event stream. Login allows five
+attempts per burst, refills one every 12 seconds, and caps active sessions at 16.
+A CLI may use the operator key in an Authorization bearer header. Never place
+credentials in a query string, fragment, shared transcript or log.
+
+Production Node serves HTTP; terminate HTTPS in the selected trusted proxy and
+preserve the configured Host. No forwarded headers are implicitly trusted.
+Cookie-authenticated mutations require the exact Origin. Local mode cannot
+detect a remote proxy that rewrites Host to loopback: a loopback bind/Host check
+is not proof of private hosting. For isolated tests, HTTP session mode is allowed
+only when both the bind and public origin are approved loopback hosts. The
+browser suite additionally tests real TLS with temporary synthetic certificates
+on loopback; this is not deployed TLS or remote-access acceptance.
 
 ### With real models
 
@@ -111,7 +146,11 @@ npm start          # one process: serves dist/ and the API on PORT
 | `MOCK_SPEED` | `1` | Multiplier on the mock's pacing; `0` is instant. |
 | `AUTO_START` | on when mock | Start the run at boot. `0`/`false` forces off. |
 | `PORT` | `8787` | Server port. |
-| `HOST` | `127.0.0.1` | Interface to listen on. `0.0.0.0` exposes the unauthenticated server to your network — opt in deliberately. |
+| `HOST` | `127.0.0.1` | Bind interface; local mode only accepts `127.0.0.1`, `::1`, or `localhost`. Remote binding requires session mode. |
+| `AUTH_MODE` | `local` | `local` or `session`, validated before listen. |
+| `PUBLIC_ORIGIN` | — | Exact HTTPS origin required in session mode; no path, query, fragment or credentials. Forbidden in local mode. |
+| `AGENT_CHAT_OPERATOR_TOKEN` | — | High-entropy operator bootstrap key from runtime secret storage; required only for session mode. |
+| `AUTH_SESSION_TTL_SECONDS` | `28800` | Absolute session lifetime, 300–86400 seconds. |
 | `STATIC_DIR` | `dist` if present | Directory of built client files to serve. |
 
 A `.env` file in the repo root is read at boot; values already in the environment win.
@@ -213,13 +252,16 @@ and [cache accounting](https://developers.openai.com/api/docs/guides/prompt-cach
 
 All JSON, no framework. Every POST returns `{ ok: true, seq }` or `{ ok: false, error }`
 (400 bad body or URL, 403 cross-site request or lifetime budget reached, 404 unknown route,
-405 wrong method, 413 body over 64 KB, 415 `/api/message` without `Content-Type: application/json`,
+401 authentication required, 403 forbidden origin/host, 405 wrong method, 413 body over 64 KB, 415 `/api/message` without `Content-Type: application/json`,
 429 more than 5 messages in a burst or 1/s sustained, 500 handler error). POSTs must be
 same-origin: a request carrying an `Origin` whose host differs from `Host`, or
 `Sec-Fetch-Site: cross-site`, is refused; requests without those headers (curl) pass.
 
 | Route | Body | Effect |
 | --- | --- | --- |
+| `GET /api/auth/status` | — | Public mode, authentication state and expiry; no run data or credentials. |
+| `POST /api/auth/login` | Authorization bearer header | Exchange the operator key for a browser session cookie and status. Generic 401, throttled 429/Retry-After, or capacity/unavailable 503. |
+| `POST /api/auth/logout` | Session cookie and exact Origin | Revoke the current session, clear cookie and return signed-out status. Repeated/expired logout can safely clear the cookie with the same Origin. |
 | `GET /api/events` | — | SSE. First event is `snapshot`; then one event per `RunEvent`, `event:` = type, `id:` = seq. `: ping` every 15 s. Reconnects get a fresh snapshot. |
 | `GET /api/state` | — | The current `RunSnapshot`. |
 | `POST /api/message` | `{ body, target }` | Human message to `all` or one agent id; slash commands parsed here. |

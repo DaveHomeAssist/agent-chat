@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRun } from './api/useRun'
 import { fetchState } from './api/client'
 import type { ConnectionStatus } from './api/client'
@@ -92,6 +92,9 @@ export function AgentChatroom({
   const [snapshotPending, setSnapshotPending] = useState(false)
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
   const snapshotExporting = useRef(false)
+  const snapshotRequest = useRef<AbortController | null>(null)
+
+  useEffect(() => () => { snapshotRequest.current?.abort() }, [])
 
   const run = snapshot?.run ?? null
   const stats = snapshot?.stats ?? null
@@ -144,9 +147,11 @@ export function AgentChatroom({
     setSnapshotPending(true)
     setSnapshotError(null)
     const controller = new AbortController()
+    snapshotRequest.current = controller
     const timeout = setTimeout(() => controller.abort(), 15_000)
     try {
       const freshSnapshot = await fetchState(controller.signal)
+      if (controller.signal.aborted) return
       const exportedAt = new Date()
       const filename = snapshotFilename(freshSnapshot.run.id, exportedAt)
       const blob = new Blob([serializeSnapshot(freshSnapshot, exportedAt)], {
@@ -172,6 +177,7 @@ export function AgentChatroom({
       setSnapshotError(controller.signal.aborted ? 'Request timed out. Try again.' : err instanceof Error ? err.message : 'Download could not be started.')
     } finally {
       clearTimeout(timeout)
+      if (snapshotRequest.current === controller) snapshotRequest.current = null
       snapshotExporting.current = false
       setSnapshotPending(false)
     }

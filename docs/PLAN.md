@@ -36,9 +36,10 @@ console. Reported-usage limits are not a guarantee of zero billing overshoot.
 Dave designated the current Codex session as orchestration only. The
 [coordination runbook](../coordination/ORCHESTRATOR.md) records ownership and the
 [starter prompts](../coordination/START_HERE.md) launch persistence, authentication
-and verification sessions. Persistence/authentication module PRs remain in review
-and correction; shared runtime wiring requires a later sequential integration
-assignment. Browser infrastructure is delivered through merged
+and verification sessions. Reviewed authentication module PR #12 is merged as
+`ecd1fc6`; its full runtime integration is staged in PR #15 at `183797e`, pending
+independent review/merge. Persistence PR #13 is held for separate integration.
+Browser infrastructure is delivered through merged
 [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), with passing main CI.
 
 The durable local SQLite queue stores immutable assignments/reports, leases,
@@ -97,12 +98,16 @@ Do not automatically retry failed or ambiguous billable requests.
 ## M2 details still outstanding
 
 - Append durable events and prove replay/resume after process termination.
-- Require authentication before remote binding; verify API and SSE authorization.
+- Review and merge the staged auth integration [PR #15](https://github.com/DaveHomeAssist/agent-chat/pull/15).
+  Local 142 Node/17 Chromium checks pass, including real loopback TLS cookies,
+  API route denial, session loss and reconnect; [exact product CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34228176386) passes.
+  Module-only main remains runtime-unwired until that separate merge.
 - Add historical run listing, snapshot retrieval, picker and transcript export.
   The current-run Snapshot download is delivered; historical exports still depend
   on persistent storage.
-- Extend the delivered seven Chromium checks with auth/history/recovery coverage
-  when those flows are wired. Existing Node/Python regressions, typechecks, build,
+- Merge the staged ten auth browser checks (17 total), then extend with
+  history/recovery coverage when those flows are wired. Existing Node/Python
+  regressions, typechecks, build,
   simulator checks and the mock console/progress browser gate remain required.
 - Wire Reassign, correct activity-footer state and reconcile the
   remaining fidelity checklist. Provider/model labels and cache counters exist.

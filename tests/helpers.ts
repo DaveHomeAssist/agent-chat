@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { setImmediate } from 'node:timers/promises'
 import type { TestContext } from 'node:test'
+import { createAuthService, type AuthServiceOptions } from '../server/auth.js'
 import { PERSONAS } from '../server/agents.js'
 import { loadConfig } from '../server/config.js'
 import type { LLM, LLMRequest, LLMResult, LLMUsage, ToolRegistry } from '../server/contracts.js'
@@ -29,8 +30,10 @@ export async function until(check: () => boolean, label = 'condition'): Promise<
 export async function settle() {
   for (let n = 0; n < 25; n++) await setImmediate()
 }
-export function harness(t: TestContext, complete: LLM['complete'], options: { env?: NodeJS.ProcessEnv; tools?: ToolRegistry; llm?: LLM } = {}) {
+export function harness(t: TestContext, complete: LLM['complete'], options: { env?: NodeJS.ProcessEnv; tools?: ToolRegistry; llm?: LLM; authOptions?: AuthServiceOptions } = {}) {
   const config = loadConfig({ MOCK_LLM: '1', MOCK_SPEED: '0', AUTO_START: '0', ...options.env })
+  const auth = createAuthService(config.auth, options.authOptions)
+  t.after(() => auth.dispose())
   const store = createRunStore(PERSONAS, config.models)
   const workspace = createWorkspace()
   const requests: LLMRequest[] = []
@@ -38,7 +41,7 @@ export function harness(t: TestContext, complete: LLM['complete'], options: { en
   const tools = options.tools ?? createToolRegistry()
   const orchestrator = createOrchestrator({ store, workspace, tools, config, llm, personas: PERSONAS })
   t.after(() => orchestrator.dispose())
-  return { config, store, workspace, tools, orchestrator, requests }
+  return { config, auth, store, workspace, tools, orchestrator, requests }
 }
 export function buildFeature(ws: ReturnType<typeof createWorkspace>, broken = false) {
   ws.write('services/auth/webauthn/register.ts', 'export const register = true\n')

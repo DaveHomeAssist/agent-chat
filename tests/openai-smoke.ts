@@ -1,5 +1,6 @@
 /** Test-only browser fixture. No env file, API keys, production endpoint or healthcheck. */
 import { resolve } from 'node:path'
+import { createAuthService } from '../server/auth.js'
 import { PERSONAS } from '../server/agents.js'
 import { loadConfig } from '../server/config.js'
 import { createServer } from '../server/http.js'
@@ -17,8 +18,9 @@ const llm = process.env.SMOKE_FAIL === '1'
   ? createOpenAILLM(config, clientWith(async () => sse([completed([], null, 'failed')])))
   : scriptedOpenAI(config)
 const orchestrator = createOrchestrator({ store, llm, workspace: createWorkspace(), tools: createToolRegistry(), config, personas: PERSONAS })
-const server = createServer({ store, orchestrator, config })
+const auth = createAuthService(config.auth)
+const server = createServer({ store, orchestrator, config, auth })
 server.listen(config.port, config.host, () => console.log(`Offline OpenAI browser fixture: http://${config.host}:${config.port}`))
-const shutdown = () => { orchestrator.dispose(); server.close(); server.closeAllConnections() }
+const shutdown = () => { auth.dispose(); orchestrator.dispose(); server.close(); server.closeAllConnections() }
 process.on('SIGTERM', shutdown)
 process.on('SIGINT', shutdown)

@@ -261,7 +261,11 @@ export interface CommandError {
 export type CommandResponse = CommandResult | CommandError
 
 /**
- * HTTP surface. Every POST returns `CommandResponse`.
+ * HTTP surface. Run command POSTs return `CommandResponse`; auth routes return AuthStatusPayload.
+ *
+ *   GET  /api/auth/status      Authentication mode/status, no run data
+ *   POST /api/auth/login       Bootstrap bearer -> HttpOnly session cookie
+ *   POST /api/auth/logout      Revoke session and clear cookie
  *
  *   GET  /api/events            SSE stream of `RunEvent` (first event is a snapshot)
  *   GET  /api/state             RunSnapshot
@@ -274,6 +278,9 @@ export type CommandResponse = CommandResult | CommandError
  *   POST /api/agents/:id/interrupt   abort the agent's in-flight model call
  */
 export const API = {
+  authStatus: '/api/auth/status',
+  login: '/api/auth/login',
+  logout: '/api/auth/logout',
   events: '/api/events',
   state: '/api/state',
   message: '/api/message',

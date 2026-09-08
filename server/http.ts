@@ -3,6 +3,8 @@ import { stat } from 'node:fs/promises'
 import http from 'node:http'
 import { extname, resolve, sep } from 'node:path'
 import { AGENT_IDS, API, type AgentId, type MessageTarget, type RunEvent } from '../shared/protocol.js'
+import type { AuthHeaderValue, AuthPrincipal, AuthService } from './auth.js'
+import { evaluateRequestSecurity, type RequestPolicy } from './request-security.js'
 import type { ServerConfig } from './config.js'
 import type { Orchestrator, RunStore } from './contracts.js'
 
@@ -17,6 +19,7 @@ interface Deps {
   store: RunStore
   orchestrator: Orchestrator
   config: ServerConfig
+  auth: AuthService
 }
 
 type Req = http.IncomingMessage
@@ -34,7 +37,7 @@ class HttpError extends Error {
 interface Route {
   method: 'GET' | 'POST'
   match: (path: string) => Record<string, string> | null
-  handle: (req: Req, res: Res, params: Record<string, string>) => Promise<void> | void
+  handle: (req: Req, res: Res, params: Record<string, string>, principal: AuthPrincipal) => Promise<void> | void
 }
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -59,18 +62,24 @@ const CONTENT_TYPES: Record<string, string> = {
 }
 
 export function createServer(deps: Deps): http.Server {
+  return http.createServer(createRequestHandler(deps))
+}
+
+/** Shared handler also permits direct TLS in isolated browser verification. */
+export function createRequestHandler(deps: Deps): http.RequestListener {
   const routes = buildRoutes(deps)
-  const staticDir = deps.config.staticDir
-
-  return http.createServer((req, res) => {
+  return (req, res) => {
     const started = Date.now()
-    res.once('finish', () => console.log(`${req.method} ${req.url} ${res.statusCode} ${Date.now() - started}ms`))
-
-    // Everything that can throw — the URL parse included — runs inside this
-    // promise so one bad request is a 4xx/5xx, never an uncaught exception.
-    dispatch(req, res, routes, staticDir).catch((err: unknown) => {
+    let safePath = '/[invalid-url]'
+    res.once('finish', () => console.log(`${req.method} ${safePath} ${res.statusCode} ${Date.now() - started}ms`))
+    // URL parsing stays inside the rejection boundary. Never log the query,
+    // headers, body or exception payload: any of them can contain a credential.
+    Promise.resolve().then(async () => {
+      safePath = pathname(req)
+      await dispatch(req, res, routes, deps, safePath)
+    }).catch((err: unknown) => {
       const status = err instanceof HttpError ? err.status : 500
-      if (status === 500) console.error(`${req.method} ${req.url} failed:`, err)
+      if (status === 500) console.error(`${req.method} ${safePath} failed`)
       if (res.headersSent) {
         res.destroy()
         return
@@ -79,29 +88,87 @@ export function createServer(deps: Deps): http.Server {
         res.setHeader('Connection', 'close')
         res.once('finish', () => req.destroy())
       }
-      if (status === 429) res.setHeader('Retry-After', '1')
-      json(res, status, { ok: false, error: err instanceof Error ? err.message : String(err) })
+      if (status === 401) res.setHeader('WWW-Authenticate', 'Bearer realm="Agent Chatroom"')
+      if (status === 429 && !res.hasHeader('Retry-After')) res.setHeader('Retry-After', '1')
+      json(res, status, { ok: false, error: err instanceof HttpError ? err.message : 'request failed' })
     })
-  })
+  }
 }
 
-async function dispatch(req: Req, res: Res, routes: Route[], staticDir: string | null): Promise<void> {
+/** Preserve duplicates that Node otherwise discards for singleton headers. */
+function securityHeader(req: Req, name: string): AuthHeaderValue {
+  const values: string[] = []
+  for (let i = 0; i < req.rawHeaders.length; i += 2) {
+    if (req.rawHeaders[i].toLowerCase() === name) values.push(req.rawHeaders[i + 1])
+  }
+  return values.length > 1 ? values : req.headers[name]
+}
+
+function assertRequestPolicy(req: Req, deps: Deps, policy: RequestPolicy, principal: AuthPrincipal | null): void {
+  const result = evaluateRequestSecurity(deps.config.auth, policy, {
+    host: securityHeader(req, 'host'),
+    origin: securityHeader(req, 'origin'),
+    secFetchSite: securityHeader(req, 'sec-fetch-site'),
+    credentialKind: principal?.kind ?? null,
+    encrypted: 'encrypted' in req.socket && req.socket.encrypted === true,
+  })
+  if (!result.ok) throw new HttpError(403, 'request forbidden')
+}
+
+async function dispatch(req: Req, res: Res, routes: Route[], deps: Deps, path: string): Promise<void> {
   const method = req.method ?? 'GET'
-  const path = pathname(req)
-  if (method === 'POST') assertSameOrigin(req)
+  const credentials = { authorization: securityHeader(req, 'authorization'), cookie: securityHeader(req, 'cookie') }
+  const result = deps.auth.authenticate(credentials)
+  const principal = result.ok ? result.principal : null
+  const authPolicy = path === API.authStatus ? 'auth-status' : path === API.login ? 'login' : path === API.logout ? 'logout' : null
+  if (authPolicy) {
+    // Login evaluates the submitted bearer itself; an existing cookie must not
+    // turn a valid explicit login attempt into an ambiguous credential request.
+    assertRequestPolicy(req, deps, authPolicy, authPolicy === 'login' ? null : principal)
+    if (method !== (authPolicy === 'auth-status' ? 'GET' : 'POST')) throw new HttpError(405, 'method not allowed')
+    if (authPolicy === 'auth-status') {
+      json(res, 200, deps.auth.status(credentials))
+    } else if (authPolicy === 'login') {
+      const issued = deps.auth.issueSession(credentials.authorization)
+      if (!issued.ok) {
+        if (issued.code === 'denied') throw new HttpError(401, 'authentication required')
+        if (issued.code === 'rate_limited') {
+          res.setHeader('Retry-After', String(issued.retryAfterSeconds))
+          throw new HttpError(429, 'too many login attempts')
+        }
+        throw new HttpError(503, 'authentication unavailable')
+      }
+      res.setHeader('Set-Cookie', issued.setCookie)
+      json(res, 200, issued.status)
+    } else {
+      if (principal?.kind === 'session') deps.auth.revoke(principal)
+      const clearCookie = deps.auth.clearSessionCookie()
+      if (clearCookie) res.setHeader('Set-Cookie', clearCookie)
+      json(res, 200, { mode: deps.auth.mode, authenticated: false, expiresAt: null })
+    }
+    return
+  }
+
+  const api = path.startsWith('/api/') || path === '/api'
+  if (api) {
+    // Before method dispatch, body reads, snapshots, SSE headers or commands.
+    if (!principal) throw new HttpError(401, 'authentication required')
+    assertRequestPolicy(req, deps, method === 'GET' || method === 'HEAD' ? 'protected-read' : 'protected-mutation', principal)
+  }
   let pathKnown = false
   for (const route of routes) {
     const params = route.match(path)
     if (!params) continue
     pathKnown = true
     if (route.method !== method) continue
-    await route.handle(req, res, params)
+    if (!principal) throw new HttpError(401, 'authentication required')
+    await route.handle(req, res, params, principal)
     return
   }
   if (pathKnown) throw new HttpError(405, `${method} not allowed on ${path}`)
-  if (path.startsWith('/api/') || path === '/api') throw new HttpError(404, `no route for ${path}`)
-  if (staticDir && (method === 'GET' || method === 'HEAD')) {
-    await serveStatic(req, res, path, staticDir)
+  if (api) throw new HttpError(404, `no route for ${path}`)
+  if (deps.config.staticDir && (method === 'GET' || method === 'HEAD')) {
+    await serveStatic(req, res, path, deps.config.staticDir)
     return
   }
   throw new HttpError(404, `no route for ${path}`)
@@ -113,27 +180,6 @@ function pathname(req: Req): string {
     return new URL(req.url ?? '/', 'http://localhost').pathname
   } catch {
     throw new HttpError(400, 'bad request url')
-  }
-}
-
-/**
- * CSRF guard. Every POST here is a CORS "simple request", so a page on any
- * origin could fire one; browsers always send `Origin` (and `Sec-Fetch-Site`)
- * on POST, so a mismatch means cross-site. Requests without either header —
- * curl, the built client is same-origin, the Vite proxy keeps Host — pass.
- */
-function assertSameOrigin(req: Req): void {
-  if (req.headers['sec-fetch-site'] === 'cross-site') throw new HttpError(403, 'cross-site request')
-  const origin = req.headers.origin
-  if (origin === undefined) return
-  let host: string | null
-  try {
-    host = new URL(origin).host
-  } catch {
-    host = null // includes the literal "null" origin
-  }
-  if (host === null || host.toLowerCase() !== req.headers.host?.toLowerCase()) {
-    throw new HttpError(403, 'cross-site request')
   }
 }
 
@@ -158,7 +204,13 @@ function tokenBucket(burst: number, perSec: number): { take(): boolean } {
   }
 }
 
-function buildRoutes({ store, orchestrator, config }: Deps): Route[] {
+function buildRoutes(deps: Deps): Route[] {
+  const { store, orchestrator, config, auth } = deps
+  const reauthorize = (req: Req) => {
+    const current = auth.authenticate({ authorization: securityHeader(req, 'authorization'), cookie: securityHeader(req, 'cookie') })
+    if (!current.ok) throw new HttpError(401, 'authentication required')
+    assertRequestPolicy(req, deps, 'protected-mutation', current.principal)
+  }
   const exact = (p: string) => (path: string) => (path === p ? {} : null)
   const interrupt = /^\/api\/agents\/([^/]+)\/interrupt$/
   const messageBucket = tokenBucket(MESSAGE_BURST, MESSAGE_PER_SEC)
@@ -169,13 +221,15 @@ function buildRoutes({ store, orchestrator, config }: Deps): Route[] {
     return async (req, res) => {
       guard?.(req)
       const body = await readJson(req)
+      // A slow body can outlive its session. Recheck after the await and before effects.
+      reauthorize(req)
       await fn(body)
       json(res, 200, { ok: true, seq: store.seq() })
     }
   }
 
   return [
-    { method: 'GET', match: exact(API.events), handle: (req, res) => streamEvents(req, res, store) },
+    { method: 'GET', match: exact(API.events), handle: (req, res, _params, principal) => streamEvents(req, res, store, auth, principal) },
     { method: 'GET', match: exact(API.state), handle: (_req, res) => json(res, 200, store.snapshot()) },
     {
       method: 'POST',
@@ -219,6 +273,7 @@ function buildRoutes({ store, orchestrator, config }: Deps): Route[] {
       handle: async (req, res, params) => {
         if (!isAgentId(params.id)) throw new HttpError(400, `unknown agent "${params.id}"`)
         await readJson(req)
+        reauthorize(req)
         orchestrator.interrupt(params.id)
         json(res, 200, { ok: true, seq: store.seq() })
       },
@@ -230,10 +285,37 @@ function buildRoutes({ store, orchestrator, config }: Deps): Route[] {
 // SSE
 // ---------------------------------------------------------------------------
 
-function streamEvents(req: Req, res: Res, store: RunStore): void {
+function streamEvents(req: Req, res: Res, store: RunStore, auth: AuthService, principal: AuthPrincipal): void {
+  let closed = false
+  let heartbeat: ReturnType<typeof setInterval> | undefined
+  let unsubscribe = () => {}
+  let unsubscribeAuth = () => {}
+  const close = () => {
+    if (closed) return
+    closed = true
+    clearInterval(heartbeat)
+    unsubscribe()
+    unsubscribeAuth()
+    req.off('close', close)
+    req.off('error', close)
+    res.off('error', close)
+    res.off('close', close)
+    if (!res.headersSent) {
+      res.setHeader('WWW-Authenticate', 'Bearer realm="Agent Chatroom"')
+      json(res, 401, { ok: false, error: 'authentication required' })
+    } else res.end()
+  }
+  // Subscribe before sending any run data. A stale/disposed principal can
+  // invalidate synchronously; no snapshot or event headers escape that race.
+  unsubscribeAuth = auth.onInvalidated(principal, close)
+  if (closed) { unsubscribeAuth(); return }
+  req.on('close', close)
+  req.on('error', close)
+  res.on('error', close)
+  res.on('close', close)
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
-    'Cache-Control': 'no-cache, no-transform',
+    'Cache-Control': 'no-store, no-transform',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
   })
@@ -241,30 +323,14 @@ function streamEvents(req: Req, res: Res, store: RunStore): void {
   req.socket.setNoDelay(true)
   req.socket.setKeepAlive(true)
   res.flushHeaders()
-
-  const send = (e: RunEvent) => {
-    res.write(`event: ${e.type}\ndata: ${JSON.stringify(e)}\nid: ${e.seq}\n\n`)
+  const send = (event: RunEvent) => {
+    if (!closed) res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\nid: ${event.seq}\n\n`)
   }
-
-  // A reconnecting client (Last-Event-ID set) gets the same fresh snapshot as a
-  // new one — state is small, so there is no replay buffer to consult.
+  // Reconnects always receive a fresh snapshot, never an old replay buffer.
   const snapshot = store.snapshot()
   send({ type: 'snapshot', seq: snapshot.seq, snapshot })
-
-  const unsubscribe = store.subscribe(send)
-  const heartbeat = setInterval(() => res.write(': ping\n\n'), HEARTBEAT_MS)
-
-  let closed = false
-  const close = () => {
-    if (closed) return
-    closed = true
-    clearInterval(heartbeat)
-    unsubscribe()
-    res.end()
-  }
-  req.on('close', close)
-  req.on('error', close)
-  res.on('error', close)
+  unsubscribe = store.subscribe(send)
+  heartbeat = setInterval(() => { if (!closed) res.write(': ping\n\n') }, HEARTBEAT_MS)
 }
 
 // ---------------------------------------------------------------------------
