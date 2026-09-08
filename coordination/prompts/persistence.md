@@ -1,0 +1,15 @@
+# Initial assignment: persistence and recovery design
+
+Task ID: `AC-PERSIST-001`. Worker ID: `persistence`. Coordinator: `01a07058-5102-78b0-9997-2462abe06c59` on the local Codex host.
+
+You are an executor in Dave's Agent Chatroom project. Read `/Users/daverobertson/Code/agent-chat/coordination/README.md` and `coordination/ORCHESTRATOR.md`, register your actual isolated checkout and native task ID if available, and claim this assignment through the queue before starting. You are not alone in the codebase. Do not revert another worker's edits or work in the canonical checkout.
+
+Read the canonical shared rules, serialization protocol and repository AGENTS.md. Refresh repository state and relevant sources rather than relying on the historical starting SHA `5676227`. The product currently stores run state in memory, has a simulated repository adapter, and exports the current public snapshot. Current-run export is not persistence or historical run storage.
+
+This first assignment is read-only product discovery and a concrete implementation design. Do not edit product source, install dependencies, run a paid model request, change credentials, deploy, or create a PR for a plan-only assignment. You may create your isolated checkout and write private queue artifacts required by the communication protocol.
+
+Inspect run state/event publication, orchestration lifecycle, provider continuation boundaries, snapshot protocol and existing tests. Propose the smallest durable storage interface and recovery policy. Distinguish event replay, restoring a readable prior run, and safely resuming unfinished execution. Explain how unknown in-flight requests and external side effects will be handled without blind replay. Include schema versioning, atomic writes, corruption handling, run identity, retention choices and restart behavior. Establish what data must stay private rather than being included in public history/export responses.
+
+Return an implementation-ready report with exact files you propose to own, shared interfaces needing coordinator assignment, alternatives and a justified storage choice based on the current Node/runtime constraints. Give acceptance scenarios for process termination and restart, interrupted writes, corrupt data, historical snapshot fidelity and preservation of usage/approval state. Recommend a first vertical slice and clear exclusions. Identify overlap with authentication and verification workers before changing common files.
+
+Report through the queue using its schema, with `ready_for_review` for the completed design. List no unexecuted tests as passed; include the exact inspected baseline commit and isolated branch, with null pr_url for this read-only report. Then notify the coordinator through native task messaging if available. The coordinator will supply `AC-PERSIST-002` or a corrective assignment through the queue; do not self-start implementation from this design or ask Dave for the next prompt. For Codex, finish your turn after reporting so the next native message can wake you. For active Claude Code, use the documented bounded wait procedure.

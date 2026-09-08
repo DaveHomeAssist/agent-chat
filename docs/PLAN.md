@@ -28,6 +28,26 @@ console. Reported-usage limits are not a guarantee of zero billing overshoot.
 - Snapshot: current-run public JSON export is implemented and browser verified.
   A useful paid proposal cost $0.113582; see [probe evidence](USEFUL_MODEL_PROBE.md).
 
+## Parallel executor delivery
+
+Dave designated the current Codex session as orchestration only. The
+[coordination runbook](../coordination/ORCHESTRATOR.md) records ownership and the
+[starter prompts](../coordination/START_HERE.md) launch persistence, authentication
+and verification sessions. Initial tasks are read-only designs/baseline checks;
+implementation follows coordinator review of actual files and shared interfaces.
+
+The durable local SQLite queue stores immutable assignments/reports, leases,
+reconciliation decisions and event cursors. Sixteen offline protocol tests pass,
+including two independent worker processes. Native Codex messages and an active
+five-minute coordinator heartbeat provide dispatch/recovery; real registered
+executor wakeup remains unverified until the first worker exchange. An active
+Claude Code session can use bounded polling, but sleeping external chats have no
+verified automatic launcher. No new application API allowance is included.
+
+The verification worker later owns integration, shared wiring, status records and
+sequential merges. This communication infrastructure is separate from the product
+milestones below; it does not make the application's simulated tools execute Git.
+
 ## Milestones, in dependency order
 
 | Milestone | Work | Required acceptance |

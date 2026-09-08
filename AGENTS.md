@@ -4,6 +4,12 @@ For work under `/Users/daverobertson/Code`, read the shared contract at
 `/Users/daverobertson/Code/ops-hub/90-governance/WORKSPACE_OPERATING_RULES.md` first.
 Preserve user changes and follow the applicable repository delivery requirements.
 
+## Coordinated executor work
+
+- When dispatched through the local coordination queue, read `coordination/README.md`, `coordination/WORKER.md` and `coordination/ORCHESTRATOR.md`. The queue records assignments and reports; it does not replace Dave's current instructions or authorize paid calls.
+- The coordinator authors prompts and reviews evidence. Executors perform product changes, tests and Git delivery in exclusive isolated checkouts. Claim only a new assignment for your registered worker, renew its lease and report evidence before awaiting follow-up. Never automatically rerun a stale assignment or instruct another worker.
+- The assigned integration executor owns shared wiring, progress records, sequential merges and final acceptance. Implementation workers commit and push bounded PRs promptly; integration completes the applicable merge and progress workflow in the same overall delivery. A worker report or unmerged PR is not completed delivery. Do not independently edit shared progress files when integration owns them.
+
 ## Required progress maintenance
 
 - The canonical visual status document is `project-progress/index.html`. Its editable source is `project-progress/status.json`; follow `project-progress/README.md` and regenerate with `node project-progress/render.mjs`. Do not create a competing dashboard or hand-edit generated HTML.

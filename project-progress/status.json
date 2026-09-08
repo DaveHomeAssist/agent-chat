@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-09-08T05:09:05-04:00",
-  "verifiedLabel": "Sep 8, 2026 · 5:09 AM ET",
-  "codeRevision": "0fc51ca15da814bf3b7630114a3c8354daa9002d",
+  "verifiedAt": "2026-09-08T05:30:04-04:00",
+  "verifiedLabel": "Sep 8, 2026 · 5:30 AM ET",
+  "codeRevision": "28bd3c0d1ad6ab9a001fc278203fe05b2335f8bf",
   "overall": "Partial",
-  "summary": "One useful OpenAI request produced the Snapshot proposal for 11.36 cents. Current-run export is browser verified; full model acceptance, durable operation and real repository delivery remain incomplete.",
+  "summary": "Executor communication infrastructure is verified offline: private queue, durable reports and three starter prompts. Native worker wakeup awaits the first registered executor. Earlier product checks retain their Sep 8 evidence; full model acceptance, durable operation and real repository delivery remain incomplete.",
   "items": [
     {
       "id": "console",
@@ -63,7 +63,7 @@
       "phase": "Delivered",
       "actualDate": "2026-09-06",
       "dateLabel": "Sep 6, 2026",
-      "notes": "PRs #5–7 delivered standalone status, theme and table controls. Sep 8 source and generated HTML updated with the useful probe and Snapshot evidence.",
+      "notes": "PRs #5–7 delivered standalone status, theme and table controls. Sep 8 source and generated HTML now distinguish executor coordination from unfinished product milestones.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/7"
     },
     {
@@ -72,7 +72,7 @@
       "status": "Complete",
       "phase": "Delivered",
       "dateLabel": "Sep 7 · reverified Sep 8",
-      "notes": "Roadmap and ledger separate the completed single useful paid probe from pending two-run model acceptance and persistent operation.",
+      "notes": "Roadmap and ledger distinguish the useful paid probe, Snapshot export and external executor coordination from unfinished M1–M4 product milestones.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/9",
       "actualDate": "2026-09-07"
     },
@@ -105,6 +105,26 @@
       "dateLabel": "Sep 8, 2026",
       "notes": "Fresh JSON download, all public log lines, no run mutation, duplicate protection, timeout and visible errors. Unit, CI production build and mock browser checks pass.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/9"
+    },
+    {
+      "id": "executor-coordination",
+      "title": "Durable executor communication queue",
+      "status": "Complete",
+      "phase": "Delivered",
+      "actualDate": "2026-09-08",
+      "dateLabel": "Sep 8, 2026",
+      "notes": "Private SQLite assignments, leases, immutable reports/decisions and restart cursor. Sixteen offline tests pass, including two separate worker processes. Product runtime remains unchanged.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/28bd3c0d1ad6ab9a001fc278203fe05b2335f8bf/coordination/README.md"
+    },
+    {
+      "id": "executor-wakeup",
+      "title": "Registered executor wakeup acceptance",
+      "status": "Partial",
+      "phase": "Coordination",
+      "plannedDate": null,
+      "dateLabel": "Awaiting first executors",
+      "notes": "Native five-minute coordinator heartbeat is active; starter prompts and durable queue are ready. Initial Codex worker registration and wakeup are not yet exercised. Sleeping external Claude/browser chats have no verified launcher.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/28bd3c0d1ad6ab9a001fc278203fe05b2335f8bf/coordination/START_HERE.md"
     },
     {
       "id": "access",

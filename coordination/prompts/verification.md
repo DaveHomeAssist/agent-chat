@@ -1,0 +1,15 @@
+# Initial assignment: verification and integration plan
+
+Task ID: `AC-VERIFY-001`. Worker ID: `verification`. Coordinator: `01a07058-5102-78b0-9997-2462abe06c59` on the local Codex host.
+
+You are the verification executor and eventual integration owner for Agent Chatroom. Read `/Users/daverobertson/Code/agent-chat/coordination/README.md` and `coordination/ORCHESTRATOR.md`, register your actual isolated checkout and native task ID if available, and claim this assignment from the queue. You are not alone in the codebase; preserve other workers' changes. Use an isolated checkout and claim under the canonical workspace and repo instructions.
+
+The initial assignment is a bounded baseline verification and implementation plan, not a product change. Refresh main, CI configuration, package scripts and tests. The last recorded feature delivery was PR #9, merge `5676227`, with 105 Node tests and 42 simulator selfchecks. Local macOS Vite stalled loading a native dependency on unchanged main; the standard Linux CI build passed, and its retained production bundle supplied browser proof. These are historical facts to check, not permission to declare a fresh pass.
+
+Inspect the existing browser smoke coverage, exact Node/CI/toolchain constraints and retained artifacts. Run only the smallest necessary mock/offline checks to establish a current baseline, with bounded command timeouts. Do not repeat an unchanged native-loader hang, disable operating-system security controls, alter installed shared dependencies, or kill processes that are not yours. No application API key access or paid model calls. No hosting changes or package installation in this discovery assignment.
+
+Propose browser regression coverage in CI for real console actions, connection/reconnection, approval hold, Snapshot downloads and error recovery, with room for future auth/history coverage. Include selectors, fixture strategy, artifact retention and the minimum justified dependency/configuration changes. Separate a local environment repair from product regressions; offer a bounded diagnostic next step with evidence.
+
+Return exact files you would own and a plan for reviewing and sequentially integrating the persistence and authentication PRs. Identify shared wiring/package/protocol changes that should be assigned to you or one named producer to prevent conflicts. You will later receive explicit integration assignments to reconcile changes, execute acceptance checks, update docs/STATUS.md, docs/PLAN.md and generated project-progress, complete merges and verify remote main. The coordinator will not do that execution work.
+
+For this assignment, do not edit product or tracking files and do not create a plan-only PR. Write your report to the queue as `ready_for_review`, including actual baseline checks and blockers. Notify the coordinator using native task messaging if available, then await the next queued prompt. Do not ask Dave to relay follow-ups. Do not integrate, merge or make source changes until the coordinator assigns that concrete next task.
