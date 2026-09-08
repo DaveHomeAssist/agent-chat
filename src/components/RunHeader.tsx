@@ -8,9 +8,13 @@ interface Props {
   stats: RunStats | null
   live: boolean
   detailOpen: boolean
+  snapshotAvailable: boolean
+  snapshotPending: boolean
+  snapshotError: string | null
   /** The primary control: start / pause / resume / approve, depending on the run status. */
   onRunAction: () => void
   onToggleDetail: () => void
+  onSnapshot: () => void
 }
 
 const STATUS_META: Record<RunStatus, { label: string; color: string; pulse: boolean }> = {
@@ -40,7 +44,19 @@ export function formatTokens(n: number): string {
   return `${(n / 1000).toFixed(1)}k tok`
 }
 
-export function RunHeader({ accent, run, stats, live, detailOpen, onRunAction, onToggleDetail }: Props) {
+export function RunHeader({
+  accent,
+  run,
+  stats,
+  live,
+  detailOpen,
+  snapshotAvailable,
+  snapshotPending,
+  snapshotError,
+  onRunAction,
+  onToggleDetail,
+  onSnapshot,
+}: Props) {
   const status: RunStatus = run?.status ?? 'idle'
   const meta = STATUS_META[status]
   const runColor = meta.color
@@ -94,7 +110,16 @@ export function RunHeader({ accent, run, stats, live, detailOpen, onRunAction, o
           <span className="ac-btn-swatch" style={{ '--c': runColor } as CSSVars} />
           {ACTION_LABEL[status]}
         </button>
-        <button className="ac-btn">Snapshot</button>
+        <button
+          className="ac-btn"
+          onClick={onSnapshot}
+          disabled={!snapshotAvailable || snapshotPending}
+          aria-busy={snapshotPending}
+          title="Download a fresh JSON snapshot of the current run"
+          aria-describedby={snapshotError ? 'ac-snapshot-error' : undefined}
+        >
+          {snapshotPending ? 'Exporting…' : 'Snapshot'}
+        </button>
         <button className="ac-btn ac-btn--accent" style={accentBtn} onClick={onToggleDetail}>
           {detailOpen ? 'Hide detail' : 'Agent detail'}
         </button>

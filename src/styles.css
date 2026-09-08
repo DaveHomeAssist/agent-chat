@@ -350,6 +350,10 @@ button {
   align-items: center;
   gap: 7px;
 }
+.ac-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .ac-btn-swatch {
   width: 7px;
   height: 7px;
@@ -1475,4 +1479,11 @@ button {
 .ac-banner--info {
   --c: var(--ink-5);
   --tint: rgba(94, 103, 121, 0.12);
+}
+.ac-snapshot-error {
+  height: auto;
+  min-height: 34px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  overflow-wrap: anywhere;
 }
