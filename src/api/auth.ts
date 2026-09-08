@@ -1,4 +1,5 @@
 import type { AuthStatusPayload } from '@shared/auth'
+import { API } from '@shared/protocol'
 
 export type AuthLossReason = 'required' | 'signed_out'
 
@@ -78,12 +79,12 @@ async function authRequest(path: string, init: RequestInit, signal?: AbortSignal
 }
 
 export function getAuthStatus(signal?: AbortSignal): Promise<AuthStatusPayload> {
-  return authRequest('/api/auth/status', { method: 'GET' }, signal)
+  return authRequest(API.authStatus, { method: 'GET' }, signal)
 }
 
 export async function login(key: string, signal?: AbortSignal): Promise<AuthStatusPayload> {
   try {
-    return await authRequest('/api/auth/login', {
+    return await authRequest(API.login, {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}` },
     }, signal)
@@ -94,5 +95,5 @@ export async function login(key: string, signal?: AbortSignal): Promise<AuthStat
 }
 
 export function logout(signal?: AbortSignal): Promise<AuthStatusPayload> {
-  return authRequest('/api/auth/logout', { method: 'POST' }, signal)
+  return authRequest(API.logout, { method: 'POST' }, signal)
 }

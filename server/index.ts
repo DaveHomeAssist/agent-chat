@@ -5,6 +5,7 @@
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { createAuthService } from './auth.js'
 import { PERSONAS } from './agents.js'
 import { loadConfig, repoRoot, type ServerConfig } from './config.js'
 import { createServer } from './http.js'
@@ -45,6 +46,8 @@ function banner(config: ServerConfig): string {
   return [
     `agent-chatroom http://${host}:${config.port}`,
     `llm=${config.llm}`,
+    `auth=${config.auth.mode}`,
+    ...(config.auth.publicOrigin ? [`origin=${config.auth.publicOrigin}`] : []),
     models,
     `effort=${config.effort}`,
     `budget=$${config.budgetUsd.toFixed(2)}/run`,
@@ -64,7 +67,8 @@ async function main(): Promise<void> {
   const tools = createToolRegistry()
   const llm = createLLM(config)
   const orchestrator = createOrchestrator({ store, llm, workspace, tools, config, personas: PERSONAS })
-  const server = createServer({ store, orchestrator, config })
+  const auth = createAuthService(config.auth)
+  const server = createServer({ store, orchestrator, config, auth })
 
   await new Promise<void>((done, fail) => {
     server.once('error', fail)
@@ -96,6 +100,7 @@ async function main(): Promise<void> {
     exiting = true
     console.log(`${signal} received, shutting down`)
     try {
+      auth.dispose()
       orchestrator.dispose()
     } catch (err) {
       console.error('dispose failed:', err)

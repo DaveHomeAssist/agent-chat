@@ -1,13 +1,33 @@
-import { fork } from 'node:child_process'
+import { fork, execFileSync } from 'node:child_process'
 import { once } from 'node:events'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { test as base, expect } from '@playwright/test'
 
-interface MockServer { command(name: 'disconnect' | 'replay'): Promise<Record<string, unknown>> }
+export const OPERATOR_TOKEN = Buffer.alloc(32, 71).toString('base64url') // Synthetic fixture only.
+interface MockServer { command(name: 'disconnect' | 'replay' | 'stats' | 'expire' | 'dispose'): Promise<Record<string, unknown>> }
+type AuthMode = 'local' | 'session' | 'session-https'
 
-export const test = base.extend<{ mockServer: MockServer }>({
-  mockServer: [async ({}, use, testInfo) => {
+export const test = base.extend<{ mockServer: MockServer; authMode: AuthMode }>({
+  authMode: ['local', { option: true }],
+  baseURL: async ({ authMode }, use) => use(`${authMode === 'session-https' ? 'https' : 'http'}://127.0.0.1:18787`),
+  ignoreHTTPSErrors: async ({ authMode }, use) => use(authMode === 'session-https'),
+  mockServer: [async ({ authMode }, use, testInfo) => {
+    let tlsDir: string | undefined
+    const args: string[] = [authMode]
+    if (authMode === 'session-https') {
+      tlsDir = await mkdtemp(join(tmpdir(), 'agent-chat-test-tls-'))
+      const cert = join(tlsDir, 'cert.pem'), key = join(tlsDir, 'key.pem')
+      try {
+        execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', '/CN=127.0.0.1', '-addext', 'subjectAltName=IP:127.0.0.1', '-keyout', key, '-out', cert], { stdio: 'ignore' })
+        args.push(cert, key)
+      } catch (error) {
+        await rm(tlsDir, { recursive: true, force: true }); throw error
+      }
+    }
     // No inherited credentials, NODE_OPTIONS, provider settings or .env loader.
-    const child = fork(new URL('./server.mjs', import.meta.url), [], {
+    const child = fork(new URL('./server.mjs', import.meta.url), args, {
       env: {}, execArgv: [], stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     })
     let output = ''
@@ -43,6 +63,7 @@ export const test = base.extend<{ mockServer: MockServer }>({
         const timer = setTimeout(() => child.kill('SIGKILL'), 3000)
         await exited.finally(() => clearTimeout(timer))
       }
+      if (tlsDir) await rm(tlsDir, { recursive: true, force: true })
     }
   }, { auto: true }],
 })

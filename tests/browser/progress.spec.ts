@@ -45,7 +45,7 @@ for (const viewport of [
     await expect(theme).toHaveAttribute('aria-pressed', before === 'true' ? 'false' : 'true')
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy()
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBeTruthy()
-    await testInfo.attach(`progress-${viewport.name}`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
+    await testInfo.attach(`progress-${viewport.name}`, { body: await page.screenshot({ fullPage: true, path: testInfo.outputPath(`progress-${viewport.name}.png`) }), contentType: 'image/png' })
     await page.emulateMedia({ media: 'print' })
     await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')))
     await expect(page.locator('tbody tr[data-id]')).toHaveCount(data.items.length)
