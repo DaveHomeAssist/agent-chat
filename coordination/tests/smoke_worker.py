@@ -28,5 +28,5 @@ report = {'task_id': assignment['task_id'], 'status': 'ready_for_review',
 path = Path(state) / (worker + '-report.json')
 path.write_text(json.dumps(report))
 path.chmod(0o600)
-result = call('report', '--worker', worker, '--task', assignment['task_id'], '--token', assignment['lease_token'], '--report-file', str(path))
+result = call('report', '--worker', worker, '--task', assignment['task_id'], f"--token={assignment['lease_token']}", '--report-file', str(path))
 print(json.dumps({'pid': os.getpid(), 'status': result['status'], 'worker': worker}))

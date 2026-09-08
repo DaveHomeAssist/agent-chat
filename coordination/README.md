@@ -94,10 +94,13 @@ python3 "$queue_cli" register --worker persistence --platform codex \
   --thread "$CODEX_THREAD_ID" --host local --checkout /absolute/isolated/checkout
 python3 "$queue_cli" next --worker persistence --wait 0 --lease 1800
 python3 "$queue_cli" renew --worker persistence --task AC-PERSIST-001 \
-  --token "$lease_token" --lease 1800
+  --token="$lease_token" --lease 1800
 python3 "$queue_cli" report --worker persistence --task AC-PERSIST-001 \
-  --token "$lease_token" --report-file /absolute/private/report.json
+  --token="$lease_token" --report-file /absolute/private/report.json
 ```
+
+Keep the lease option and quoted value in the joined `--token="$lease_token"`
+form so the value remains unambiguous when a URL-safe token begins with a dash.
 
 Read `CODEX_THREAD_ID` only, never dump the environment; verify it against native
 task metadata. Omit `--thread` for an external worker without a verified native
