@@ -30,20 +30,27 @@ console. Reported-usage limits are not a guarantee of zero billing overshoot.
 - PR #11: seven production Chromium checks, mock-only fixtures and retained browser
   evidence are merged as `9ed160c`; main CI passes. [Browser checks](BROWSER_TESTS.md)
   cover console controls, approval, Snapshot, reconnect/replay and progress views.
+- PR #15: reviewed config/API/SSE/browser authentication is merged as `e5dc358`;
+  main CI passes, including ten additional auth/HTTPS checks (17 browser tests total).
+- PR #13: reviewed durable storage module merged as `6b984db`; runtime/history/resume
+  are still unimplemented. V1 checkpoints cannot restore runner/workspace/provider state.
+- PR #16: leading-dash queue caller correction merged as `e48bc17`; all 17 protocol
+  tests pass. Integrated main CI passes 167 Node tests, 42 simulator checks and all
+  17 browser tests, plus clean installation/build/typechecks.
 
 ## Parallel executor delivery
 
 Dave designated the current Codex session as orchestration only. The
 [coordination runbook](../coordination/ORCHESTRATOR.md) records ownership and the
 [starter prompts](../coordination/START_HERE.md) launch persistence, authentication
-and verification sessions. Reviewed authentication module PR #12 is merged as
-`ecd1fc6`; its full runtime integration is staged in PR #15 at `183797e`, pending
-independent review/merge. Persistence PR #13 is held for separate integration.
+and verification sessions. Authentication module #12 and full runtime #15 are
+reviewed and merged; persistence module #13 is merged without runtime wiring.
+Queue caller repair #16 is delivered with passing main CI.
 Browser infrastructure is delivered through merged
 [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), with passing main CI.
 
 The durable local SQLite queue stores immutable assignments/reports, leases,
-reconciliation decisions and event cursors. Sixteen offline protocol tests pass,
+reconciliation decisions and event cursors. Seventeen offline protocol tests pass,
 including two independent worker processes. Native Codex messages and an active
 five-minute coordinator heartbeat provide dispatch/recovery. The queue now records
 verified native claim/report/follow-up cycles and a completed local verification
@@ -97,18 +104,19 @@ Do not automatically retry failed or ambiguous billable requests.
 
 ## M2 details still outstanding
 
-- Append durable events and prove replay/resume after process termination.
-- Review and merge the staged auth integration [PR #15](https://github.com/DaveHomeAssist/agent-chat/pull/15).
-  Local 142 Node/17 Chromium checks pass, including real loopback TLS cookies,
-  API route denial, session loss and reconnect; [exact product CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34228176386) passes.
-  Module-only main remains runtime-unwired until that separate merge.
+- Wire the merged durable storage module with explicit private path/configuration,
+  open/close/failure handling and the required Node runtime floor. Append durable
+  events and prove process-restart history/recovery behavior. Safe explicit resume
+  needs separately reviewed runner/workspace/provider serializers; V1 does not
+  support executable continuation or automatic replay.
+- Preserve delivered [auth](https://github.com/DaveHomeAssist/agent-chat/pull/15)
+  protection on every future history/recovery API and browser flow.
 - Add historical run listing, snapshot retrieval, picker and transcript export.
   The current-run Snapshot download is delivered; historical exports still depend
   on persistent storage.
-- Merge the staged ten auth browser checks (17 total), then extend with
-  history/recovery coverage when those flows are wired. Existing Node/Python
-  regressions, typechecks, build,
-  simulator checks and the mock console/progress browser gate remain required.
+- Extend the 17 delivered browser checks with history/recovery coverage once wired.
+  The 167 Node/17 queue regressions, typechecks, build, 42 simulator checks and
+  mock console/progress browser gate remain required.
 - Wire Reassign, correct activity-footer state and reconcile the
   remaining fidelity checklist. Provider/model labels and cache counters exist.
 
