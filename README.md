@@ -10,7 +10,10 @@ a faithful port of the Claude Design prototype in
 [`project/Agent Chatroom.dc.html`](project/Agent%20Chatroom.dc.html) — see
 [`docs/HANDOFF.md`](docs/HANDOFF.md) and [`chats/`](chats) for the original brief.
 
-The run console has a hard floor of 1180 × 700. The sign-in screen adapts to phone, desktop and ultrawide viewports.
+The run console and sign-in screen support light and dark modes and adapt to phone,
+tablet, desktop and ultrawide viewports. On compact screens, Room, Agents and Context
+are available through the bottom navigation. Console layouts have been checked from
+320px through 3440px wide.
 
 ## Running it
 
