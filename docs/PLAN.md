@@ -37,6 +37,13 @@ console. Reported-usage limits are not a guarantee of zero billing overshoot.
 - PR #16: leading-dash queue caller correction merged as `e48bc17`; all 17 protocol
   tests pass. Integrated main CI passes 167 Node tests, 42 simulator checks and all
   17 browser tests, plus clean installation/build/typechecks.
+- PR #18: explicit Message/Interrupt acceptance merged as `1a7819f`, with actual
+  HTTP 409 draft retention, no-effect refusals, held-body state checks and accepted
+  paused messages/one-time aborts. Existing early and post-body auth is preserved.
+- PR #19: truthful activity, unavailable controls/reasons, native token disclosure
+  and dynamic PR labels merged as `78f84fc`. Its tree matches the tested candidate;
+  local and main CI pass 183 Node, 17 queue, 42 simulator and 24 Chromium checks.
+  Console theme/mobile limits and unfinished control contracts remain below.
 
 ## Parallel executor delivery
 
@@ -45,7 +52,8 @@ Dave designated the current Codex session as orchestration only. The
 [starter prompts](../coordination/START_HERE.md) launch persistence, authentication
 and verification sessions. Authentication module #12 and full runtime #15 are
 reviewed and merged; persistence module #13 is merged without runtime wiring.
-Queue caller repair #16 is delivered with passing main CI.
+Queue caller repair #16, command acceptance #18 and console presentation #19 are
+reviewed and merged with passing main CI. Whole fidelity remains Partial.
 Browser infrastructure is delivered through merged
 [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), with passing main CI.
 
@@ -114,16 +122,17 @@ Do not automatically retry failed or ambiguous billable requests.
 - Add historical run listing, snapshot retrieval, picker and transcript export.
   The current-run Snapshot download is delivered; historical exports still depend
   on persistent storage.
-- Extend the 17 delivered browser checks with history/recovery coverage once wired.
-  The 167 Node/17 queue regressions, typechecks, build, 42 simulator checks and
-  mock console/progress browser gate remain required.
-- Review and merge backend Message/Interrupt acceptance [PR #18](https://github.com/DaveHomeAssist/agent-chat/pull/18).
-  At `55e4dbd`, 177 Node/18 Chromium tests pass in CI, including 409 draft
-  preservation, no-effect refusals, held-body state changes, paused messages and
-  one-time active aborts. Main remains `ca97d42` until that separate merge.
-- Reconcile separately assigned frontend controls and the remaining fidelity
-  checklist. Full task reassignment and pending-action locks remain unimplemented;
-  this backend acceptance change does not deliver them.
+- Extend the 24 delivered browser checks with history/recovery coverage once wired.
+  Preserve 183 Node/17 queue regressions, typechecks, build, 42 simulator checks
+  and the production mock console/progress browser gate.
+- Preserve delivered Message/Interrupt refusals and draft retention from #18, and
+  truthful activity/unavailable controls/token disclosure/dynamic PR labels from #19.
+  Full task reassignment needs an atomic task-transfer contract; real auto-approval
+  needs an explicit tool-approval contract. Pending-action locks remain unfinished.
+- Complete separate console theme/responsiveness foundations: controls screenshots
+  currently cover dark mode, with an inherited 1180px minimum width on mobile.
+  Light/dark auth and responsive progress-page proof do not establish responsive
+  or light-theme console acceptance. Do not mark fidelity Complete from those checks.
 
 ## M3 and M4 boundaries
 
