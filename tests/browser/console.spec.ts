@@ -76,7 +76,7 @@ test('dropped SSE reconnects with fresh state and ignores replayed thread frames
   await page.getByRole('button', { name: 'Pause run', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Resume run', exact: true })).toBeVisible()
   await mockServer.command('disconnect')
-  await expect(page.getByRole('status')).toContainText('reconnecting')
+  await expect(page.getByRole('status').filter({ hasText: 'reconnecting to run server' })).toContainText('reconnecting')
   await expect(page.getByRole('button', { name: 'Snapshot', exact: true })).toBeDisabled()
   const body = 'Message created while the stream was disconnected.'
   const response = await page.request.post('/api/message', { data: { body, target: 'all' } })

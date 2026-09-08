@@ -22,6 +22,7 @@ interface Props {
   typingLabel: string
   draft: string
   onDraft: (v: string) => void
+  sendAvailable: boolean
   onSend: () => void
   targetLabel: string
   targetColor: string
@@ -45,6 +46,7 @@ export function ChatPanel({
   draft,
   onDraft,
   onSend,
+  sendAvailable,
   targetLabel,
   targetColor,
   onCycleTarget,
@@ -166,7 +168,7 @@ export function ChatPanel({
           />
 
           <span className="ac-send-hint">⏎ send</span>
-          <button className="ac-send" style={{ '--accent': accent } as CSSVars} onClick={onSend}>
+          <button className="ac-send" style={{ '--accent': accent } as CSSVars} onClick={onSend} disabled={!sendAvailable || !draft.trim()} aria-describedby={!sendAvailable ? 'ac-command-availability' : undefined}>
             Send
           </button>
         </div>

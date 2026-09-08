@@ -1,141 +1,64 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import type {
-  Agent,
-  AgentId,
-  CommandResult,
-  MessageTarget,
-  RunEvent,
-  RunSnapshot,
-  ThreadItem,
-} from '@shared/protocol'
-import {
-  approveMerge,
-  connectEvents,
-  interruptAgent,
-  pauseRun,
-  resumeRun,
-  sendMessage,
-  setGate as postGate,
-  startRun,
-  type ConnectionStatus,
-} from './client'
-
-/** Output-log lines kept per agent; the server's history is the source of truth. */
-const LOG_CAP = 200
+import { useEffect, useMemo, useState } from 'react'
+import type { AgentId, MessageTarget } from '@shared/protocol'
+import { authVersion, subscribeAuthLoss } from './auth'
+import { approveMerge, connectEvents, fetchState, interruptAgent, pauseRun, resumeRun, sendMessage, setGate, startRun } from './client'
+import { CommandController, type AdmissionToken, type Command, type CommandOutcome, type CommandView, type RefreshOutcome } from './commandState'
 
 export interface RunActions {
-  send(body: string, target: MessageTarget): Promise<boolean>
-  start(): Promise<boolean>
-  pause(): Promise<boolean>
-  resume(): Promise<boolean>
-  setGate(enabled: boolean): Promise<boolean>
-  approve(): Promise<boolean>
-  interrupt(id: AgentId): Promise<boolean>
+  send(body: string, target: MessageTarget, expected: AdmissionToken): Promise<CommandOutcome>
+  start(expected: AdmissionToken): Promise<CommandOutcome>
+  pause(expected: AdmissionToken): Promise<CommandOutcome>
+  resume(expected: AdmissionToken): Promise<CommandOutcome>
+  setGate(enabled: boolean, expected: AdmissionToken): Promise<CommandOutcome>
+  approve(expected: AdmissionToken): Promise<CommandOutcome>
+  interrupt(id: AgentId, expected: AdmissionToken): Promise<CommandOutcome>
+  refreshState(expected: AdmissionToken): Promise<RefreshOutcome>
 }
-
-export interface RunState {
-  snapshot: RunSnapshot | null
-  connection: ConnectionStatus
-  /** The last failed command's message; cleared by the next success. */
-  lastError: string | null
+export interface RunState extends CommandView {
   actions: RunActions
+  isCurrentContext(generation: number): boolean
 }
-
-function patchAgent(
-  agents: Agent[],
-  id: AgentId,
-  fn: (a: Agent) => Agent,
-): Agent[] {
-  return agents.map((a) => (a.id === id ? fn(a) : a))
-}
-
-function apply(s: RunSnapshot, e: RunEvent): RunSnapshot {
-  switch (e.type) {
-    case 'snapshot':
-      return e.snapshot
-    case 'run':
-      return { ...s, seq: e.seq, run: { ...s.run, ...e.run } }
-    case 'stats':
-      return { ...s, seq: e.seq, stats: e.stats }
-    case 'agent':
-      return { ...s, seq: e.seq, agents: patchAgent(s.agents, e.id, (a) => ({ ...a, ...e.patch })) }
-    case 'agent.log':
-      return {
-        ...s,
-        seq: e.seq,
-        agents: patchAgent(s.agents, e.id, (a) => ({ ...a, log: [...a.log, e.line].slice(-LOG_CAP) })),
-      }
-    case 'agent.tool':
-      return {
-        ...s,
-        seq: e.seq,
-        agents: patchAgent(s.agents, e.id, (a) => {
-          const i = a.tools.findIndex((t) => t.id === e.call.id)
-          const tools = i === -1 ? [...a.tools, e.call] : a.tools.map((t, j) => (j === i ? e.call : t))
-          return { ...a, tools }
-        }),
-      }
-    case 'thread.append':
-      return { ...s, seq: e.seq, thread: [...s.thread, e.item] }
-    case 'thread.patch':
-      return {
-        ...s,
-        seq: e.seq,
-        thread: s.thread.map((t) => (t.id === e.id ? ({ ...t, ...e.patch } as ThreadItem) : t)),
-      }
-    case 'pipeline':
-      return { ...s, seq: e.seq, pipeline: e.pipeline }
-    case 'typing':
-      return { ...s, seq: e.seq, typing: e.typing }
+function execute(command: Command, signal: AbortSignal) {
+  switch (command.kind) {
+    case 'send': return sendMessage(command.body, command.target, signal)
+    case 'start': return startRun(signal)
+    case 'pause': return pauseRun(signal)
+    case 'resume': return resumeRun(signal)
+    case 'approve': return approveMerge(signal)
+    case 'gate': return setGate(command.enabled, signal)
+    case 'interrupt': return interruptAgent(command.id, signal)
   }
 }
 
-function reduce(s: RunSnapshot | null, e: RunEvent): RunSnapshot | null {
-  if (e.type === 'snapshot') return e.snapshot
-  // Nothing to merge into before the first snapshot; stale or replayed events are dropped.
-  if (!s || e.seq <= s.seq) return s
-  return apply(s, e)
-}
-
 export function useRun(): RunState {
-  const [snapshot, dispatch] = useReducer(reduce, null)
-  const [connection, setConnection] = useState<ConnectionStatus>('connecting')
-  const [lastError, setLastError] = useState<string | null>(null)
-  const mounted = useRef(false)
-
+  // Each effect setup owns a different controller, including StrictMode's setup/cleanup/setup.
+  const [{ owner, view }, setState] = useState(() => {
+    const owner = new CommandController(authVersion(), { execute, fetchState, refresh: () => {} })
+    return { owner, view: owner.getView() }
+  })
   useEffect(() => {
-    mounted.current = true
-    const disconnect = connectEvents(dispatch, setConnection)
-    return () => {
-      mounted.current = false
-      disconnect()
-    }
+    let stream: ReturnType<typeof connectEvents> | undefined
+    const controller = new CommandController(authVersion(), { execute, fetchState, refresh: (signal) => stream?.refresh(signal) })
+    const unsubscribe = controller.subscribe(() => setState({ owner: controller, view: controller.getView() }))
+    const unsubscribeAuth = subscribeAuthLoss(() => controller.dispose())
+    setState({ owner: controller, view: controller.getView() })
+    stream = connectEvents({
+      started: (epoch) => controller.streamStarted(epoch),
+      opened: (epoch) => controller.streamOpened(epoch),
+      error: (epoch) => controller.streamError(epoch),
+      event: (event, epoch, bytes) => { controller.ingest(event, epoch, bytes); return controller.getView().mutationAvailable },
+    })
+    return () => { unsubscribe(); unsubscribeAuth(); controller.dispose(); stream?.close() }
   }, [])
-
-  const run = useCallback(async (command: () => Promise<CommandResult>): Promise<boolean> => {
-    try {
-      await command()
-      if (!mounted.current) return false
-      setLastError(null)
-      return true
-    } catch (err) {
-      if (mounted.current) setLastError(err instanceof Error ? err.message : String(err))
-      return false
-    }
-  }, [])
-
-  const actions = useMemo<RunActions>(
-    () => ({
-      send: (body, target) => run(() => sendMessage(body, target)),
-      start: () => run(startRun),
-      pause: () => run(pauseRun),
-      resume: () => run(resumeRun),
-      setGate: (enabled) => run(() => postGate(enabled)),
-      approve: () => run(approveMerge),
-      interrupt: (id) => run(() => interruptAgent(id)),
-    }),
-    [run],
-  )
-
-  return { snapshot, connection, lastError, actions }
+  const actions = useMemo<RunActions>(() => ({
+    send: (body, target, expected) => owner.perform({ kind: 'send', body, target }, expected),
+    start: (expected) => owner.perform({ kind: 'start' }, expected),
+    pause: (expected) => owner.perform({ kind: 'pause' }, expected),
+    resume: (expected) => owner.perform({ kind: 'resume' }, expected),
+    approve: (expected) => owner.perform({ kind: 'approve' }, expected),
+    setGate: (enabled, expected) => owner.perform({ kind: 'gate', enabled }, expected),
+    interrupt: (id, expected) => owner.perform({ kind: 'interrupt', id }, expected),
+    refreshState: (expected) => owner.refreshState(expected),
+  }), [owner])
+  return { ...view, actions, isCurrentContext: owner.isCurrentContext }
 }

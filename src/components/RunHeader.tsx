@@ -14,6 +14,7 @@ interface Props {
   snapshotError: string | null
   theme: AppTheme
   /** The primary control: start / pause / resume / approve, depending on the run status. */
+  commandAvailable: boolean
   onRunAction: () => void
   onToggleDetail: () => void
   onSnapshot: () => void
@@ -62,6 +63,7 @@ export function RunHeader({
   snapshotError,
   theme,
   onRunAction,
+  commandAvailable,
   onToggleDetail,
   onSnapshot,
   onToggleTheme,
@@ -130,7 +132,7 @@ export function RunHeader({
 
       <div className="ac-actions">
         <ThemeControl theme={theme} onToggle={onToggleTheme} />
-        <button className="ac-btn ac-btn--pause" onClick={onRunAction}>
+        <button className="ac-btn ac-btn--pause" onClick={onRunAction} disabled={!commandAvailable} aria-describedby={!commandAvailable ? 'ac-command-availability' : undefined}>
           <span className="ac-btn-swatch" style={{ '--c': runColor } as CSSVars} />
           {ACTION_LABEL[status]}
         </button>

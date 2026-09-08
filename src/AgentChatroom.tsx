@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent as ReactFocusEvent } from 'react'
 import { useRun } from './api/useRun'
+import { DraftBuffer } from './api/commandState'
 import { fetchState } from './api/client'
 import type { ConnectionStatus } from './api/client'
 import { AgentDetail } from './components/AgentDetail'
@@ -101,15 +102,18 @@ export function AgentChatroom({
   theme = 'light',
   onToggleTheme = noop,
 }: AgentChatroomProps) {
-  const { snapshot, connection, lastError, actions } = useRun()
+  const { snapshot, connection, lastError, actions, admission, pending, availabilityReason, globalAvailable, sendAvailable, interruptAvailable, coherence, refreshPending, isCurrentContext } = useRun()
 
   const [selectedId, setSelectedId] = useState<AgentId>('forge')
   const [tab, setTab] = useState<DetailTab>('subtask')
   const [filter, setFilter] = useState<ThreadFilter>('all')
   const [detailOpen, setDetailOpen] = useState(true)
   const [tracker, setTracker] = useState<TrackerMode>(trackerMode)
-  const [target, setTarget] = useState<MessageTarget>('all')
-  const [draft, setDraft] = useState('')
+  const draftBuffer = useRef(new DraftBuffer())
+  const [{ raw: draft, target }, setDraftView] = useState(() => draftBuffer.current.read())
+  const editDraft = useCallback((raw: string, destination?: MessageTarget) => {
+    setDraftView(draftBuffer.current.edit(raw, destination))
+  }, [])
   const [openTools, setOpenTools] = useState<Record<string, boolean>>({})
   const [snapshotPending, setSnapshotPending] = useState(false)
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
@@ -253,23 +257,21 @@ export function AgentChatroom({
   }, [])
 
   const send = useCallback(async () => {
-    const body = draft.trim()
+    const capture = draftBuffer.current.read()
+    const body = capture.raw.trim()
     if (!body) return
-    if (await actions.send(body, target)) setDraft('')
-  }, [draft, target, actions])
+    const outcome = await actions.send(body, capture.target, admission)
+    if (draftBuffer.current.clearAccepted(capture, outcome, isCurrentContext)) setDraftView(draftBuffer.current.read())
+  }, [actions, admission, isCurrentContext])
 
   const runAction = useCallback(() => {
     switch (run?.status ?? 'idle') {
-      case 'live':
-        return actions.pause()
-      case 'paused':
-        return actions.resume()
-      case 'needs_approval':
-        return actions.approve()
-      default:
-        return actions.start()
+      case 'live': return actions.pause(admission)
+      case 'paused': return actions.resume(admission)
+      case 'needs_approval': return actions.approve(admission)
+      default: return actions.start(admission)
     }
-  }, [run?.status, actions])
+  }, [run?.status, actions, admission])
 
   const exportSnapshot = useCallback(async () => {
     if (!snapshot || snapshotExporting.current) return
@@ -342,7 +344,8 @@ export function AgentChatroom({
 
   const model =
     run?.llm === 'mock' ? 'the scripted mock' : (agentsById.atlas?.model ?? 'claude-opus-5')
-  const banner = bannerFor(connection, run, lastError, model)
+  const banner = coherence === 'needs_refresh' ? null : bannerFor(connection, run, null, model)
+  const sendAllowed = draft.trimStart().startsWith('/') ? globalAvailable : sendAvailable
 
   return (
     <div className="ac-app" data-theme={theme} data-mobile-panel={mobilePanel}>
@@ -357,12 +360,27 @@ export function AgentChatroom({
         snapshotError={snapshotError}
         theme={theme}
         onRunAction={runAction}
+        commandAvailable={globalAvailable}
         onToggleDetail={toggleDetail}
         onSnapshot={exportSnapshot}
         onToggleTheme={onToggleTheme}
       />
 
       {banner ? <div className={`ac-banner ac-banner--${banner.tone}`} role={banner.tone === 'error' ? 'alert' : 'status'}>{banner.text}</div> : null}
+      {lastError ? <div className="ac-banner ac-banner--error" role="alert">{lastError}</div> : null}
+      {availabilityReason || pending.length ? (
+        <div id="ac-command-availability" className="ac-command-state" role="status">
+          <div className="ac-command-state-summary">
+            <span>{availabilityReason ?? 'Command pending'}</span>
+            {coherence === 'needs_refresh' ? (
+              <button className="ac-btn" disabled={refreshPending} aria-busy={refreshPending} onClick={() => actions.refreshState(admission)}>
+                {refreshPending ? 'Refreshing…' : 'Refresh state'}
+              </button>
+            ) : null}
+          </div>
+          {pending.length ? <ul className="ac-command-pending">{pending.map((item) => <li key={item.id}>{item.label}: {item.phase === 'network' ? 'Sending…' : 'Synchronizing…'}</li>)}</ul> : null}
+        </div>
+      ) : null}
       {snapshotError ? (
         <div id="ac-snapshot-error" className="ac-banner ac-banner--error ac-snapshot-error" role="alert">
           Snapshot failed: {snapshotError}
@@ -379,7 +397,8 @@ export function AgentChatroom({
           stats={stats}
           theme={theme}
           onSelect={selectAgent}
-          onToggleGate={() => actions.setGate(!gate)}
+          onToggleGate={() => actions.setGate(!gate, admission)}
+          commandAvailable={globalAvailable}
         />
 
         <ChatPanel
@@ -396,12 +415,13 @@ export function AgentChatroom({
           onToggleTool={toggleTool}
           typingLabel={typingLabel}
           draft={draft}
-          onDraft={setDraft}
+          onDraft={editDraft}
           onSend={send}
+          sendAvailable={sendAllowed}
           targetLabel={targetLabel}
           targetColor={targetColor}
           onCycleTarget={() =>
-            setTarget((t) => targets[(targets.indexOf(t) + 1) % targets.length])
+            editDraft(draftBuffer.current.read().raw, targets[(targets.indexOf(draftBuffer.current.read().target) + 1) % targets.length])
           }
           composerRef={composerRef}
         />
@@ -432,11 +452,11 @@ export function AgentChatroom({
                 }}
                 onMessage={() => {
                   if (isCompactViewport()) pendingFocus.current = 'composer'
-                  setTarget(selectedAgent.id)
-                  setDraft(`@${selectedAgent.name} `)
+                  editDraft(`@${selectedAgent.name} `, selectedAgent.id)
                   setMobilePanel('room')
                 }}
-                onInterrupt={() => actions.interrupt(selectedAgent.id)}
+                onInterrupt={() => actions.interrupt(selectedAgent.id, admission)}
+                interruptAvailable={interruptAvailable[selectedAgent.id]}
               />
             ) : (
               <div className="ac-agentpane" />

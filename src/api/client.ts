@@ -1,10 +1,8 @@
 import {
   API,
   type AgentId,
-  type CommandResponse,
   type CommandResult,
   type MessageTarget,
-  type RunEvent,
   type RunEventType,
   type RunSnapshot,
   type SendMessageRequest,
@@ -19,7 +17,8 @@ import {
   subscribeAuthLoss,
 } from './auth'
 
-export type ConnectionStatus = 'connecting' | 'live' | 'reconnecting'
+import { parseJson, validateAcknowledgement, validateEvent, validateSnapshot, type ParsedJson } from './runValidation'
+export type { ConnectionStatus } from './commandState'
 
 const EVENT_TYPES: readonly RunEventType[] = [
   'snapshot',
@@ -38,7 +37,7 @@ const EVENT_TYPES: readonly RunEventType[] = [
 const RETRY_MS = 2000
 const MAX_RETRY_MS = 30_000
 
-async function request(path: string, init?: RequestInit): Promise<{ response: Response; data: unknown }> {
+async function request(path: string, init?: RequestInit): Promise<{ response: Response; parsed: ParsedJson }> {
   const expected = authVersion()
   const controller = new AbortController()
   const abort = () => controller.abort()
@@ -58,10 +57,10 @@ async function request(path: string, init?: RequestInit): Promise<{ response: Re
       notifyAuthLoss('required', expected)
       throw new AuthRequiredError()
     }
-    const data: unknown = await response.json().catch(() => null)
+    const parsed = parseJson(await response.text())
     ensureAuthVersion(expected)
     if (controller.signal.aborted) throw new Error('Request cancelled or timed out. Try again.')
-    return { response, data }
+    return { response, parsed }
   } catch (error) {
     ensureAuthVersion(expected)
     if (error instanceof AuthRequiredError) throw error
@@ -74,153 +73,136 @@ async function request(path: string, init?: RequestInit): Promise<{ response: Re
   }
 }
 
-async function post(path: string, body?: unknown): Promise<CommandResult> {
-  const { response: res, data: value } = await request(path, {
-    method: 'POST',
+async function post(path: string, body?: unknown, signal?: AbortSignal): Promise<CommandResult> {
+  const { response, parsed } = await request(path, {
+    method: 'POST', signal,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
-  const data = value as CommandResponse | null
-  if (data && data.ok === false) throw new Error(data.error)
-  if (!res.ok || !data) throw new Error(`${res.status} ${res.statusText || 'request failed'}`)
-  return data
+  return validateAcknowledgement(response.ok, parsed, `${response.status} ${response.statusText || 'request failed'}`)
 }
 
 export async function fetchState(signal?: AbortSignal): Promise<RunSnapshot> {
-  const { response: res, data } = await request(API.state, { signal, cache: 'no-store' })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText || 'request failed'}`)
-  if (!data) throw new Error('The run server returned an invalid snapshot.')
-  return data as RunSnapshot
+  const { response, parsed } = await request(API.state, { signal, cache: 'no-store' })
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText || 'request failed'}`)
+  const snapshot = parsed.parsed ? validateSnapshot(parsed.value) : null
+  if (!snapshot) throw new Error('The run server returned an invalid snapshot.')
+  return snapshot
 }
 
-export function sendMessage(body: string, target: MessageTarget): Promise<CommandResult> {
+export function sendMessage(body: string, target: MessageTarget, signal?: AbortSignal): Promise<CommandResult> {
   const req: SendMessageRequest = { body, target }
-  return post(API.message, req)
+  return post(API.message, req, signal)
 }
-
-export function startRun(): Promise<CommandResult> {
-  return post(API.start)
-}
-
-export function pauseRun(): Promise<CommandResult> {
-  return post(API.pause)
-}
-
-export function resumeRun(): Promise<CommandResult> {
-  return post(API.resume)
-}
-
-export function setGate(enabled: boolean): Promise<CommandResult> {
+export function startRun(signal?: AbortSignal): Promise<CommandResult> { return post(API.start, undefined, signal) }
+export function pauseRun(signal?: AbortSignal): Promise<CommandResult> { return post(API.pause, undefined, signal) }
+export function resumeRun(signal?: AbortSignal): Promise<CommandResult> { return post(API.resume, undefined, signal) }
+export function setGate(enabled: boolean, signal?: AbortSignal): Promise<CommandResult> {
   const req: SetGateRequest = { enabled }
-  return post(API.gate, req)
+  return post(API.gate, req, signal)
 }
+export function approveMerge(signal?: AbortSignal): Promise<CommandResult> { return post(API.approve, undefined, signal) }
+export function interruptAgent(id: AgentId, signal?: AbortSignal): Promise<CommandResult> { return post(API.interrupt(id), undefined, signal) }
 
-export function approveMerge(): Promise<CommandResult> {
-  return post(API.approve)
-}
-
-export function interruptAgent(id: AgentId): Promise<CommandResult> {
-  return post(API.interrupt(id))
-}
-
-function parseEvent(raw: unknown): RunEvent | null {
-  if (typeof raw !== 'string') return null
-  try {
-    return JSON.parse(raw) as RunEvent
-  } catch {
-    return null
-  }
+export interface StreamCallbacks {
+  started(epoch: number): void
+  opened(epoch: number): void
+  error(epoch: number): void
+  event(value: unknown, epoch: number, rawBytes: number): boolean
 }
 
 /**
  * Close failed streams to prevent EventSource's implicit unauthenticated retries.
  * Only a successful auth probe permits a reconnect and its fresh snapshot.
  */
-export function connectEvents(
-  onEvent: (e: RunEvent) => void,
-  onStatus: (s: ConnectionStatus) => void,
-): () => void {
+export function connectEvents(callbacks: StreamCallbacks): { close(): void; refresh(signal: AbortSignal): void } {
   let source: EventSource | null = null
   let retry: ReturnType<typeof setTimeout> | null = null
   let closed = false
-  let first = true
   let failures = 0
+  let epoch = 0
   let probe: AbortController | null = null
+  let releaseManualSignal: (() => void) | null = null
   const expected = authVersion()
 
-  const close = () => {
-    closed = true
+  const cancelCurrent = () => {
     if (retry) clearTimeout(retry)
-    probe?.abort()
-    source?.close()
+    retry = null
+    probe?.abort(); probe = null
+    source?.close(); source = null
+    releaseManualSignal?.(); releaseManualSignal = null
   }
+  const close = () => { closed = true; cancelCurrent() }
   const unsubscribe = subscribeAuthLoss(close)
+  const current = (id: number) => !closed && epoch === id && authVersion() === expected
 
   const scheduleProbe = () => {
     if (closed) return
     const delay = Math.min(RETRY_MS * 2 ** Math.min(Math.max(failures - 1, 0), 4), MAX_RETRY_MS)
-    retry = setTimeout(() => { void checkAndOpen() }, delay)
+    retry = setTimeout(() => { begin(false) }, delay)
   }
-
-  const checkAndOpen = async () => {
-    if (closed) return
-    const controller = new AbortController()
-    probe = controller
-    try {
-      const status = await getAuthStatus(controller.signal)
-      if (closed || controller.signal.aborted) return
-      ensureAuthVersion(expected)
-      if (!status.authenticated) {
-        notifyAuthLoss('required', expected)
-        return
-      }
-      open()
-    } catch (error) {
-      if (closed || controller.signal.aborted) return
-      if (error instanceof AuthRequiredError) {
-        notifyAuthLoss('required', expected)
-        return
-      }
-      failures += 1
-      scheduleProbe()
-    } finally {
-      if (probe === controller) probe = null
-    }
+  const failed = (id: number, manual: boolean) => {
+    if (!current(id)) return
+    source?.close(); source = null
+    callbacks.error(id)
+    if (!manual) { failures++; scheduleProbe() }
   }
-
-  const open = () => {
-    if (closed || authVersion() !== expected) return
-    onStatus(first ? 'connecting' : 'reconnecting')
-    first = false
+  const open = (id: number, manual: boolean) => {
+    if (!current(id)) return
     const es = new EventSource(API.events)
     source = es
-
+    let receivedInitial = false
     es.onopen = () => {
-      if (closed || source !== es) return
+      if (!current(id) || source !== es) return
       failures = 0
-      onStatus('live')
+      callbacks.opened(id)
     }
     es.onerror = () => {
-      if (closed || source !== es) return
-      es.close()
-      source = null
-      onStatus('reconnecting')
-      failures += 1
-      scheduleProbe()
+      if (!current(id) || source !== es) return
+      failed(id, manual && !receivedInitial)
     }
     for (const type of EVENT_TYPES) {
       es.addEventListener(type, (ev) => {
-        if (closed || source !== es || authVersion() !== expected) return
-        const event = parseEvent((ev as MessageEvent).data)
-        if (event) onEvent(event)
+        if (!current(id) || source !== es) return
+        const raw: unknown = (ev as MessageEvent).data
+        const parsed = typeof raw === 'string' ? parseJson(raw) : { parsed: false as const }
+        const event = parsed.parsed ? validateEvent(parsed.value) : null
+        // The named SSE type must agree with the JSON envelope. Bad frames are explicit failures.
+        const value = parsed.parsed ? parsed.value : null
+        const frame = typeof value === 'object' && value !== null && 'type' in value && value.type === type
+          ? value : typeof value === 'object' && value !== null && 'seq' in value ? { seq: value.seq } : null
+        const admitted = callbacks.event(frame, id, typeof raw === 'string' ? new TextEncoder().encode(raw).byteLength : 0)
+        if (event?.type === 'snapshot' && admitted) {
+          receivedInitial = true
+          releaseManualSignal?.(); releaseManualSignal = null
+        }
       })
     }
   }
-
-  open()
-
-  return () => {
-    close()
-    unsubscribe()
+  const begin = (manual: boolean, signal?: AbortSignal, initial = false) => {
+    if (closed || signal?.aborted) return
+    cancelCurrent()
+    const id = ++epoch // Reserve synchronously, before the probe or any source callback.
+    callbacks.started(id)
+    if (signal) {
+      const abort = () => { if (epoch === id) { cancelCurrent(); epoch++ } }
+      signal.addEventListener('abort', abort, { once: true })
+      releaseManualSignal = () => signal.removeEventListener('abort', abort)
+      if (signal.aborted) { abort(); return }
+    }
+    if (initial) { open(id, false); return }
+    const controller = new AbortController()
+    probe = controller
+    void getAuthStatus(controller.signal).then((status) => {
+      if (!current(id) || controller.signal.aborted) return
+      if (!status.authenticated) { notifyAuthLoss('required', expected); return }
+      open(id, manual)
+    }, (error: unknown) => {
+      if (!current(id) || controller.signal.aborted) return
+      if (error instanceof AuthRequiredError) { notifyAuthLoss('required', expected); return }
+      failed(id, manual)
+    }).finally(() => { if (probe === controller) probe = null })
   }
+  begin(false, undefined, true)
+  return { close: () => { close(); unsubscribe() }, refresh: (signal) => begin(true, signal) }
 }

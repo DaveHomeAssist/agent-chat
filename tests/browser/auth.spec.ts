@@ -91,7 +91,7 @@ test.describe('session authentication over loopback HTTPS', () => {
     await page.getByRole('button', { name: 'Pause run', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Resume run', exact: true })).toBeVisible()
     await mockServer.command('disconnect')
-    await expect(page.getByRole('status')).toContainText('reconnecting')
+    await expect(page.getByRole('status').filter({ hasText: 'reconnecting to run server' })).toContainText('reconnecting')
     await expect(page.getByRole('button', { name: 'Snapshot', exact: true })).toBeDisabled()
     const posted = await page.evaluate(async () => {
       const response = await fetch('/api/message', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: 'Fresh state after authenticated reconnect.', target: 'all' }) })
@@ -124,7 +124,7 @@ test.describe('session authentication over loopback HTTPS', () => {
     await page.route('**/api/auth/status', (route) => route.abort('internetdisconnected'))
     const before = await mockServer.command('stats')
     await mockServer.command('disconnect')
-    await expect(page.getByRole('status')).toContainText('reconnecting')
+    await expect(page.getByRole('status').filter({ hasText: 'reconnecting to run server' })).toContainText('reconnecting')
     await page.waitForTimeout(2500)
     expect((await mockServer.command('stats')).eventRequests).toBe(before.eventRequests)
     await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible()
