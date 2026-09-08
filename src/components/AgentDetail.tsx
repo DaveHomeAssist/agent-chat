@@ -57,9 +57,9 @@ export function AgentDetail({ agent, tab, onTab, accent, live, activity, onClose
               className="ac-tab"
               style={
                 {
-                  '--c': on ? accent : '#7E879B',
+                  '--c': on ? accent : 'var(--ink-6)',
                   '--bg-c': on ? tint(accent, 0.12) : 'transparent',
-                  '--ring': on ? tint(accent, 0.3) : 'rgba(255,255,255,.07)',
+                  '--ring': on ? tint(accent, 0.3) : 'var(--surface-7)',
                 } as CSSVars
               }
               onClick={() => onTab(k)}

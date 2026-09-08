@@ -1,6 +1,7 @@
 import type { CSSVars } from '../lib/css'
-import { COLOR, tint } from '../lib/theme'
+import { COLOR, tint, type AppTheme } from '../lib/theme'
 import type { RunInfo, RunStats, RunStatus } from '../types'
+import { ThemeControl } from './ThemeControl'
 
 interface Props {
   accent: string
@@ -11,10 +12,12 @@ interface Props {
   snapshotAvailable: boolean
   snapshotPending: boolean
   snapshotError: string | null
+  theme: AppTheme
   /** The primary control: start / pause / resume / approve, depending on the run status. */
   onRunAction: () => void
   onToggleDetail: () => void
   onSnapshot: () => void
+  onToggleTheme: () => void
 }
 
 const STATUS_META: Record<RunStatus, { label: string; color: string; pulse: boolean }> = {
@@ -57,9 +60,11 @@ export function RunHeader({
   snapshotAvailable,
   snapshotPending,
   snapshotError,
+  theme,
   onRunAction,
   onToggleDetail,
   onSnapshot,
+  onToggleTheme,
 }: Props) {
   const status: RunStatus = run?.status ?? 'idle'
   const meta = STATUS_META[status]
@@ -124,6 +129,7 @@ export function RunHeader({
       <div className="ac-spacer" />
 
       <div className="ac-actions">
+        <ThemeControl theme={theme} onToggle={onToggleTheme} />
         <button className="ac-btn ac-btn--pause" onClick={onRunAction}>
           <span className="ac-btn-swatch" style={{ '--c': runColor } as CSSVars} />
           {ACTION_LABEL[status]}

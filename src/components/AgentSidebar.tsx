@@ -42,9 +42,9 @@ export function AgentSidebar({ agents, selected, live, accent, gate, stats, onSe
             className="ac-switch"
             style={
               {
-                '--track': gate ? tint(accent, 0.55) : 'rgba(255,255,255,.10)',
+                '--track': gate ? tint(accent, 0.55) : 'var(--surface-10)',
                 '--justify': gate ? 'flex-end' : 'flex-start',
-                '--knob': '#E8EBF3',
+                '--knob': 'var(--ink)',
               } as CSSVars
             }
           >
@@ -86,7 +86,7 @@ function AgentRow({
   const status = statusMeta(agent.status, live)
 
   const row: CSSVars = {
-    '--row-ring': selected ? tint(agent.color, 0.26) : 'rgba(255,255,255,.05)',
+    '--row-ring': selected ? tint(agent.color, 0.26) : 'var(--surface-5)',
     '--row-bg': selected ? tint(agent.color, 0.09) : 'transparent',
     '--bar': selected ? agent.color : 'transparent',
   }

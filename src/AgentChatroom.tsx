@@ -9,6 +9,7 @@ import { PipelinePanel } from './components/PipelinePanel'
 import { RunHeader } from './components/RunHeader'
 import { deriveAgentActivity } from './lib/activity'
 import { serializeSnapshot, snapshotFilename } from './lib/snapshot'
+import type { AppTheme } from './lib/theme'
 import type {
   Agent,
   AgentId,
@@ -28,7 +29,20 @@ export interface AgentChatroomProps {
   trackerMode?: TrackerMode
   /** Status pulses, the progress sweep and the log cursor. */
   liveMotion?: boolean
+  /** Shared visual theme; changing it never reconnects or remounts the console. */
+  theme?: AppTheme
+  onToggleTheme?: () => void
 }
+
+type MobilePanel = 'room' | 'agents' | 'context'
+
+const MOBILE_PANELS: ReadonlyArray<readonly [MobilePanel, string]> = [
+  ['room', 'Room'],
+  ['agents', 'Agents'],
+  ['context', 'Context'],
+]
+
+const noop = () => {}
 
 /** Status badges are not decisions: test ratios like "22/24", and BLOCKED. PLAN / RISK / ACK are. */
 const isDecisionBadge = (badge: string) => badge !== 'BLOCKED' && !/^\d+\/\d+$/.test(badge)
@@ -79,6 +93,8 @@ export function AgentChatroom({
   accent = '#4C8CFF',
   trackerMode = 'board',
   liveMotion = true,
+  theme = 'light',
+  onToggleTheme = noop,
 }: AgentChatroomProps) {
   const { snapshot, connection, lastError, actions } = useRun()
 
@@ -92,6 +108,7 @@ export function AgentChatroom({
   const [openTools, setOpenTools] = useState<Record<string, boolean>>({})
   const [snapshotPending, setSnapshotPending] = useState(false)
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
+  const [mobilePanel, setMobilePanel] = useState<MobilePanel>('room')
   const snapshotExporting = useRef(false)
   const snapshotRequest = useRef<AbortController | null>(null)
 
@@ -118,6 +135,19 @@ export function AgentChatroom({
   const selectAgent = useCallback((id: AgentId) => {
     setSelectedId(id)
     setDetailOpen(true)
+    setMobilePanel('context')
+  }, [])
+
+  const toggleDetail = useCallback(() => {
+    setDetailOpen((open) => {
+      setMobilePanel(open ? 'room' : 'context')
+      return !open
+    })
+  }, [])
+
+  const showMobilePanel = useCallback((panel: MobilePanel) => {
+    if (panel === 'context') setDetailOpen(true)
+    setMobilePanel(panel)
   }, [])
 
   const toggleTool = useCallback((id: string) => {
@@ -217,7 +247,7 @@ export function AgentChatroom({
   const banner = bannerFor(connection, run, lastError, model)
 
   return (
-    <div className="ac-app">
+    <div className="ac-app" data-theme={theme} data-mobile-panel={mobilePanel}>
       <RunHeader
         accent={accent}
         run={run}
@@ -227,9 +257,11 @@ export function AgentChatroom({
         snapshotAvailable={snapshot !== null && connection === 'live'}
         snapshotPending={snapshotPending}
         snapshotError={snapshotError}
+        theme={theme}
         onRunAction={runAction}
-        onToggleDetail={() => setDetailOpen((d) => !d)}
+        onToggleDetail={toggleDetail}
         onSnapshot={exportSnapshot}
+        onToggleTheme={onToggleTheme}
       />
 
       {banner ? <div className={`ac-banner ac-banner--${banner.tone}`} role={banner.tone === 'error' ? 'alert' : 'status'}>{banner.text}</div> : null}
@@ -292,10 +324,14 @@ export function AgentChatroom({
                 accent={accent}
                 live={liveMotion}
                 activity={selectedActivity}
-                onClose={() => setDetailOpen(false)}
+                onClose={() => {
+                  setDetailOpen(false)
+                  setMobilePanel('room')
+                }}
                 onMessage={() => {
                   setTarget(selectedAgent.id)
                   setDraft(`@${selectedAgent.name} `)
+                  setMobilePanel('room')
                 }}
                 onInterrupt={() => actions.interrupt(selectedAgent.id)}
               />
@@ -305,13 +341,30 @@ export function AgentChatroom({
           </aside>
         ) : (
           <aside className="ac-rail">
-            <button className="ac-rail-btn" onClick={() => setDetailOpen(true)}>
+            <button className="ac-rail-btn" onClick={() => {
+              setDetailOpen(true)
+              setMobilePanel('context')
+            }}>
               ‹
             </button>
             <div className="ac-rail-label">PIPELINE · AGENT DETAIL</div>
           </aside>
         )}
       </div>
+
+      <nav className="ac-mobile-nav" aria-label="Console panels">
+        {MOBILE_PANELS.map(([panel, label]) => (
+          <button
+            key={panel}
+            type="button"
+            aria-current={mobilePanel === panel ? 'page' : undefined}
+            onClick={() => showMobilePanel(panel)}
+          >
+            <span className={`ac-mobile-nav-icon ac-mobile-nav-icon--${panel}`} aria-hidden="true" />
+            {label}
+          </button>
+        ))}
+      </nav>
     </div>
   )
 }

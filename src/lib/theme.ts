@@ -1,5 +1,11 @@
 import type { AgentStatus, LogLevel, ToolStatus } from '../types'
 
+export type AppTheme = 'light' | 'dark'
+
+export function toggleTheme(theme: AppTheme): AppTheme {
+  return theme === 'light' ? 'dark' : 'light'
+}
+
 /** The four accent choices exposed as a design prop. */
 export const ACCENTS = ['#4C8CFF', '#8B5CF6', '#3ED8C4', '#F472B6'] as const
 
