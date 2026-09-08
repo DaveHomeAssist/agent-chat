@@ -204,7 +204,13 @@ function tokenBucket(burst: number, perSec: number): { take(): boolean } {
   }
 }
 
-function buildRoutes({ store, orchestrator, config, auth }: Deps): Route[] {
+function buildRoutes(deps: Deps): Route[] {
+  const { store, orchestrator, config, auth } = deps
+  const reauthorize = (req: Req) => {
+    const current = auth.authenticate({ authorization: securityHeader(req, 'authorization'), cookie: securityHeader(req, 'cookie') })
+    if (!current.ok) throw new HttpError(401, 'authentication required')
+    assertRequestPolicy(req, deps, 'protected-mutation', current.principal)
+  }
   const exact = (p: string) => (path: string) => (path === p ? {} : null)
   const interrupt = /^\/api\/agents\/([^/]+)\/interrupt$/
   const messageBucket = tokenBucket(MESSAGE_BURST, MESSAGE_PER_SEC)
@@ -215,6 +221,8 @@ function buildRoutes({ store, orchestrator, config, auth }: Deps): Route[] {
     return async (req, res) => {
       guard?.(req)
       const body = await readJson(req)
+      // A slow body can outlive its session. Recheck after the await and before effects.
+      reauthorize(req)
       await fn(body)
       json(res, 200, { ok: true, seq: store.seq() })
     }
@@ -265,6 +273,7 @@ function buildRoutes({ store, orchestrator, config, auth }: Deps): Route[] {
       handle: async (req, res, params) => {
         if (!isAgentId(params.id)) throw new HttpError(400, `unknown agent "${params.id}"`)
         await readJson(req)
+        reauthorize(req)
         orchestrator.interrupt(params.id)
         json(res, 200, { ok: true, seq: store.seq() })
       },

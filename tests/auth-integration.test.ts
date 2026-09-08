@@ -7,7 +7,7 @@ import type { AuthServiceOptions } from '../server/auth.js'
 import { loadConfig } from '../server/config.js'
 import { createServer } from '../server/http.js'
 import { API } from '../shared/protocol.js'
-import { harness, reply } from './helpers.js'
+import { harness, reply, until } from './helpers.js'
 
 const TOKEN = Buffer.alloc(32, 65).toString('base64url')
 const WRONG = Buffer.alloc(32, 66).toString('base64url')
@@ -76,7 +76,7 @@ async function serve(t: TestContext, options: { local?: boolean; authOptions?: A
     const cookie = res.headers.get('set-cookie')!
     return { cookie: cookie.split(';')[0], setCookie: cookie, body: await res.json() }
   }
-  return { ...h, url, request, login, subscribers: () => subscribers, authListeners: () => authListeners }
+  return { ...h, server, url, request, login, subscribers: () => subscribers, authListeners: () => authListeners }
 }
 
 test('loadConfig applies auth to the selected bind and rejects unsafe inputs before composition', () => {
@@ -269,3 +269,57 @@ test('credentials never appear in public state/events/status, query logs or erro
   assert.ok(logs.some((line) => String(line[0]).includes('GET /api/state 500')))
   assert.ok(!JSON.stringify(logs).includes('?token='))
 })
+
+for (const invalidation of ['logout', 'expiry'] as const) {
+  test(`every held command body rechecks authorization after ${invalidation}, including interrupt`, async (t) => {
+    for (const path of [API.message, API.start, API.pause, API.resume, API.gate, API.approve, API.interrupt('forge')]) {
+      const time = clock()
+      const h = await serve(t, { authOptions: { runtime: time.runtime } })
+      const session = await h.login()
+      const effects: string[] = []
+      t.mock.method(h.orchestrator, 'humanMessage', async () => { effects.push('message') })
+      t.mock.method(h.orchestrator, 'start', async () => { effects.push('start') })
+      t.mock.method(h.orchestrator, 'pause', () => { effects.push('pause') })
+      t.mock.method(h.orchestrator, 'resume', () => { effects.push('resume') })
+      t.mock.method(h.orchestrator, 'setGate', () => { effects.push('gate') })
+      t.mock.method(h.orchestrator, 'approve', () => { effects.push('approve') })
+      t.mock.method(h.orchestrator, 'interrupt', () => { effects.push('interrupt') })
+      const before = h.store.snapshot()
+      const body = JSON.stringify(path === API.message ? { body: 'Held authenticated command', target: 'all' } : path === API.gate ? { enabled: true } : {})
+      let incoming: http.IncomingMessage | undefined
+      h.server.once('request', (req) => { incoming = req })
+      let finish!: (response: { status: number; headers: http.IncomingHttpHeaders; body: string }) => void
+      let fail!: (error: Error) => void
+      const response = new Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }>((resolve, reject) => { finish = resolve; fail = reject })
+      const held = http.request(h.url + path, { method: 'POST', headers: {
+        Host: 'console.example', Origin: ORIGIN, Cookie: session.cookie,
+        'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body),
+      } }, (res) => {
+        let result = ''
+        res.on('data', (chunk: Buffer) => { result += chunk.toString() })
+        res.on('end', () => finish({ status: res.statusCode!, headers: res.headers, body: result }))
+        res.on('error', fail)
+      })
+      held.on('error', fail)
+      t.after(() => held.destroy())
+      held.flushHeaders()
+      // This data listener is installed by readJson only after early auth passed.
+      await until(() => !!incoming && incoming.listenerCount('data') > 0, 'authorized request waiting on its body')
+      if (invalidation === 'logout') {
+        assert.equal((await h.request(API.logout, { method: 'POST', headers: { Cookie: session.cookie, Origin: ORIGIN } })).status, 200)
+      } else time.advance(28_800_001)
+      held.end(body)
+      const denied = await response
+      assert.equal(denied.status, 401, `${invalidation}: ${path}`)
+      assert.equal(denied.headers['www-authenticate'], 'Bearer realm="Agent Chatroom"')
+      assert.deepEqual(JSON.parse(denied.body), { ok: false, error: 'authentication required' })
+      assert.deepEqual(effects, [], path)
+      assert.deepEqual(h.store.snapshot(), before, path)
+      assert.equal(h.requests.length, 0)
+      // The exact same valid payload still reaches its effect with a new session.
+      const fresh = await h.login()
+      assert.equal((await h.request(path, { method: 'POST', headers: { Cookie: fresh.cookie, Origin: ORIGIN, 'Content-Type': 'application/json' }, body })).status, 200)
+      assert.equal(effects.length, 1, path)
+    }
+  })
+}
