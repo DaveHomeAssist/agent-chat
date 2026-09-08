@@ -117,8 +117,13 @@ Do not automatically retry failed or ambiguous billable requests.
 - Extend the 17 delivered browser checks with history/recovery coverage once wired.
   The 167 Node/17 queue regressions, typechecks, build, 42 simulator checks and
   mock console/progress browser gate remain required.
-- Wire Reassign, correct activity-footer state and reconcile the
-  remaining fidelity checklist. Provider/model labels and cache counters exist.
+- Review and merge backend Message/Interrupt acceptance [PR #18](https://github.com/DaveHomeAssist/agent-chat/pull/18).
+  At `55e4dbd`, 177 Node/18 Chromium tests pass in CI, including 409 draft
+  preservation, no-effect refusals, held-body state changes, paused messages and
+  one-time active aborts. Main remains `ca97d42` until that separate merge.
+- Reconcile separately assigned frontend controls and the remaining fidelity
+  checklist. Full task reassignment and pending-action locks remain unimplemented;
+  this backend acceptance change does not deliver them.
 
 ## M3 and M4 boundaries
 

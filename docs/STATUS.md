@@ -103,6 +103,35 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   preserved historical completion dates. This evidence-only closeout uses integrated
   product revision `e48bc17`; documentation delivery does not create a new milestone.
 
+## Message and Interrupt acceptance — PR #18 staged for review
+
+- Delivered main remains `ca97d42b937deaed11d0ef5c037fd80c4cf02527`, with
+  [passing main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34230602645).
+  [PR #18](https://github.com/DaveHomeAssist/agent-chat/pull/18) stages backend
+  acceptance at `55e4dbd1f8228bceb6d9f178bc14270367e522c3`; it is not merged.
+- Message and Interrupt return explicit accepted/refused results. HTTP 409 now
+  describes an unavailable run or non-interruptible operation; 200 follows only
+  accepted work. Refusals leave public state, events, logs, typing and tasks alone.
+  Existing live/paused messages, recognized slash commands and one-time active
+  aborts are retained. Eligibility and effects stay within the existing synchronous
+  command boundary, including state changes while an HTTP body is held.
+- Early authentication and post-body authorization/request policy remain intact.
+  Deterministic held-body logout/expiry tests still demand 401 and zero effects.
+  No frontend, shared protocol, persistence, provider or scheduling code changed.
+- [Product CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34232539938)
+  passes clean installation/build/typechecks, **177 Node tests, 17 queue tests,
+  42 simulator checks and 18 Chromium tests**. The real backend/browser case
+  proves a refused Message retains the exact draft, shows an error, appends no
+  human item and does not retry automatically; a later explicit accepted send
+  clears the draft. Local backend/build gates pass. Corrected local browser launch
+  initially hit shared-port contention before assertions; CI ran in isolation.
+- Ten new unit/HTTP regressions and the production browser case reproduced the
+  old undefined/HTTP-200 result before the fix. No assertions were weakened.
+  Independent review and merge remain required; fidelity stays **Partial**.
+  Separate frontend control work, full reassignment, pending-action locks,
+  persistence/history/resume and M1–M4 acceptance are not completed by this slice.
+  Canonical status refresh is held for its later integration assignment.
+
 ## Executor coordination delivery
 
 - The private SQLite communication queue, worker bootstrap and coordinator runbook
