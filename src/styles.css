@@ -2257,3 +2257,20 @@ button {
     transition: none !important;
   }
 }
+
+/* Command transport and state availability remain separate from command/export errors. */
+.ac-command-state {
+  flex: 0 0 auto;
+  max-height: 20vh;
+  overflow: auto;
+  border-bottom: 1px solid var(--surface-10);
+  padding: 8px 16px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 12px;
+}
+.ac-command-state-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ac-command-state-summary .ac-btn { flex: 0 0 auto; }
+.ac-command-pending { display: flex; flex-wrap: wrap; gap: 4px 16px; list-style: none; margin: 4px 0 0; padding: 0; }
+.ac-command-pending li { color: var(--ink); }
+.ac-send:disabled, .ac-toggle-row:disabled { cursor: not-allowed; opacity: .55; }

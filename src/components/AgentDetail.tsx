@@ -21,10 +21,11 @@ interface Props {
   theme: AppTheme
   onClose: () => void
   onMessage: () => void
+  interruptAvailable: boolean
   onInterrupt: () => void
 }
 
-export function AgentDetail({ agent, tab, onTab, accent, live, activity, theme, onClose, onMessage, onInterrupt }: Props) {
+export function AgentDetail({ agent, tab, onTab, accent, live, activity, theme, onClose, onMessage, onInterrupt, interruptAvailable }: Props) {
   const status = statusMeta(agent.status, live, theme)
   const identity: CSSVars = {
     '--c': agent.color,
@@ -79,6 +80,7 @@ export function AgentDetail({ agent, tab, onTab, accent, live, activity, theme, 
             live={live}
             onMessage={onMessage}
             onInterrupt={onInterrupt}
+            interruptAvailable={interruptAvailable}
           />
         ) : null}
         {tab === 'output' ? <OutputTab agent={agent} live={live} activity={activity} theme={theme} /> : null}
@@ -94,11 +96,13 @@ function SubtaskTab({
   live,
   onMessage,
   onInterrupt,
+  interruptAvailable,
 }: {
   agent: Agent
   accent: string
   live: boolean
   onMessage: () => void
+  interruptAvailable: boolean
   onInterrupt: () => void
 }) {
   return (
@@ -129,7 +133,7 @@ function SubtaskTab({
       </div>
 
       <div className="ac-detail-actions">
-        <button className="ac-action" onClick={onInterrupt}>
+        <button className="ac-action" onClick={onInterrupt} disabled={!interruptAvailable} aria-describedby={!interruptAvailable ? 'ac-command-availability' : undefined}>
           Interrupt
         </button>
         <button

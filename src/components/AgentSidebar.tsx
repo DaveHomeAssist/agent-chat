@@ -11,10 +11,11 @@ interface Props {
   stats: RunStats | null
   theme: AppTheme
   onSelect: (id: AgentId) => void
+  commandAvailable: boolean
   onToggleGate: () => void
 }
 
-export function AgentSidebar({ agents, selected, live, accent, gate, stats, theme, onSelect, onToggleGate }: Props) {
+export function AgentSidebar({ agents, selected, live, accent, gate, stats, theme, onSelect, onToggleGate, commandAvailable }: Props) {
   return (
     <aside className="ac-sidebar">
       <div className="ac-sidebar-head">
@@ -38,7 +39,7 @@ export function AgentSidebar({ agents, selected, live, accent, gate, stats, them
       <div className="ac-oversight">
         <div className="ac-eyebrow">HUMAN OVERSIGHT</div>
 
-        <button className="ac-toggle-row" onClick={onToggleGate} aria-pressed={gate}>
+        <button className="ac-toggle-row" onClick={onToggleGate} disabled={!commandAvailable} aria-describedby={!commandAvailable ? 'ac-command-availability' : undefined} aria-pressed={gate}>
           <span className="ac-toggle-label">Approve before merge</span>
           <span
             className="ac-switch"
