@@ -29,7 +29,8 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   No retries or additional paid requests. This is not full M1 acceptance.
 - Snapshot exports fresh public run JSON, preserves the approval gate, handles
   failures and cleans up download resources. Browser checks include a 501-line log
-  fixture, duplicate clicks, HTTP failure/retry, timeout and download failure.
+  fixture (an injected API response; the server itself retains 200 log lines per
+  agent), duplicate clicks, HTTP failure/retry, timeout and download failure.
 - 105 Node tests, all typechecks and 42 simulator checks pass locally.
 - [Linux CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34208042574)
   passes clean installation and the standard production build/tests/selfchecks.

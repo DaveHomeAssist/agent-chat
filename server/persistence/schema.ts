@@ -1,6 +1,16 @@
 import { z, type ZodType } from 'zod'
 import type { RunEvent, RunSnapshot } from '../../shared/protocol.js'
 import {
+  AGENT_IDS,
+  AGENT_STATUSES,
+  LLM_PROVIDERS,
+  LOG_LEVELS,
+  PHASES,
+  RUN_STATUSES,
+  STEP_STATES,
+  TOOL_STATUSES,
+} from '../../shared/protocol.js'
+import {
   PERSISTENCE_SCHEMA_VERSION,
   PersistenceValidationError,
   type DurableCommit,
@@ -27,13 +37,15 @@ export const JsonValueSchema: ZodType<JsonValue> = z.lazy(() =>
   ]),
 )
 
-const AgentIdSchema = z.enum(['atlas', 'vector', 'forge', 'probe', 'sentry'])
-const RunStatusSchema = z.enum(['idle', 'live', 'paused', 'needs_approval', 'done', 'failed'])
-const ToolStatusSchema = z.enum(['ok', 'queued', 'drafting', 'running', 'error'])
+// Closed vocabularies come from the wire contract so the durable store cannot
+// drift from what the server emits and the console renders.
+const AgentIdSchema = z.enum(AGENT_IDS)
+const RunStatusSchema = z.enum(RUN_STATUSES)
+const ToolStatusSchema = z.enum(TOOL_STATUSES)
 
 const LogLineSchema = z.object({
   t: z.string().max(32),
-  level: z.enum(['INFO', 'WARN', 'FAIL', 'RISK']),
+  level: z.enum(LOG_LEVELS),
   msg: z.string(),
 }).strict()
 
@@ -52,7 +64,7 @@ const AgentSchema = z.object({
   role: z.string(),
   model: z.string(),
   color: z.string(),
-  status: z.enum(['working', 'thinking', 'idle', 'blocked']),
+  status: z.enum(AGENT_STATUSES),
   pct: z.number().int().min(0).max(100),
   subtask: z.string(),
   subtaskTitle: z.string(),
@@ -96,7 +108,7 @@ const ThreadItemSchema = z.discriminatedUnion('kind', [
 ])
 
 const PipelineSchema = z.object({
-  phase: z.enum(['spec', 'build', 'test', 'review', 'ship', 'done']),
+  phase: z.enum(PHASES),
   lanes: z.array(z.object({
     name: z.string(),
     color: z.string(),
@@ -105,7 +117,7 @@ const PipelineSchema = z.object({
   }).strict()),
   steps: z.array(z.object({
     title: z.string(),
-    state: z.enum(['done', 'active', 'wait']),
+    state: z.enum(STEP_STATES),
     detail: z.string(),
     meta: z.string(),
     pct: z.number().int().min(0).max(100),
@@ -124,7 +136,7 @@ const RunInfoSchema = z.object({
   goal: z.string(),
   startedAt: z.string(),
   toolServers: SafeInteger,
-  llm: z.enum(['anthropic', 'openai', 'mock']),
+  llm: z.enum(LLM_PROVIDERS),
   error: z.string().optional(),
 }).strict()
 
@@ -234,7 +246,7 @@ export const OperationRecordSchema = z.object({
 export const UsageRecordSchema = z.object({
   operationId: Identifier,
   runId: Identifier,
-  provider: z.enum(['anthropic', 'openai', 'mock']),
+  provider: z.enum(LLM_PROVIDERS),
   model: Identifier,
   state: z.enum(['reported', 'unknown']),
   inputTokens: NullableSafeInteger,
@@ -302,12 +314,25 @@ function parse<T>(schema: ZodType<T>, value: unknown, label: string): T {
   return result.data
 }
 
-export const parseCommit = (value: unknown): DurableCommit => parse(DurableCommitSchema as ZodType<DurableCommit>, value, 'commit')
-export const parseSnapshot = (value: unknown): RunSnapshot => parse(RunSnapshotSchema as ZodType<RunSnapshot>, value, 'public snapshot')
-export const parseCheckpoint = (value: unknown): PrivateCheckpointV1 => parse(PrivateCheckpointSchema as ZodType<PrivateCheckpointV1>, value, 'private checkpoint')
-export const parseEvent = (value: unknown): RunEvent => parse(RunEventSchema as ZodType<RunEvent>, value, 'event')
-export const parseOperation = (value: unknown): OperationRecord => parse(OperationRecordSchema as ZodType<OperationRecord>, value, 'operation')
-export const parseUsage = (value: unknown): UsageRecord => parse(UsageRecordSchema as ZodType<UsageRecord>, value, 'usage')
+/**
+ * Every parser output must be assignable to the shared contract type. The
+ * `satisfies` checks below make a schema that drifts from `shared/protocol.ts`
+ * (a field or vocabulary added there but not here) a typecheck failure rather
+ * than a runtime rejection of valid snapshots.
+ */
+const CommitParser = DurableCommitSchema satisfies ZodType<DurableCommit>
+const SnapshotParser = RunSnapshotSchema satisfies ZodType<RunSnapshot>
+const CheckpointParser = PrivateCheckpointSchema satisfies ZodType<PrivateCheckpointV1>
+const EventParser = RunEventSchema satisfies ZodType<RunEvent>
+const OperationParser = OperationRecordSchema satisfies ZodType<OperationRecord>
+const UsageParser = UsageRecordSchema satisfies ZodType<UsageRecord>
+
+export const parseCommit = (value: unknown): DurableCommit => parse(CommitParser, value, 'commit')
+export const parseSnapshot = (value: unknown): RunSnapshot => parse(SnapshotParser, value, 'public snapshot')
+export const parseCheckpoint = (value: unknown): PrivateCheckpointV1 => parse(CheckpointParser, value, 'private checkpoint')
+export const parseEvent = (value: unknown): RunEvent => parse(EventParser, value, 'event')
+export const parseOperation = (value: unknown): OperationRecord => parse(OperationParser, value, 'operation')
+export const parseUsage = (value: unknown): UsageRecord => parse(UsageParser, value, 'usage')
 
 export function parseStoredJson<T>(text: string, parser: (value: unknown) => T, label: string): T {
   let value: unknown

@@ -34,9 +34,12 @@ and is not proof of the application's future real repository adapter.
 Click **Snapshot** in a connected console to download
 `agent-chatroom-<safe-run-id>-<UTC-time>.json`. The version 1 envelope contains
 `exportedAt` and the complete public `RunSnapshot`: run, usage, roster, transcript,
-pipeline and typing state. A fresh uncached GET uses server state, including logs
-beyond the browser's 200-line display limit. Provider continuation and private
-execution state are not requested or exported. Public messages and logs remain
+pipeline and typing state. A fresh uncached GET uses server state rather than the
+browser's copy. Correction: the server also retains at most 200 output-log lines
+per agent (`LOG_CAP` in `server/run.ts`), the same cap as the browser, so the
+export cannot contain lines the server has already dropped; the 501-line check
+below used an injected API fixture, not state a running server produces. Provider
+continuation and private execution state are not requested or exported. Public messages and logs remain
 part of the file; export is not a content redaction feature.
 
 The button is unavailable before connection and during export. A 15-second abort

@@ -2,6 +2,9 @@ import test, { type TestContext } from 'node:test'
 import assert from 'node:assert/strict'
 import http from 'node:http'
 import { once } from 'node:events'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import type { AuthServiceOptions } from '../server/auth.js'
 import { loadConfig } from '../server/config.js'
@@ -31,8 +34,17 @@ function clock() {
   }
 }
 
+/** A private static root so the public shell check does not depend on a prior `npm run build` leaving `dist/` behind. */
+function staticRoot(t: TestContext): string {
+  const dir = mkdtempSync(join(tmpdir(), 'agent-chat-static-'))
+  writeFileSync(join(dir, 'index.html'), '<!doctype html><title>test shell</title>')
+  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  return dir
+}
+
 async function serve(t: TestContext, options: { local?: boolean; authOptions?: AuthServiceOptions } = {}) {
-  const h = harness(t, async () => reply(), { env: options.local ? {} : ENV, authOptions: options.authOptions })
+  const env = { STATIC_DIR: staticRoot(t), ...(options.local ? {} : ENV) }
+  const h = harness(t, async () => reply(), { env, authOptions: options.authOptions })
   // Count subscribers to prove invalidation removes the store callback, not just the socket.
   let subscribers = 0
   const subscribe = h.store.subscribe.bind(h.store)

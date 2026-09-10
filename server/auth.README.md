@@ -1,6 +1,6 @@
 # Authentication module integration contract
 
-Status: module slice only. The running Agent Chatroom application is **not authenticated** until a later integration assignment wires these exports into configuration, HTTP routes, SSE and the browser.
+Status: integrated. These exports are wired into `server/config.ts`, `server/index.ts`, `server/http.ts` (every `/api` route and the SSE stream) and the browser gate in `src/components/AuthGate.tsx` by PR #15 (`e5dc358`). The sentence in earlier revisions of this file stating that the running application was not authenticated described the module slice before that integration and is superseded; `tests/auth-integration.test.ts` and `tests/browser/auth.spec.ts` are the current evidence.
 
 This slice has no dependency on `RunStore`, persistence, model providers, browser code or third-party packages.
 
@@ -91,9 +91,9 @@ Rules:
 
 Callers should map every request-policy failure to one generic 403 without echoing the received Host or Origin.
 
-## Required HTTP integration order
+## HTTP integration order (completed by PR #15)
 
-The later integration worker should make the following changes in existing shared files; they are intentionally not part of this module PR.
+This list was the integration contract for the module PR. Each step below is now implemented; it is kept as the description of how the shared files consume the module.
 
 1. `server/config.ts`: call `parseAuthConfig(env)` with the already selected `HOST` value and add the result to `ServerConfig` without logging/serializing `operatorToken`.
 2. `server/index.ts`: create one `AuthService`, pass it to `createServer`, include only mode/public origin in the startup banner and call `dispose()` during shutdown.
@@ -106,7 +106,7 @@ The later integration worker should make the following changes in existing share
 9. `shared/protocol.ts`: add only the auth route constants/error shape required by the wire; detailed browser-safe auth payload types already live in `shared/auth.ts`.
 10. Browser: add an auth-status/login/logout client and gate before mounting `useRun`. Keep the operator token only in component memory. On SSE failure, probe auth status; a lost session clears the snapshot and stops reconnect churn.
 
-Actual 401 wire behavior, full route coverage, EventSource behavior, browser storage inspection and application-level authentication remain integration acceptance checks. This module slice must not be used as evidence that the current server is protected.
+Actual 401 wire behavior, full route coverage, EventSource behavior and browser storage inspection are covered by the integration and browser suites named above, not by this module's unit tests alone. The unit tests in `tests/auth.test.ts` and `tests/request-security.test.ts` prove the module, not that a given deployment is protected.
 
 ## Trust limits
 
