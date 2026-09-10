@@ -866,7 +866,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
       approvedRevision = null
       return
     }
-    post({ kind: 'message', who: 'atlas', body: 'Human approval received. Simulated PR #482 merged; run complete.' })
+    post({ kind: 'message', who: 'atlas', body: `Human approval received. Simulated PR #${workspace.pr.state().number} merged; run complete.` })
     markDone()
   }
 
@@ -897,12 +897,15 @@ export function createOrchestrator(deps: Deps): Orchestrator {
       approvedRevision = null
       pendingMergeRevision = null
       const previous = runInfo()
+      // Repository identity comes from the workspace adapter, not a copy here:
+      // the real-repository adapter (M3) replaces the workspace behind the same
+      // interface and the run must follow it without an orchestrator edit.
       store.reset({
         label: 'RUN 04',
         status: 'live',
         channel: '#feature-passkey-auth',
-        repo: 'helios/api',
-        branch: 'feat/passkey-auth',
+        repo: workspace.repo,
+        branch: workspace.branch,
         goal: 'Ship passkey sign-in behind the auth.passkeys flag',
         startedAt: store.now(),
         toolServers: 3,
