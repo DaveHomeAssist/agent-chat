@@ -10,15 +10,27 @@
 // Agents
 // ---------------------------------------------------------------------------
 
-export type AgentId = 'atlas' | 'vector' | 'forge' | 'probe' | 'sentry'
+/**
+ * Closed vocabularies are declared once here as runtime tuples and the types
+ * are derived from them, so validators on either side of the wire (the HTTP
+ * layer, the tool registry, the durable store) read the same list instead of
+ * restating it.
+ */
+export const AGENT_IDS = ['atlas', 'vector', 'forge', 'probe', 'sentry'] as const
 
-export const AGENT_IDS: readonly AgentId[] = ['atlas', 'vector', 'forge', 'probe', 'sentry']
+export type AgentId = (typeof AGENT_IDS)[number]
 
-export type AgentStatus = 'working' | 'thinking' | 'idle' | 'blocked'
+export const AGENT_STATUSES = ['working', 'thinking', 'idle', 'blocked'] as const
 
-export type LogLevel = 'INFO' | 'WARN' | 'FAIL' | 'RISK'
+export type AgentStatus = (typeof AGENT_STATUSES)[number]
 
-export type ToolStatus = 'ok' | 'queued' | 'drafting' | 'running' | 'error'
+export const LOG_LEVELS = ['INFO', 'WARN', 'FAIL', 'RISK'] as const
+
+export type LogLevel = (typeof LOG_LEVELS)[number]
+
+export const TOOL_STATUSES = ['ok', 'queued', 'drafting', 'running', 'error'] as const
+
+export type ToolStatus = (typeof TOOL_STATUSES)[number]
 
 export interface QueueItem {
   title: string
@@ -120,9 +132,9 @@ export type MessageTarget = 'all' | AgentId
 // Pipeline
 // ---------------------------------------------------------------------------
 
-export type Phase = 'spec' | 'build' | 'test' | 'review' | 'ship' | 'done'
+export const PHASES = ['spec', 'build', 'test', 'review', 'ship', 'done'] as const
 
-export const PHASES: readonly Phase[] = ['spec', 'build', 'test', 'review', 'ship', 'done']
+export type Phase = (typeof PHASES)[number]
 
 export interface LaneTask {
   title: string
@@ -137,7 +149,9 @@ export interface Lane {
   tasks: LaneTask[]
 }
 
-export type StepState = 'done' | 'active' | 'wait'
+export const STEP_STATES = ['done', 'active', 'wait'] as const
+
+export type StepState = (typeof STEP_STATES)[number]
 
 export interface Step {
   title: string
@@ -159,7 +173,14 @@ export interface Pipeline {
 // Run
 // ---------------------------------------------------------------------------
 
-export type RunStatus = 'idle' | 'live' | 'paused' | 'needs_approval' | 'done' | 'failed'
+export const RUN_STATUSES = ['idle', 'live', 'paused', 'needs_approval', 'done', 'failed'] as const
+
+export type RunStatus = (typeof RUN_STATUSES)[number]
+
+/** Which driver produced the run; `mock` is the scripted offline driver. */
+export const LLM_PROVIDERS = ['anthropic', 'openai', 'mock'] as const
+
+export type LLMProvider = (typeof LLM_PROVIDERS)[number]
 
 export interface RunStats {
   /** Seconds since the run started. */
@@ -196,7 +217,7 @@ export interface RunInfo {
   /** Number of tool servers the agents have access to. */
   toolServers: number
   /** "mock" when the scripted LLM is driving the run. */
-  llm: 'anthropic' | 'openai' | 'mock'
+  llm: LLMProvider
   /** Non-empty when status is `failed`. */
   error?: string
 }

@@ -13,7 +13,8 @@
  */
 
 import type { AgentId, LogLevel, Phase, ToolOutputLine } from '../shared/protocol.js'
-import { TOOL_CATALOGUE, toolNamesFor } from './contracts.js'
+import { AGENT_IDS, PHASES } from '../shared/protocol.js'
+import { TOOL_CATALOGUE, WORKER_IDS, toolNamesFor } from './contracts.js'
 import type { LLMTool, ToolInputSchema, DiffStat, ToolContext, ToolEffect, ToolOutcome, ToolRegistry, ToolSpec } from './contracts.js'
 import type { TestSummary, WorkspaceWithHistory } from './workspace.js'
 
@@ -26,9 +27,8 @@ const FILE_READ_CAP = 6 * 1024
 const COMMAND_OUTPUT_CAP = 3 * 1024
 const MAX_CARD_LINES = 40
 
-const AGENT_IDS: readonly AgentId[] = ['atlas', 'vector', 'forge', 'probe', 'sentry']
-const WORKER_IDS: readonly AgentId[] = ['vector', 'forge', 'probe', 'sentry']
-const PHASES: readonly Phase[] = ['spec', 'build', 'test', 'review', 'ship']
+/** Phases a model may set or assign into; `done` is reached only by a merge. */
+const SETTABLE_PHASES: readonly Phase[] = PHASES.filter((p) => p !== 'done')
 
 type Input = Record<string, unknown>
 
@@ -184,7 +184,7 @@ const HANDLERS: Record<string, Handler> = {
       const effect: ToolEffect = {
         kind: 'assign',
         agent: oneOf(i, 'agent', WORKER_IDS),
-        phase: oneOf(i, 'phase', PHASES),
+        phase: oneOf(i, 'phase', SETTABLE_PHASES),
         title: str(i, 'title'),
         subtask: str(i, 'subtask'),
         eta: optStr(i, 'eta'),
@@ -202,7 +202,7 @@ const HANDLERS: Record<string, Handler> = {
   'run.set_phase': {
     summarize: (i) => text(i.phase),
     execute(i) {
-      const phase = oneOf(i, 'phase', PHASES)
+      const phase = oneOf(i, 'phase', SETTABLE_PHASES)
       return { ok: true, result: `ok · phase → ${phase}`, effect: { kind: 'set_phase', phase } }
     },
   },
