@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import type { Page, TestInfo } from '@playwright/test'
 import type { RunSnapshot } from '../../shared/protocol.js'
 import { test, expect, OPERATOR_TOKEN } from './fixtures.js'
 
@@ -27,16 +27,80 @@ async function screenshot(page: Page, output: (name: string) => string, name: st
   }
 }
 
+const forgeInterrupts = (state: RunSnapshot) => state.agents.find((agent) => agent.id === 'forge')!.log.filter((line) => line.msg === 'interrupted by human').length
+
+async function inactiveForge(page: Page, info: TestInfo, exerciseParkedTurns = false) {
+  // Pause parks turns; neither an idle card nor empty typing proves no controller.
+  // The companion case forces parked/queued wakes without spending the measured test's message burst.
+  const setupDeadline = performance.now() + 10_000
+  const setup = { messagePosts: 0, interruptStatuses: [] as number[] }
+  const remaining = () => {
+    const ms = Math.ceil(setupDeadline - performance.now())
+    expect(ms, `Inactive Forge setup exceeded its deadline: ${JSON.stringify(setup)}`).toBeGreaterThan(0)
+    return ms
+  }
+  const quiescent = (state: RunSnapshot) => ({
+    status: state.run.status,
+    typing: state.typing.length,
+    runningAgentTools: state.agents.flatMap((agent) => agent.tools).filter((tool) => tool.status === 'running').length,
+    runningThreadTools: state.thread.filter((item) => item.kind === 'tool' && item.status === 'running').length,
+  })
+  const quiet = { status: 'paused', typing: 0, runningAgentTools: 0, runningThreadTools: 0 }
+  const waitQuiescent = () => expect.poll(async () => {
+    const response = await page.request.get('/api/state', { timeout: remaining() })
+    expect(response.status()).toBe(200)
+    return quiescent(await response.json() as RunSnapshot)
+  }, { timeout: remaining(), intervals: [0, 10, 25, 50] }).toEqual(quiet)
+  try {
+    await waitQuiescent()
+    for (let wake = 0; wake < (exerciseParkedTurns ? 2 : 0); wake++) {
+      const response = await page.request.post('/api/message', { data: { target: 'forge', body: `Setup parked Forge wake ${wake}` }, timeout: remaining() })
+      setup.messagePosts++
+      expect(response.status()).toBe(200)
+    }
+    await waitQuiescent()
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const response = await page.request.post('/api/agents/forge/interrupt', { timeout: remaining() })
+      setup.interruptStatuses.push(response.status())
+      if (response.status() === 409) {
+        expect(await response.json()).toEqual({ ok: false, error: 'agent has no active operation' })
+        break
+      }
+      expect(response.status()).toBe(200)
+      expect(await response.json()).toMatchObject({ ok: true })
+    }
+    expect(setup.interruptStatuses.at(-1), `Inactive Forge setup exhausted its attempt cap: ${JSON.stringify(setup)}`).toBe(409)
+    if (exerciseParkedTurns) expect(setup.interruptStatuses.filter((status) => status === 200).length).toBeGreaterThanOrEqual(2)
+  } finally {
+    await info.attach('inactive-forge-setup.json', { body: JSON.stringify(setup), contentType: 'application/json' })
+  }
+  const setupState = await (await page.request.get('/api/state', { timeout: remaining() })).json() as RunSnapshot
+  expect(quiescent(setupState)).toEqual(quiet)
+  const setupInterruptEffects = forgeInterrupts(setupState)
+  expect(setupInterruptEffects).toBe(setup.interruptStatuses.filter((status) => status === 200).length)
+  return { setup, setupInterruptEffects }
+}
+
+test('inactive Forge setup drains a deliberately parked turn and queued successor to a real refusal', async ({ page }, info) => {
+  await page.goto('/'); await pausedRun(page)
+  const evidence = await inactiveForge(page, info, true)
+  console.info(`[parked interrupt setup] ${JSON.stringify(evidence)}`)
+})
+
 test('real held acceptance excludes duplicate sends, preserves every newer edit and keeps safe controls usable', async ({ page }, info) => {
   await page.goto('/'); await pausedRun(page)
+  const { setup, setupInterruptEffects } = await inactiveForge(page, info)
+  await expect(page.locator('.ac-target')).toContainText('Broadcast → all agents')
   const input = page.getByRole('textbox', { name: 'Message the room' })
-  let posts = 0
+  let posts = 0, interrupts = 0
+  page.on('request', (request) => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/agents/forge/interrupt') interrupts++ })
   page.on('request', (request) => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/message') posts++ })
   const edits = ['typing', 'edit-revert', 'target', 'quick-command', 'detail-message'] as const
   for (const [index, edit] of edits.entries()) {
     const held = barrier(), fetched = barrier()
     let serverStatus = 0
     await page.route('**/api/message', async (route) => {
+      if (index === 0) expect(route.request().postDataJSON().target).toBe('all')
       const response = await route.fetch()
       serverStatus = response.status()
       fetched.release()
@@ -71,7 +135,16 @@ test('real held acceptance excludes duplicate sends, preserves every newer edit 
       await page.getByRole('button', { name: 'Dark mode', exact: true }).click()
       await screenshot(page, (name) => info.outputPath(name), 'desktop-dark-pending')
       // A newer allowed interrupt owns this real server rejection banner.
+      const beforeInterrupt = await (await page.request.get('/api/state')).json() as RunSnapshot
+      const interrupted = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/agents/forge/interrupt' && response.request().method() === 'POST')
       await page.getByRole('button', { name: 'Interrupt', exact: true }).click()
+      const rejection = await interrupted
+      expect(rejection.status()).toBe(409)
+      expect(await rejection.json()).toEqual({ ok: false, error: 'agent has no active operation' })
+      expect(interrupts).toBe(1)
+      const afterInterrupt = await (await page.request.get('/api/state')).json() as RunSnapshot
+      expect(afterInterrupt.agents.find((agent) => agent.id === 'forge')).toEqual(beforeInterrupt.agents.find((agent) => agent.id === 'forge'))
+      expect(forgeInterrupts(afterInterrupt)).toBe(setupInterruptEffects)
       await expect(page.getByRole('alert')).toContainText('agent has no active operation')
       await screenshot(page, (name) => info.outputPath(name), 'desktop-dark-pending-error')
       await page.getByRole('button', { name: 'Dark mode', exact: true }).click()
@@ -89,9 +162,14 @@ test('real held acceptance excludes duplicate sends, preserves every newer edit 
     if (edit === 'typing') await expect(page.getByRole('alert')).toContainText('agent has no active operation')
     const state = await (await page.request.get('/api/state')).json() as RunSnapshot
     expect(state.thread.filter((item) => item.kind === 'human' && item.body === raw.trim())).toHaveLength(1)
+    expect(forgeInterrupts(state)).toBe(setupInterruptEffects)
     await page.unroute('**/api/message')
   }
   expect(posts).toBe(edits.length)
+  expect(interrupts).toBe(1)
+  const evidence = { setup, setupInterruptEffects, measuredMessagePosts: posts, measuredInterruptPosts: interrupts, measuredInterruptStatus: 409, additionalForgeInterruptEffects: 0 }
+  await info.attach('measured-command-effects.json', { body: JSON.stringify(evidence), contentType: 'application/json' })
+  console.info(`[interrupt precondition] ${JSON.stringify(evidence)}`)
 })
 
 test('malformed and non-success HTTP acknowledgements retain draft and never start a repair read', async ({ page, mockServer }) => {

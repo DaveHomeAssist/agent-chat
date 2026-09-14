@@ -66,6 +66,27 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   phone and ultrawide, working controls/pagination and all 25 print rows. They prove
   the local report surface, not deployment or refresh of an existing user tab.
 
+## Browser refusal precondition correction — PR #26
+
+The first September 14 documentation CI failed one existing command browser case:
+Forge Interrupt returned 200 while the test assumed pausing meant no active turn.
+The other 48 browser cases and all build/Node/queue/simulator gates passed. That
+failure is preserved; no unchanged retry or merge bypass was used.
+
+The [PR #26](https://github.com/DaveHomeAssist/agent-chat/pull/26) test correction
+requires paused, globally empty typing and no running tool, then bounded real
+Forge interrupts ending in the exact no-active-operation 409. Setup effects are
+counted separately. A companion test deliberately creates parked/queued turns and
+proves two accepted setup interrupts followed by 409; the measured interaction
+retains five Message POSTs, one UI Interrupt 409 and no additional Forge effect.
+Separating the companion case preserves the real five-message rate limit.
+
+Both targeted cases passed three executions each; the full September 14 local
+suite passed **50 Chromium cases**, with build/typechecks. Runtime source remains
+unchanged at product `dcf2ff26`; this test/status PR must pass exact-head CI and
+merged-main CI before canonical delivery. These current checks do not relabel the
+September 10 product CI or September 8 provider/hosting observations as newly run.
+
 ## Snapshot delivery evidence (earlier Sep 8 checks)
 
 - One authorized OpenAI proposal request cost **$0.113582**, calculated from reported

@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-09-14T06:52:27-04:00",
-  "verifiedLabel": "Sep 14, 2026 · 6:52 AM ET",
+  "verifiedAt": "2026-09-14T07:12:08-04:00",
+  "verifiedLabel": "Sep 14, 2026 · 7:12 AM ET",
   "codeRevision": "dcf2ff26ece5837131121b6c82e23f147cca0a20",
   "overall": "Partial",
-  "summary": "PR #24 delivers client command admission, edited-draft protection and bounded coherent state refresh. DaveHomeAssist merged it after PR #25 on Sep 10; product dcf2ff26 passed 209 Node, 17 queue, 42 simulator and 49 Chromium checks that day. Sep 14 verifies current source/CI readback and the status page separately. Fidelity remains Partial: task transfer is incomplete and tool-approval design is held at its correction limit. Recovery retains its three-issue hold and exhausted correction limit. Paid-model, real-repository and hosting acceptance remain separate and incomplete.",
+  "summary": "PR #24 delivers client command admission, edited-draft protection and bounded coherent state refresh. DaveHomeAssist merged it after PR #25 on Sep 10; unchanged runtime product dcf2ff26 passed 209 Node, 17 queue, 42 simulator and 49 Chromium checks that day. Sep 14 local verification passes 50 browser cases after PR #26 corrects a refusal-test precondition; source/CI readback and status rendering are dated separately. Fidelity remains Partial: task transfer is incomplete, tool-approval design is held, and recovery retains its exhausted-limit hold. Paid-model, real-repository and hosting acceptance remain incomplete.",
   "items": [
     {
       "id": "console",
@@ -43,8 +43,8 @@
       "phase": "Delivered",
       "actualDate": "2026-09-05",
       "dateLabel": "Sep 5 · CI Sep 10; readback Sep 14",
-      "notes": "Product dcf2ff26 passed build/typechecks, 209 Node, 17 queue, 42 simulator and 49 Chromium checks in Sep 10 main CI. Sep 14 source/CI readback confirms that dated evidence; unchanged application suites were not rerun locally for this documentation closeout.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34454028618"
+      "notes": "Runtime product dcf2ff26 passed build/typechecks, 209 Node, 17 queue, 42 simulator and 49 Chromium checks in Sep 10 main CI. Sep 14 local build/typechecks and 50 Chromium cases verify PR #26’s deterministic refusal-test correction; current test/status CI is linked from that PR. Runtime source is unchanged.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/26"
     },
     {
       "id": "browser",
@@ -53,8 +53,8 @@
       "phase": "Delivered",
       "actualDate": "2026-09-06",
       "dateLabel": "Sep 6 · CI Sep 10; readback Sep 14",
-      "notes": "All 49 production Chromium checks passed on Sep 10 main CI. Coverage includes real mock command effects/refusals, draft retention, pending/refresh behavior, auth/HTTPS, SSE and Snapshot, plus both console themes, responsive layouts, tokens and focus. Synthetic frames/status/KeyboardEvent cases prove their stated client or presentation behavior; no native IME, paid provider or deployment acceptance is implied.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34454028618"
+      "notes": "Sep 14 local suite passes 50 Chromium checks. PR #26 explicitly drains parked Forge turns to real 409 before measuring refusal, preserves five Message requests and records no additional Forge interruption effect. Drafts, pending/refresh, auth/HTTPS, SSE, Snapshot and console themes/layouts remain covered. Synthetic cases remain client/presentation proof only; no native IME, provider or deployment acceptance.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/26"
     },
     {
       "id": "progress-document",
@@ -72,7 +72,7 @@
       "status": "Complete",
       "phase": "Delivered",
       "dateLabel": "Sep 7 · reconciled Sep 14",
-      "notes": "Roadmap and ledger now distinguish externally merged command safety #24 and supporting #25 from the Sep 8 foundation. Current product CI executed Sep 10; source/CI and status-file verification are dated Sep 14. Recovery retains its three contradictions/exhausted correction limit; task transfer/tool approval and M1/M3/M4 acceptance remain incomplete.",
+      "notes": "Roadmap and ledger distinguish externally merged command safety #24/#25, September 10 product CI and September 14 test/status verification. PR #26 corrects the paused-Interrupt test assumption without runtime changes. Recovery and tool-approval design holds remain; task transfer and M1/M3/M4 acceptance are incomplete.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/STATUS.md",
       "actualDate": "2026-09-07"
     },
@@ -202,8 +202,8 @@
       "status": "Complete",
       "phase": "M2",
       "dateLabel": "Sep 8 · 8:10 AM ET",
-      "notes": "Sep 10 main CI passed all 49 Chromium cases: commands and drafts, pending/refresh, auth/temporary loopback HTTPS, Snapshot, SSE, activity, unavailable controls, token disclosure, console themes, responsive/focus/contrast and progress views. Source/CI read back Sep 14; historical-run/recovery coverage remains unimplemented.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34454028618",
+      "notes": "Sep 10 main CI passed 49 Chromium cases. PR #26 adds the parked/queued-turn precondition regression and preserves all real refusal/draft assertions; Sep 14 local suite passes 50. Exact-head and merged-main CI remain mandatory delivery gates. Historical-run/recovery coverage is still unimplemented.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/26",
       "actualDate": "2026-09-08"
     },
     {

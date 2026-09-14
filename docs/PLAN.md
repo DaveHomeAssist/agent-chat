@@ -148,7 +148,9 @@ Dave explicitly extending the correction limit. Proposed acceptance is UNEXECUTE
 - Add historical run listing, snapshot retrieval, picker and transcript export.
   The current-run Snapshot download is delivered; historical exports still depend
   on persistent storage.
-- Extend the 49 delivered browser checks with history/recovery coverage once wired.
+- Extend the 50 browser checks with history/recovery coverage once wired.
+  PR #26 adds a deterministic parked-turn/refusal setup test while preserving the
+  real rate limit, exact 409 and existing draft/error assertions.
   Preserve 209 Node/17 queue regressions, typechecks, build, 42 simulator checks
   and the production mock console/progress browser gate.
 - Preserve delivered Message/Interrupt refusals and draft retention from #18, and
