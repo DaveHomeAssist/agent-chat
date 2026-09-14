@@ -1,6 +1,8 @@
 # Agent Chatroom roadmap
 
-Current plan reconciled September 8, 2026. Read `docs/STATUS.md` and the
+Current plan reconciled September 14, 2026 from source/CI readback. Application
+Product CI executed September 10; this closeout separately verifies the status page.
+Read `docs/STATUS.md` and the
 [visual progress record](../project-progress/index.html) for evidence and blockers.
 Historical execution prompts and timing estimates from the
 [September 5 plan](https://github.com/DaveHomeAssist/agent-chat/blob/a346ef090aca2fa6d1d6b197b61a2110dc88a5ee/docs/PLAN.md)
@@ -26,7 +28,9 @@ console. Reported-usage limits are not a guarantee of zero billing overshoot.
   an explicitly requested pair of real OpenAI runs. Offline regression tests prove
   the runner; the separate Sep 8 single-call probe proves provider access only.
 - Snapshot: current-run public JSON export is implemented and browser verified.
-  A useful paid proposal cost $0.113582; see [probe evidence](USEFUL_MODEL_PROBE.md).
+  It exports retained public state, capped at 200 output-log lines per agent; the
+  earlier 501-line check was an injected API fixture. A useful paid proposal cost
+  $0.113582; see [probe evidence](USEFUL_MODEL_PROBE.md).
 - PR #11: seven production Chromium checks, mock-only fixtures and retained browser
   evidence are merged as `9ed160c`; main CI passes. [Browser checks](BROWSER_TESTS.md)
   cover console controls, approval, Snapshot, reconnect/replay and progress views.
@@ -47,7 +51,15 @@ console. Reported-usage limits are not a guarantee of zero billing overshoot.
   navigation, ultrawide capacity, visible token disclosure, focus and contrast
   merged as `8419cb9`. Main CI passes 183 Node, 17 queue, 42 simulator and 41
   Chromium cases; synthetic status images prove presentation only. Control
-  contracts and recovery remain incomplete below.
+  contracts and recovery remained incomplete at that checkpoint.
+- PR #24: independently accepted command admission, unchanged-draft clearing,
+  pending lanes, strict ACKs, coherent state repair and bounded explicit refresh.
+  Composing/repeat/Shift Enter preserves input and Refresh focus survives resize.
+  DaveHomeAssist externally merged corrected `44dfdab` on September 10 as `dcf2ff26`,
+  after PR #25 (`a13fe3a`). Product main CI then passed 209 Node, 17 queue,
+  42 simulator and 49 Chromium checks. Current readback confirms that dated result.
+  PR #25's workspace-derived labels/shared vocabularies and documentation corrections
+  do not implement real Git tools or persistence runtime wiring.
 
 ## Parallel executor delivery
 
@@ -57,7 +69,9 @@ Dave designated the current Codex session as orchestration only. The
 and verification sessions. Authentication module #12 and full runtime #15 are
 reviewed and merged; persistence module #13 is merged without runtime wiring.
 Queue caller repair #16, command acceptance #18 and console presentation #19/#22 are
-reviewed and merged with passing main CI. Whole fidelity remains Partial.
+reviewed and merged with passing main CI. Corrected command safety #24 is also
+accepted and externally merged; current product evidence is `dcf2ff26`. Whole
+fidelity remains Partial because task transfer and real tool approval are unfinished.
 Browser infrastructure is delivered through merged
 [PR #11](https://github.com/DaveHomeAssist/agent-chat/pull/11), with passing main CI.
 
@@ -134,23 +148,26 @@ Dave explicitly extending the correction limit. Proposed acceptance is UNEXECUTE
 - Add historical run listing, snapshot retrieval, picker and transcript export.
   The current-run Snapshot download is delivered; historical exports still depend
   on persistent storage.
-- Extend the 41 delivered browser checks with history/recovery coverage once wired.
-  Preserve 183 Node/17 queue regressions, typechecks, build, 42 simulator checks
+- Extend the 49 delivered browser checks with history/recovery coverage once wired.
+  Preserve 209 Node/17 queue regressions, typechecks, build, 42 simulator checks
   and the production mock console/progress browser gate.
 - Preserve delivered Message/Interrupt refusals and draft retention from #18, and
   truthful activity/unavailable controls/token disclosure/dynamic PR labels from #19.
   Full task reassignment needs an atomic task-transfer contract; real auto-approval
-  needs an explicit tool-approval contract. Pending-command locks and edited-draft
-  safety remain unfinished. The private AC-VERIFY-009 contract supplement is
-  independently accepted: strict ACK validation, contiguous/full-snapshot state
-  proof, bounded refresh and rendered-context/intent admission. Its proposed
-  acceptance is UNEXECUTED; assign one frontend executor against delivered PR #22
-  before implementing the preserved lane/draft/error rules.
+  needs an explicit tool-approval contract. Preserve PR #24's delivered client
+  command lanes, edited-draft safety, strict ACK validation, contiguous/snapshot
+  state proof, bounded refresh and rendered-context/intent admission. These are
+  in-process client guarantees, not server fencing or durable exactly-once effects.
+  Tool-approval design is now held at the two-correction limit: its final F6 row
+  conflates terminal UI admission with direct duplicate endpoint replay. All proposed
+  acceptance remains UNEXECUTED; no further correction or implementation is authorized
+  without an explicit extension. See `tool-approval-final-hold.md`. Independent
+  task-transfer design does not relax this hold or implement either control.
 - Preserve PR #22's shared light-default/light-dark theme and tested layouts at
   320/390/768/1024/1440/3440px, topmost token rows, visible keyboard destinations
   and status-text/focus contrast. The old dark-only/1180px mobile limitation is
-  superseded. Do not mark fidelity Complete: task transfer, real tool approval
-  and pending-command safety still need implementation and independent acceptance.
+  superseded. Do not mark fidelity Complete: task transfer and real tool approval
+  still need implementation and independent acceptance.
 
 ## M3 and M4 boundaries
 
