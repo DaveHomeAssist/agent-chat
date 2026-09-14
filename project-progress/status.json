@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-09-08T11:19:43-04:00",
-  "verifiedLabel": "Sep 8, 2026 · 11:19 AM ET",
-  "codeRevision": "8419cb9f8e0f536b1b34d1f6a6618b8f76c2567b",
+  "verifiedAt": "2026-09-14T07:12:08-04:00",
+  "verifiedLabel": "Sep 14, 2026 · 7:12 AM ET",
+  "codeRevision": "dcf2ff26ece5837131121b6c82e23f147cca0a20",
   "overall": "Partial",
-  "summary": "Reviewed PR #22 is merged: the console defaults to light mode, supports both themes and adapts from 320px phones through tablets to ultrawide displays. Product 8419cb9 passes 183 Node, 17 queue, 42 simulator and 41 Chromium checks in main CI. Fidelity remains Partial: accepted pending-command/draft-safety design is UNEXECUTED; task transfer and real tool approval remain incomplete. Recovery retains its three-issue final-review hold and exhausted correction limit. Real-provider, real-repository and hosting gates remain separate and incomplete.",
+  "summary": "PR #24 delivers client command admission, edited-draft protection and bounded coherent state refresh. DaveHomeAssist merged it after PR #25 on Sep 10; unchanged runtime product dcf2ff26 passed 209 Node, 17 queue, 42 simulator and 49 Chromium checks that day. Sep 14 local verification passes 50 browser cases after PR #26 corrects a refusal-test precondition; source/CI readback and status rendering are dated separately. Fidelity remains Partial: task transfer is incomplete, tool-approval design is held, and recovery retains its exhausted-limit hold. Paid-model, real-repository and hosting acceptance remain incomplete.",
   "items": [
     {
       "id": "console",
@@ -42,9 +42,9 @@
       "status": "Complete",
       "phase": "Delivered",
       "actualDate": "2026-09-05",
-      "dateLabel": "Sep 5 · reverified Sep 8",
-      "notes": "Merged product 8419cb9 passes build/typechecks, 183 Node, 17 queue, 42 simulator and 41 Chromium checks in main CI. The exact accepted presentation source passed 17 layout and 41 browser cases locally in authentication; this integration used fresh main CI rather than repeating unchanged local suites.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34243674321"
+      "dateLabel": "Sep 5 · CI Sep 10; readback Sep 14",
+      "notes": "Runtime product dcf2ff26 passed build/typechecks, 209 Node, 17 queue, 42 simulator and 49 Chromium checks in Sep 10 main CI. Sep 14 local build/typechecks and 50 Chromium cases verify PR #26’s deterministic refusal-test correction; current test/status CI is linked from that PR. Runtime source is unchanged.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/26"
     },
     {
       "id": "browser",
@@ -52,9 +52,9 @@
       "status": "Complete",
       "phase": "Delivered",
       "actualDate": "2026-09-06",
-      "dateLabel": "Sep 6 · reverified Sep 8",
-      "notes": "All 41 production Chromium checks pass in merged main CI, with the same accepted presentation source verified locally. Real backend 409 draft retention, auth/HTTPS, SSE and Snapshot remain covered. Console light/dark, phone/tablet/desktop/ultrawide layouts, token visibility and focus pass. LIVE/PAUSED/FAILED contrast cases are synthetic presentation proof only.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34243674321"
+      "dateLabel": "Sep 6 · CI Sep 10; readback Sep 14",
+      "notes": "Sep 14 local suite passes 50 Chromium checks. PR #26 explicitly drains parked Forge turns to real 409 before measuring refusal, preserves five Message requests and records no additional Forge interruption effect. Drafts, pending/refresh, auth/HTTPS, SSE, Snapshot and console themes/layouts remain covered. Synthetic cases remain client/presentation proof only; no native IME, provider or deployment acceptance.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/26"
     },
     {
       "id": "progress-document",
@@ -63,7 +63,7 @@
       "phase": "Delivered",
       "actualDate": "2026-09-06",
       "dateLabel": "Sep 6, 2026",
-      "notes": "Standalone status records delivered PR #22 presentation with exact merged-product evidence. All 25 IDs, historical dates and 14 Complete/11 Remaining counts are preserved. Both themes, pagination, controls and all print rows are checked on the actual status file; this is a different surface from console acceptance.",
+      "notes": "Standalone status records delivered PR #24 and PR #25 with product dcf2ff26 evidence. All 25 IDs, historical dates and 14 Complete/11 Remaining totals are preserved. Sep 14 actual status-file checks cover both themes, pagination/search/filter/sort and all print rows at desktop, phone and ultrawide; application CI is dated separately.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/project-progress/index.html"
     },
     {
@@ -71,8 +71,8 @@
       "title": "Roadmap and status reconciliation",
       "status": "Complete",
       "phase": "Delivered",
-      "dateLabel": "Sep 7 · reverified Sep 8",
-      "notes": "Roadmap and ledger record merged auth #15, storage module #13, queue repair #16, command acceptance #18 and console #19/#22. Pending-command design is accepted but UNEXECUTED; recovery retains three exact contradictions and the exhausted correction limit. M1, M3 and M4 gates remain incomplete.",
+      "dateLabel": "Sep 7 · reconciled Sep 14",
+      "notes": "Roadmap and ledger distinguish externally merged command safety #24/#25, September 10 product CI and September 14 test/status verification. PR #26 corrects the paused-Interrupt test assumption without runtime changes. Recovery and tool-approval design holds remain; task transfer and M1/M3/M4 acceptance are incomplete.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/STATUS.md",
       "actualDate": "2026-09-07"
     },
@@ -103,7 +103,7 @@
       "phase": "Delivered",
       "actualDate": "2026-09-08",
       "dateLabel": "Sep 8, 2026",
-      "notes": "Fresh JSON download, all public log lines, no run mutation, duplicate protection, timeout and visible errors. Unit, CI production build and mock browser checks pass.",
+      "notes": "Fresh JSON download of retained public state, at most 200 output-log lines per agent. The 501-line browser check used an injected API response, not server-retained history (clarified by PR #25). No run mutation; duplicate protection, timeout and visible errors remain covered by the existing mock tests.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/9"
     },
     {
@@ -202,8 +202,8 @@
       "status": "Complete",
       "phase": "M2",
       "dateLabel": "Sep 8 · 8:10 AM ET",
-      "notes": "Merged main CI runs all 41 Chromium checks: commands, auth/temporary loopback HTTPS, Snapshot, SSE, activity, unavailable controls, token disclosure, both console themes, responsive/focus/contrast cases and progress views. Historical-run/recovery and pending-command protection acceptance remain unimplemented.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34243674321",
+      "notes": "Sep 10 main CI passed 49 Chromium cases. PR #26 adds the parked/queued-turn precondition regression and preserves all real refusal/draft assertions; Sep 14 local suite passes 50. Exact-head and merged-main CI remain mandatory delivery gates. Historical-run/recovery coverage is still unimplemented.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/26",
       "actualDate": "2026-09-08"
     },
     {
@@ -213,8 +213,8 @@
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "PR #22 delivers light-default/light-dark console layouts at 320/390/768/1024/1440/3440px, visible token rows, panel/resize focus and activity-text contrast. Prior #18/#19 command refusals, activity and PR labels remain. Pending-command locks and edited-draft safety design AC-VERIFY-009 is accepted but UNEXECUTED. Real task transfer and tool approval remain unavailable; fidelity stays Partial.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/22"
+      "notes": "PR #24 delivers command admission/lanes, strict ACKs, unchanged accepted-draft clearing and bounded state refresh. Composing/repeat/Shift Enter preserves input; Refresh focus survives resize. PR #22 themes/layout and #18/#19 truthful controls remain. Task transfer is unavailable. Tool-approval design is held at its two-correction limit: F6 conflates terminal UI intent with duplicate endpoint replay; implementation and acceptance remain UNEXECUTED. Fidelity stays Partial.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/24"
     },
     {
       "id": "workspace",

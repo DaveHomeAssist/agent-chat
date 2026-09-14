@@ -36,6 +36,19 @@ Browser coverage includes:
   replay, session expiry/disposal and read-only request/stream counts; there is
   no test-control HTTP route in the application.
 - Visible command and Snapshot failures, followed by successful user retry.
+- Pending command lanes, edited/retargeted drafts, strict acknowledgement failures,
+  bounded state refresh, session cleanup and latest-command error ownership.
+  Held real mock responses pair request counts with authoritative state readback;
+  synthetic ACK/event cases prove client behavior only. Composing, repeated and
+  Shift+Enter events issue zero Message POSTs and retain the draft, then deliberate
+  Enter produces one accepted effect. KeyboardEvent flags do not prove a native
+  operating-system IME or a multiline composer. Refresh focus remains on the
+  visible action through 1440/1024 layout changes in both themes.
+- Refusal setup first observes a paused run, empty global typing and no running tool,
+  then drains real Forge interrupts to exact 409 under a deadline and attempt cap.
+  A separate companion case forces parked/queued turns and records accepted setup
+  effects; the held-message case retains five measured sends and one UI 409 with
+  no new Forge effect. No fixture hook, rate-limit change or quiet sleep is used.
 - The standalone progress document at desktop (1440 × 1000), mobile (390 × 844)
   and ultrawide (3440 × 968): every item through pagination, view switching,
   filtering/reset, theme control, contained layout and all items in print mode.

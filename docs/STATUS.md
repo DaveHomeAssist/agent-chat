@@ -1,6 +1,8 @@
 # Agent Chatroom status
 
-Refreshed September 8, 2026. [Visual progress](../project-progress/index.html) ·
+Reconciled September 14, 2026 from current Git/CI readback; application CI below
+executed September 10. Status-file rendering is verified separately in this closeout.
+[Visual progress](../project-progress/index.html) ·
 [Current roadmap](PLAN.md) · [Acceptance commands](REAL_MODEL_ACCEPTANCE.md).
 The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 
@@ -21,6 +23,69 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Explicit Message/Interrupt acceptance | [PR #18](https://github.com/DaveHomeAssist/agent-chat/pull/18), merged Sep 8 as `1a7819f`; actual 409 draft retention and no-effect refusals verified |
 | Truthful console controls and activity | [PR #19](https://github.com/DaveHomeAssist/agent-chat/pull/19), merged Sep 8 as `78f84fc`; token disclosure and dynamic PR labels; presentation extended by PR #22 below |
 | Responsive light/dark console | [PR #22](https://github.com/DaveHomeAssist/agent-chat/pull/22), merged Sep 8 as `8419cb9`; 41 Chromium cases and independent presentation review pass |
+| Client command admission, draft protection and bounded refresh | [PR #24](https://github.com/DaveHomeAssist/agent-chat/pull/24), externally merged Sep 10 as `dcf2ff26`; corrected source independently accepted, 209 Node / 49 Chromium product CI passes |
+
+## Current command delivery — PR #24
+
+- DaveHomeAssist merged [PR #25](https://github.com/DaveHomeAssist/agent-chat/pull/25)
+  on September 10 at 08:13:11 UTC as `a13fe3a`, then corrected
+  [PR #24](https://github.com/DaveHomeAssist/agent-chat/pull/24) at 08:13:40 UTC as
+  `dcf2ff26ece5837131121b6c82e23f147cca0a20`. These external merges occurred while
+  the coordinator was interrupted; this closeout does not repeat or claim them.
+- Independently accepted command source `44dfdab` is preserved in current main.
+  Rendered-context/intent admission and synchronous command lanes prevent conflicting
+  submissions; strict acknowledgements clear only an unchanged accepted draft.
+  Newer edits, target changes, refusals and obsolete responses retain safe ownership.
+- Validated contiguous stream state, a qualifying snapshot and its buffered suffix
+  jointly prove command readiness. Network/synchronization and explicit Refresh
+  state are bounded by a 15-second deadline. No automatic POST replay occurs.
+  Composing, repeated and Shift+Enter events do not submit; Refresh retains focus
+  across compact layout changes. Snapshot, safe edits, navigation and Sign out keep
+  their existing behavior.
+- [Exact product main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34454028618)
+  executed September 10: build/typechecks, **209 Node tests, 17 queue tests,
+  42 simulator checks and 49 Chromium cases** passed. September 14 readback confirms
+  that result and current main; it is not a new local application test run.
+  September 8 local correction evidence includes 26 deterministic controller cases,
+  209 Node tests and 49 browser cases, with meaningful pre-fix failures preserved.
+  Independent frontend/core review accepted the correction and PR #25 composition.
+- [Product browser evidence](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34454028618/artifacts/10142752959)
+  expires September 24 at 08:15:37 UTC; the production bundle expires September 17
+  at 08:15:39 UTC, unless removed earlier. Availability was read back September 14.
+- PR #25 derives run repository/branch and completion PR labels from the workspace,
+  shares runtime vocabularies with persistence validation, isolates the auth-test
+  static root and corrects earlier auth/Snapshot documentation. It does not deliver
+  a real repository adapter or wire persistence into the runtime. Snapshot exports
+  only retained public state, including at most 200 output-log lines per agent.
+- Fidelity remains **Partial**: task transfer and real tool approval are incomplete.
+  Client command safety does not provide server run fencing, durable idempotency,
+  rollback, cross-tab locking or exactly-once effects. Recovery retains the hold
+  below. M1 paid acceptance, M3 real tools and M4 hosting remain separate gates.
+- This documentation closeout preserves all 25 IDs, historical completion dates and
+  **14 Complete / 11 Remaining**. Status-file checks cover both themes at desktop,
+  phone and ultrawide, working controls/pagination and all 25 print rows. They prove
+  the local report surface, not deployment or refresh of an existing user tab.
+
+## Browser refusal precondition correction — PR #26
+
+The first September 14 documentation CI failed one existing command browser case:
+Forge Interrupt returned 200 while the test assumed pausing meant no active turn.
+The other 48 browser cases and all build/Node/queue/simulator gates passed. That
+failure is preserved; no unchanged retry or merge bypass was used.
+
+The [PR #26](https://github.com/DaveHomeAssist/agent-chat/pull/26) test correction
+requires paused, globally empty typing and no running tool, then bounded real
+Forge interrupts ending in the exact no-active-operation 409. Setup effects are
+counted separately. A companion test deliberately creates parked/queued turns and
+proves two accepted setup interrupts followed by 409; the measured interaction
+retains five Message POSTs, one UI Interrupt 409 and no additional Forge effect.
+Separating the companion case preserves the real five-message rate limit.
+
+Both targeted cases passed three executions each; the full September 14 local
+suite passed **50 Chromium cases**, with build/typechecks. Runtime source remains
+unchanged at product `dcf2ff26`; this test/status PR must pass exact-head CI and
+merged-main CI before canonical delivery. These current checks do not relabel the
+September 10 product CI or September 8 provider/hosting observations as newly run.
 
 ## Snapshot delivery evidence (earlier Sep 8 checks)
 
@@ -134,8 +199,9 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   tree exactly matched that tested candidate. [Combined main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34234695533)
   passes the same gates at product revision `78f84fc`; all agent/tool work is mocked.
   Shared browser port 18787 was free before launch and after teardown.
-- Fidelity remains **Partial**. Atomic task transfer, a real tool-approval contract
-  and pending-action locks remain unimplemented. The earlier dark-only images and
+- Fidelity remains **Partial**. Atomic task transfer and a real tool-approval contract
+  remained unimplemented at that September 8 checkpoint. Client pending-action
+  safety is now delivered by PR #24 above. The earlier dark-only images and
   1180px minimum-width limitation are superseded by delivered PR #22 below.
   Progress-page checks remain a separate surface from console acceptance.
 - Status retains **14 Complete / 11 Remaining**, 25 stable IDs and historical dates.
@@ -143,7 +209,7 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   Runtime persistence/history/resume, M1 paid acceptance, M3 real tools and M4
   hosting/remote acceptance remain pending. No paid calls or hosting changes occurred.
 
-## Recovery final-review hold and pending command design
+## Recovery final-review hold
 
 The proposed recovery contract is **held**, while the merged V1 SQLite module
 remains accepted. Final independent review resolved the original provider ordinal
@@ -163,13 +229,22 @@ further contract revision requires Dave's explicit authorization to extend that 
 No third correction, migration, runtime wiring or history/resume implementation is
 currently authorized. Persistence remains In Progress with this explicit design hold.
 
-The pending-command and draft-safety design is independently accepted through the
-private **AC-VERIFY-009-command-contract.md** supplement and correction matrix.
-It specifies strict acknowledgements, contiguous/full-snapshot synchronization,
-bounded refresh and caller-rendered context/intent admission. All proposed
-implementation acceptance remains **UNEXECUTED**. Pending locks, edited-draft
-protection, atomic task transfer and a real approval contract remain incomplete.
-Implementation needs its own executor assignment; this does not relax recovery.
+The independently accepted pending-command/draft-safety contract was implemented
+and verified by PR #24, as recorded above. Its earlier UNEXECUTED label is
+superseded. Atomic task transfer and a real tool-approval contract remain incomplete;
+delivered client view synchronization does not relax the recovery hold.
+
+## Tool-approval design hold
+
+Final design review is held at the existing two-correction limit. Its F6 acceptance
+row combines terminal-row UI admission (zero POST/no ticket) with direct duplicate
+endpoint replay (one transport request); those are different acceptance paths.
+The original synchronization/rejection issue is resolved, but this contradiction
+still blocks implementation. Private decision `tool-approval-final-hold.md` records
+the result. All proposed tool-approval acceptance remains UNEXECUTED; no third
+correction or implementation is authorized. This is a design/test-contract blocker,
+not a defect proven in delivered behavior. Tool approval remains unavailable and
+fidelity Partial; independent task-transfer design does not relax this hold.
 
 ## Delivered responsive console and both themes — PR #22
 
@@ -200,7 +275,8 @@ Implementation needs its own executor assignment; this does not relax recovery.
   neither provider acceptance nor real repository work. Authentication, Snapshot,
   command refusal and unavailable-control regressions remain strict.
 - Fidelity remains **Partial**, with **14 Complete / 11 Remaining**, all 25 IDs and
-  historical dates preserved. Pending-command safety is accepted design only;
+  historical dates preserved. At this September 8 checkpoint, pending-command
+  safety was accepted design only; PR #24 above supersedes that limitation.
   Reassign and real tool auto-approval are still unavailable. Recovery retains the
   three-issue hold above. M1 budgets/runner, M3 real tools and M4 hosting/remote
   acceptance remain incomplete. Earlier paid/hosting observations keep their dates.
@@ -239,7 +315,7 @@ Implementation needs its own executor assignment; this does not relax recovery.
 | Milestone | State | Next action / dependency |
 | --- | --- | --- |
 | M1 real-model acceptance | Partial | Provider access demonstrated; explicitly approved two-run budgets and runner environment still needed |
-| M2 unattended operation | Partial | Snapshot, auth, command refusals, truthful controls and browser CI delivered; recovery contract held, runtime/history unimplemented; console themes/responsiveness delivered; command safety accepted but unexecuted; transfer/approval contracts pending |
+| M2 unattended operation | Partial | Snapshot, auth, command refusals, truthful controls and browser CI delivered; recovery contract held, runtime/history unimplemented; console themes/responsiveness delivered; command admission/draft protection/bounded refresh delivered; transfer/approval contracts pending |
 | M3 real repository | Not started | Isolated Git/command adapter and sandbox PR acceptance after M2 |
 | M4 remote deployment | Not started | Hosting decision, durable runtime, HTTPS and deployed auth/remote acceptance after M3 |
 
@@ -270,7 +346,11 @@ before sharing. No application real-repository run or hosting change was perform
   combined product passes all offline gates. Fidelity remains Partial.
 
 - Sep 8: Reviewed responsive/light-dark console PR #22 merged with successful main
-  CI and 41 browser cases; command safety remains unexecuted and fidelity Partial.
+  CI and 41 browser cases; command safety was then unexecuted and fidelity Partial.
+- Sep 10: DaveHomeAssist externally merged PR #25 then corrected PR #24; product
+  main CI passed 209 Node, 17 queue, 42 simulator and 49 browser checks.
+- Sep 14: Recovered interrupted evidence, read back the existing merges/CI and
+  reconciled status records. Local status rendering is separate from application CI.
 
 Future delivery dates are unscheduled. Update this file and structured visual
 status after meaningful changes under the root AGENTS.md contract.
