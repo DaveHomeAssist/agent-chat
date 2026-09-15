@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-09-14T07:12:08-04:00",
-  "verifiedLabel": "Sep 14, 2026 · 7:12 AM ET",
+  "verifiedAt": "2026-09-14T22:08:35-04:00",
+  "verifiedLabel": "Sep 14, 2026 · 10:08 PM ET",
   "codeRevision": "dcf2ff26ece5837131121b6c82e23f147cca0a20",
   "overall": "Partial",
-  "summary": "PR #24 delivers client command admission, edited-draft protection and bounded coherent state refresh. DaveHomeAssist merged it after PR #25 on Sep 10; unchanged runtime product dcf2ff26 passed 209 Node, 17 queue, 42 simulator and 49 Chromium checks that day. Sep 14 local verification passes 50 browser cases after PR #26 corrects a refusal-test precondition; source/CI readback and status rendering are dated separately. Fidelity remains Partial: task transfer is incomplete, tool-approval design is held, and recovery retains its exhausted-limit hold. Paid-model, real-repository and hosting acceptance remain incomplete.",
+  "summary": "PR #24 command safety and PR #26 browser-test correction are delivered; runtime product remains dcf2ff26. Sep 14 main CI at ac893045 passed 209 Node, 17 queue, 42 simulator and 50 Chromium checks; this later closeout verifies design-review readback and status rendering separately. Reassign proposal 018 passed frontend review but failed backend review; all 56 proposed cases are UNEXECUTED. Reassign, tool approval and recovery are held at exhausted correction limits. Fidelity stays Partial. Foundation runtime paths await a decision; M1 budget/runner, M3 real tools and M4 hosting remain incomplete.",
   "items": [
     {
       "id": "console",
@@ -43,8 +43,8 @@
       "phase": "Delivered",
       "actualDate": "2026-09-05",
       "dateLabel": "Sep 5 · CI Sep 10; readback Sep 14",
-      "notes": "Runtime product dcf2ff26 passed build/typechecks, 209 Node, 17 queue, 42 simulator and 49 Chromium checks in Sep 10 main CI. Sep 14 local build/typechecks and 50 Chromium cases verify PR #26’s deterministic refusal-test correction; current test/status CI is linked from that PR. Runtime source is unchanged.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/26"
+      "notes": "Runtime product dcf2ff26 passed 209 Node/17 queue/42 simulator/49 Chromium checks Sep 10. PR #26 main ac893045 passed build/typechecks and 209/17/42/50 Sep 14 after the refusal-test correction. This later status-only closeout reads that evidence and renders the status page; no local runtime suite is rerun.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34837854088"
     },
     {
       "id": "browser",
@@ -63,7 +63,7 @@
       "phase": "Delivered",
       "actualDate": "2026-09-06",
       "dateLabel": "Sep 6, 2026",
-      "notes": "Standalone status records delivered PR #24 and PR #25 with product dcf2ff26 evidence. All 25 IDs, historical dates and 14 Complete/11 Remaining totals are preserved. Sep 14 actual status-file checks cover both themes, pagination/search/filter/sort and all print rows at desktop, phone and ultrawide; application CI is dated separately.",
+      "notes": "Standalone report preserves all 25 IDs, historical dates and 14 Complete/11 Remaining totals. Sep 14 closeout records the final Reassign design hold beside existing recovery/tool-approval holds. Actual file checks cover both themes, controls/pagination and all print rows at desktop, phone and ultrawide; application CI remains separately dated.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/project-progress/index.html"
     },
     {
@@ -72,7 +72,7 @@
       "status": "Complete",
       "phase": "Delivered",
       "dateLabel": "Sep 7 · reconciled Sep 14",
-      "notes": "Roadmap and ledger distinguish externally merged command safety #24/#25, September 10 product CI and September 14 test/status verification. PR #26 corrects the paused-Interrupt test assumption without runtime changes. Recovery and tool-approval design holds remain; task transfer and M1/M3/M4 acceptance are incomplete.",
+      "notes": "Command safety #24/#25 and test correction #26 remain delivered. Reassign proposal 018 passed frontend but failed backend review on Forge repair completion and receipt retention/replay; all 56 cases remain UNEXECUTED. Reassign, tool approval and recovery are held at their exhausted correction limits. Foundation runtime paths await a decision; M1/M3/M4 gates remain incomplete.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/STATUS.md",
       "actualDate": "2026-09-07"
     },
@@ -202,8 +202,8 @@
       "status": "Complete",
       "phase": "M2",
       "dateLabel": "Sep 8 · 8:10 AM ET",
-      "notes": "Sep 10 main CI passed 49 Chromium cases. PR #26 adds the parked/queued-turn precondition regression and preserves all real refusal/draft assertions; Sep 14 local suite passes 50. Exact-head and merged-main CI remain mandatory delivery gates. Historical-run/recovery coverage is still unimplemented.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/26",
+      "notes": "PR #26 merged as ac893045 Sep 14; exact PR and merged-main CI passed all 50 Chromium cases, including parked/queued-turn setup and unchanged real refusal/draft assertions. This later closeout reads the CI evidence separately from status rendering. Historical-run/recovery and Reassign acceptance remain unimplemented.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/actions/runs/34837854088",
       "actualDate": "2026-09-08"
     },
     {
@@ -213,8 +213,8 @@
       "phase": "M2",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "PR #24 delivers command admission/lanes, strict ACKs, unchanged accepted-draft clearing and bounded state refresh. Composing/repeat/Shift Enter preserves input; Refresh focus survives resize. PR #22 themes/layout and #18/#19 truthful controls remain. Task transfer is unavailable. Tool-approval design is held at its two-correction limit: F6 conflates terminal UI intent with duplicate endpoint replay; implementation and acceptance remain UNEXECUTED. Fidelity stays Partial.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/pull/24"
+      "notes": "PR #24 command/draft safety and #22 themes/layout remain delivered. Reassign 018 frontend passed; backend breaks Forge repair completion/report flow and omits the latest-successful-receipt-per-task policy. All 56 proposed cases are UNEXECUTED. This unimplemented proposal is held after two corrections; further repair/implementation needs Dave’s limit extension. Reassign stays unavailable. Tool approval retains its two-correction F6 terminal-UI/endpoint-replay hold. Fidelity stays Partial.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/STATUS.md#reassign-final-design-hold"
     },
     {
       "id": "workspace",

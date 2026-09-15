@@ -1,7 +1,8 @@
 # Agent Chatroom roadmap
 
-Current plan reconciled September 14, 2026 from source/CI readback. Application
-Product CI executed September 10; this closeout separately verifies the status page.
+Current plan reconciled September 14, 2026 from source/CI and final design-review
+readback. Product CI executed September 10 and PR #26 CI earlier September 14;
+this status-only closeout separately verifies the report without local runtime reruns.
 Read `docs/STATUS.md` and the
 [visual progress record](../project-progress/index.html) for evidence and blockers.
 Historical execution prompts and timing estimates from the
@@ -77,8 +78,9 @@ Browser infrastructure is delivered through merged
 
 The durable local SQLite queue stores immutable assignments/reports, leases,
 reconciliation decisions and event cursors. Seventeen offline protocol tests pass,
-including two independent worker processes. Native Codex messages and an active
-five-minute coordinator heartbeat provide dispatch/recovery. The queue now records
+including two independent worker processes. Native Codex messages and the coordinator
+heartbeat provide dispatch/recovery; its current state is managed separately.
+The queue records
 verified native claim/report/follow-up cycles and a completed local verification
 subagent assignment followed by a new queue claim. Claude's cloud
 verification review could not access the Mac-local queue, so local verification is
@@ -89,6 +91,22 @@ automatic launcher or cloud bridge. No new application API allowance is included
 The verification worker later owns integration, shared wiring, status records and
 sequential merges. This communication infrastructure is separate from the product
 milestones below; it does not make the application's simulated tools execute Git.
+
+## Foundation decision gate
+
+Reassign proposal 018 passed frontend/public review, but backend review still finds
+an incompatible Forge repair completion/report flow under completed-is-terminal
+and an omitted latest-successful-receipt-per-task retention/replay policy. All 56
+proposed acceptance cases are UNEXECUTED; no transfer behavior has shipped.
+`reassignment-final-hold.md` records the exhausted two-correction limit. Reassign
+remains unavailable and fidelity Partial; repair or implementation needs Dave to
+extend the existing limit, without renaming the problem.
+
+Recovery/runtime/history and tool-approval designs retain their own exhausted-limit
+holds. All currently dispatchable foundation runtime paths are held pending a
+post-closeout decision. M1 needs separate budget/runner authority; M3 follows these
+foundations and is not authorized for implementation; M4 needs hosting authority.
+The coordinator handles the decision and heartbeat state after this delivery.
 
 ## Milestones, in dependency order
 
@@ -155,8 +173,9 @@ Dave explicitly extending the correction limit. Proposed acceptance is UNEXECUTE
   and the production mock console/progress browser gate.
 - Preserve delivered Message/Interrupt refusals and draft retention from #18, and
   truthful activity/unavailable controls/token disclosure/dynamic PR labels from #19.
-  Full task reassignment needs an atomic task-transfer contract; real auto-approval
-  needs an explicit tool-approval contract. Preserve PR #24's delivered client
+  Full task reassignment is held at its exhausted correction limit, as recorded
+  above; real auto-approval needs an explicit tool-approval contract. Preserve
+  PR #24's delivered client
   command lanes, edited-draft safety, strict ACK validation, contiguous/snapshot
   state proof, bounded refresh and rendered-context/intent admission. These are
   in-process client guarantees, not server fencing or durable exactly-once effects.
@@ -164,7 +183,8 @@ Dave explicitly extending the correction limit. Proposed acceptance is UNEXECUTE
   conflates terminal UI admission with direct duplicate endpoint replay. All proposed
   acceptance remains UNEXECUTED; no further correction or implementation is authorized
   without an explicit extension. See `tool-approval-final-hold.md`. Independent
-  task-transfer design does not relax this hold or implement either control.
+  task-transfer design is also held and does not relax this hold or implement
+  either control.
 - Preserve PR #22's shared light-default/light-dark theme and tested layouts at
   320/390/768/1024/1440/3440px, topmost token rows, visible keyboard destinations
   and status-text/focus contrast. The old dark-only/1180px mobile limitation is

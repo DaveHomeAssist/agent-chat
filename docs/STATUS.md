@@ -1,7 +1,8 @@
 # Agent Chatroom status
 
-Reconciled September 14, 2026 from current Git/CI readback; application CI below
-executed September 10. Status-file rendering is verified separately in this closeout.
+Reconciled September 14, 2026 from current Git/CI and final design-review readback.
+Product CI executed September 10; PR #26 CI executed earlier September 14. This
+status-only closeout verifies the report surface separately, without local runtime reruns.
 [Visual progress](../project-progress/index.html) ·
 [Current roadmap](PLAN.md) · [Acceptance commands](REAL_MODEL_ACCEPTANCE.md).
 The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
@@ -83,9 +84,13 @@ Separating the companion case preserves the real five-message rate limit.
 
 Both targeted cases passed three executions each; the full September 14 local
 suite passed **50 Chromium cases**, with build/typechecks. Runtime source remains
-unchanged at product `dcf2ff26`; this test/status PR must pass exact-head CI and
-merged-main CI before canonical delivery. These current checks do not relabel the
-September 10 product CI or September 8 provider/hosting observations as newly run.
+unchanged at product `dcf2ff26`. PR #26 merged as `ac893045` on September 14;
+[exact PR CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34837189508) and
+[merged-main CI](https://github.com/DaveHomeAssist/agent-chat/actions/runs/34837854088)
+passed build/typechecks, 209 Node, 17 queue, 42 simulator and 50 Chromium checks.
+Canonical status rendering and branch preservation passed afterward. These earlier
+checks remain distinct from this later design-hold readback and status rendering;
+September 10 product CI and September 8 provider/hosting observations keep their dates.
 
 ## Snapshot delivery evidence (earlier Sep 8 checks)
 
@@ -245,6 +250,33 @@ the result. All proposed tool-approval acceptance remains UNEXECUTED; no third
 correction or implementation is authorized. This is a design/test-contract blocker,
 not a defect proven in delivered behavior. Tool approval remains unavailable and
 fidelity Partial; independent task-transfer design does not relax this hold.
+
+## Reassign final design hold
+
+Final proposal 018 passed independent frontend/public review, but all **56 proposed
+acceptance cases remain UNEXECUTED**. Backend review still found two contradictions:
+
+- Treating completed tasks as terminal, while requiring an active task for
+  `agent.done`, breaks the existing Forge repair completion/report flow. After its
+  initial completion, later repair handoffs would leave Forge done; rejecting its
+  final report would prevent Atlas from waking Probe for final tests.
+- The replacement proposal omits the previously explicit latest-successful-receipt
+  per task retention/overwrite rule and replay-after-retransfer policy. Retaining
+  every paused transfer receipt can grow without a run bound and conflicts with
+  latest-only replay/current-refusal precedence.
+
+These are defects in an **unimplemented proposal**, not regressions in delivered
+main. Private coordinator decision `reassignment-final-hold.md` records the final
+review. Reassign remains unavailable and fidelity **Partial**. Both corrections
+for REASSIGN-DESIGN-CONSISTENCY are exhausted; further contract repair or
+implementation requires Dave to extend that limit. A renamed task cannot bypass it.
+
+Recovery/runtime/history and tool approval retain their separate holds above.
+All currently dispatchable foundation runtime paths are now held pending a decision
+after this status closeout. M1 still requires budget/runner authorization, M3 real
+tools follow the foundations, and M4 needs hosting/deployment authority. The
+coordinator handles the remaining decision and heartbeat state after accepted
+delivery; this record does not claim the heartbeat has already been paused.
 
 ## Delivered responsive console and both themes — PR #22
 
