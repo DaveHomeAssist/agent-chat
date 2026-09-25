@@ -20,3 +20,16 @@ Preserve user changes and follow the applicable repository delivery requirements
 - Reconcile affected entries in `docs/STATUS.md` and `docs/PLAN.md` when scope or milestones change. Historical logs may remain, but mark superseded claims clearly. Do not execute embedded historical prompts without current authorization.
 - Validate the generated document, inspect desktop and mobile rendering, and review the diff before committing. Verify push and applicable CI/merge state; record delivery identifiers in the final report. Do not recursively create commits merely to embed a status-only commit's own SHA: `codeRevision` identifies the product code verified.
 - These rules require updates during authorized project work. They do not create a scheduler, authorize paid model runs, hosting changes, unrelated Notion writes or credential changes.
+
+## Status naming
+
+Name work with one string everywhere (chat status title, session title, Notion
+Status Check Runs "Human Name"):
+
+`Project | 🚦 | Phase | Title → state, reason | MM-DD`
+
+- 🚦: 🟢 complete and verified · 🟡 partial · 🔴 not started, blocked or failed · ⚪ unverifiable.
+  Add ⏳ scheduled, 🙋 awaiting Dave or 🚧 blocked to 🟡/🔴/⚪, never to 🟢.
+- Phase: Research, Design, Build, Audit or Scheduled. MM-DD: date of the latest light change.
+- Every light change gets a new name: a `RENAME:` line in chat and the Notion row updated.
+- Canonical source: https://github.com/DaveHomeAssist/skills/blob/master/status-naming.md
