@@ -4,6 +4,10 @@ For work under `/Users/daverobertson/Code`, read the shared contract at
 `/Users/daverobertson/Code/ops-hub/90-governance/WORKSPACE_OPERATING_RULES.md` first.
 Preserve user changes and follow the applicable repository delivery requirements.
 
+## Workspace contract
+
+Read `~/Code/ops-hub/90-governance/WORKSPACE_OPERATING_RULES.md` before project rules, including COMMS (one entry on the shared Agent Communications Page per session).
+
 ## Coordinated executor work
 
 - When dispatched through the local coordination queue, read `coordination/README.md`, `coordination/WORKER.md` and `coordination/ORCHESTRATOR.md`. The queue records assignments and reports; it does not replace Dave's current instructions or authorize paid calls.
