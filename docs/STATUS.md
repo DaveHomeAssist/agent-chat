@@ -26,7 +26,7 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Responsive light/dark console | [PR #22](https://github.com/DaveHomeAssist/agent-chat/pull/22), merged Sep 8 as `8419cb9`; 41 Chromium cases and independent presentation review pass |
 | Client command admission, draft protection and bounded refresh | [PR #24](https://github.com/DaveHomeAssist/agent-chat/pull/24), externally merged Sep 10 as `dcf2ff26`; corrected source independently accepted, 209 Node / 49 Chromium product CI passes |
 
-## Anthropic acceptance path: October 14 (branch, not yet merged)
+## Anthropic acceptance path: October 14 (merged as PR #29)
 
 - Branch `m1-anthropic-runner`, product commit `98d0bc604894fe21c160516f6882beda09969fea`, built on `55b465e`.
   `npm run smoke:real` now requires `LLM_PROVIDER=anthropic` or `openai` plus that
@@ -45,7 +45,7 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   unmodified `55b465e` run in the same environment passed 49 of 50. Failures were
   different 12–13 second timing cases each run, the client bundle is byte-identical to
   main and mock-mode models and costs are unchanged, so CI remains the browser gate.
-- No push, CI, merge or paid request has occurred for this branch. M1 stays Partial.
+- Merged October 14 via [PR #29](https://github.com/DaveHomeAssist/agent-chat/pull/29) as `d5fff04` after the `validate` CI job passed. No paid request has occurred. M1 stays Partial.
 
 ## Current command delivery — PR #24
 
