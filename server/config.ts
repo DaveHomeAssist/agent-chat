@@ -109,7 +109,11 @@ function models(env: NodeJS.ProcessEnv, llm: Provider): Record<AgentId, string> 
   const out = {} as Record<AgentId, string>
   for (const id of AGENT_IDS) {
     const name = `AGENT_MODEL_${id.toUpperCase()}`
-    const v = raw(name, env) ?? (llm === 'openai' ? raw('OPENAI_MODEL', env) ?? OPENAI_MODEL : DEFAULT_MODEL)
+    const v = raw(name, env) ?? (
+      llm === 'openai' ? raw('OPENAI_MODEL', env) ?? OPENAI_MODEL
+      : llm === 'anthropic' ? raw('ANTHROPIC_MODEL', env) ?? DEFAULT_MODEL
+      : DEFAULT_MODEL
+    )
     if (!/^[A-Za-z0-9._:-]+$/.test(v)) throw new Error(`${name} is not a valid model id: "${v}"`)
     out[id] = v
   }

@@ -153,7 +153,7 @@
       "phase": "M1",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Runner verified offline and one useful paid proposal completed. Two consecutive five-agent OpenAI passes remain pending explicit budgets and runner configuration.",
+      "notes": "Runner verified offline and one useful paid proposal completed. Oct 14: the runner also accepts Anthropic at 98d0bc60 (branch m1-anthropic-runner, not yet pushed): explicit LLM_PROVIDER and that provider's key, exact pricing for configured and served models, 5.5 rates. Local offline evidence: 216 Node, 17 queue, 42 simulator, build/typechecks; local Chromium runs were timing-flaky on main and branch alike, so CI remains the browser gate. Two consecutive live five-agent passes remain pending explicit budgets.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/4042e3485b0e7a4ed17eedd4a7fcb3f1d80d435d/docs/REAL_MODEL_ACCEPTANCE.md"
     },
     {

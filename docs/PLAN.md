@@ -122,8 +122,11 @@ All future completion dates are unscheduled.
 ## M1 execution contract
 
 See [Real model acceptance](REAL_MODEL_ACCEPTANCE.md) for commands and report format.
-The initial runner targets the already-supported OpenAI provider/model. It does not
-change the application's default provider or add a Codex repository execution adapter.
+The initial runner targeted the already-supported OpenAI provider/model. As of
+October 14 it also accepts the application's default Anthropic provider; the paid
+run must name `LLM_PROVIDER` and that provider's key, and every configured or served
+model must have exact pricing. It does not change the application's default provider
+or model, or add a Codex repository execution adapter.
 
 Provider access was demonstrated by one separately authorized useful request on
 Sep 8. It does not authorize additional calls or replace the following two-run gate.

@@ -3,23 +3,31 @@ import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { PERSONAS } from '../server/agents.js'
 import { loadConfig, type ServerConfig } from '../server/config.js'
-import type { LLM } from '../server/contracts.js'
+import { LLMRequestError, type LLM } from '../server/contracts.js'
+import { hasExactPricing } from '../server/llm/pricing.js'
 import { createOrchestrator } from '../server/orchestrator.js'
 import { createRunStore } from '../server/run.js'
 import { createToolRegistry } from '../server/tools.js'
 import { createWorkspace } from '../server/workspace.js'
 import { AGENT_IDS, type RunSnapshot } from '../shared/protocol.js'
 
+/** Paid providers the runner accepts, with the one credential each must be given explicitly. */
+export const ACCEPTANCE_KEYS = { anthropic: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY' } as const
+export type AcceptanceProvider = keyof typeof ACCEPTANCE_KEYS
+
 export function acceptanceConfig(env: NodeJS.ProcessEnv): ServerConfig {
-  const missing = ['OPENAI_API_KEY', 'RUN_BUDGET_USD', 'LIFETIME_BUDGET_USD'].filter(key => !env[key]?.trim())
+  const requested = env.LLM_PROVIDER?.trim()
+  // A paid run names its provider; the app's default never silently selects whose account is billed.
+  if (requested && !Object.hasOwn(ACCEPTANCE_KEYS, requested)) throw new Error('smoke:real requires LLM_PROVIDER=anthropic or LLM_PROVIDER=openai')
+  const provider = requested as AcceptanceProvider | undefined
+  const missing = [...(provider ? [ACCEPTANCE_KEYS[provider]] : ['LLM_PROVIDER']), 'RUN_BUDGET_USD', 'LIFETIME_BUDGET_USD'].filter(key => !env[key]?.trim())
   if (missing.length) throw new Error(`Missing required environment variables: ${missing.join(', ')}`)
-  if (env.LLM_PROVIDER && env.LLM_PROVIDER !== 'openai') throw new Error('smoke:real requires LLM_PROVIDER=openai')
   if (env.MOCK_LLM && !['0', 'false', 'off', 'no'].includes(env.MOCK_LLM.toLowerCase())) throw new Error('smoke:real refuses MOCK_LLM')
   // Deliberately excludes ambient hosting, autostart and .env settings.
   const selected: NodeJS.ProcessEnv = {
-    LLM_PROVIDER: 'openai', AUTO_START: '0', HOST: '127.0.0.1',
+    LLM_PROVIDER: provider, AUTO_START: '0', HOST: '127.0.0.1',
     RUN_BUDGET_USD: env.RUN_BUDGET_USD, LIFETIME_BUDGET_USD: env.LIFETIME_BUDGET_USD,
-    OPENAI_MODEL: env.OPENAI_MODEL, EFFORT: env.EFFORT ?? 'medium',
+    OPENAI_MODEL: env.OPENAI_MODEL, ANTHROPIC_MODEL: env.ANTHROPIC_MODEL, EFFORT: env.EFFORT ?? 'medium',
     MAX_TURNS_PER_AGENT: env.MAX_TURNS_PER_AGENT ?? '12',
     MAX_ITERATIONS_PER_TURN: env.MAX_ITERATIONS_PER_TURN ?? '12',
   }
@@ -28,6 +36,9 @@ export function acceptanceConfig(env: NodeJS.ProcessEnv): ServerConfig {
   let config: ServerConfig
   try { config = loadConfig(selected) } catch { throw new Error('Invalid acceptance configuration; check model, effort, positive budgets and integer turn limits') }
   if (config.lifetimeBudgetUsd < config.budgetUsd) throw new Error('LIFETIME_BUDGET_USD must be at least RUN_BUDGET_USD')
+  // Acceptance records spend as evidence, so every configured model needs its own published rates.
+  const unpriced = AGENT_IDS.filter(id => !hasExactPricing(config.models[id]))
+  if (unpriced.length) throw new Error(`No exact pricing for the model configured for ${unpriced.join(', ')}; add it to server/llm/pricing.ts before a paid run`)
   return config
 }
 
@@ -46,6 +57,8 @@ interface RunReport {
   costUsd: number
   cumulativeCostUsd: number
   unreportedRequests: number
+  /** Served models without exact pricing; any entry means the recorded spend is not evidence. */
+  unpricedModels: string[]
   accountingComplete: boolean
   elapsedMs: number
   requests: Record<string, number>
@@ -58,7 +71,7 @@ export interface AcceptanceResult {
   revision: string
   directory: string
   reports: RunReport[]
-  settings: { models: ServerConfig['models']; effort: string; runBudgetUsd: number; lifetimeBudgetUsd: number; timeoutMs: number }
+  settings: { provider: AcceptanceProvider; models: ServerConfig['models']; effort: string; runBudgetUsd: number; lifetimeBudgetUsd: number; timeoutMs: number }
 }
 interface Options {
   config: ServerConfig
@@ -75,7 +88,8 @@ interface Options {
 /** Runs two consecutive attempts, stopping on the first failure. No HTTP listener or automatic merge. */
 export async function runAcceptance(options: Options): Promise<AcceptanceResult> {
   const { config } = options
-  if (config.llm !== 'openai') throw new Error('Acceptance requires the OpenAI provider')
+  if (!Object.hasOwn(ACCEPTANCE_KEYS, config.llm)) throw new Error('Acceptance requires the Anthropic or OpenAI provider')
+  const providerKind = config.llm as AcceptanceProvider
   const timeoutMs = options.timeoutMs ?? 25 * 60_000
   const drainMs = options.drainMs ?? 1500
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0 || !Number.isFinite(drainMs) || drainMs < 0) throw new Error('Invalid runner time limits')
@@ -83,7 +97,7 @@ export async function runAcceptance(options: Options): Promise<AcceptanceResult>
   const directory = mkdtempSync(join(options.outputDir, 'acceptance-'))
   const safe = (value: unknown) => redact(JSON.stringify(value), options.secrets)
   const save = (name: string, value: unknown) => writeFileSync(join(directory, name), safe(value) + '\n', { mode: 0o600 })
-  const result: AcceptanceResult = { proof: options.proof, passed: false, revision: options.revision, directory, reports: [], settings: { models: config.models, effort: config.effort, runBudgetUsd: config.budgetUsd, lifetimeBudgetUsd: config.lifetimeBudgetUsd, timeoutMs } }
+  const result: AcceptanceResult = { proof: options.proof, passed: false, revision: options.revision, directory, reports: [], settings: { provider: providerKind, models: config.models, effort: config.effort, runBudgetUsd: config.budgetUsd, lifetimeBudgetUsd: config.lifetimeBudgetUsd, timeoutMs } }
   const store = createRunStore(PERSONAS, config.models)
   save('result.json', { ...result, state: 'running', startedAt: new Date().toISOString() })
 
@@ -91,15 +105,25 @@ export async function runAcceptance(options: Options): Promise<AcceptanceResult>
     const started = Date.now()
     const workspace = createWorkspace()
     const provider = options.provider()
-    if (provider.kind !== 'openai') throw new Error('Acceptance refuses a mock provider identity')
+    if (provider.kind !== providerKind) throw new Error('Acceptance provider identity does not match LLM_PROVIDER')
     const requests = Object.fromEntries(AGENT_IDS.map(id => [id, 0]))
+    const unpriced = new Set<string>()
+    const notePricing = (model: string | undefined) => { if (model !== undefined && !hasExactPricing(model)) unpriced.add(model) }
     let pending = 0, writeError = false, bytes = 0
     const llm: LLM = {
-      kind: 'openai', healthcheck: model => provider.healthcheck(model),
+      kind: providerKind, healthcheck: model => provider.healthcheck(model),
       async complete(request) {
         requests[request.agent]++
         pending++
-        try { return await provider.complete(request) } finally { pending-- }
+        try {
+          const result = await provider.complete(request)
+          // A server-side fallback can bill a model the configuration never named.
+          notePricing(result.usage?.model)
+          return result
+        } catch (error) {
+          if (error instanceof LLMRequestError) notePricing(error.usage?.model)
+          throw error
+        } finally { pending-- }
       },
     }
     const orchestrator = createOrchestrator({ config, store, workspace, tools: createToolRegistry(), llm, personas: PERSONAS })
@@ -114,7 +138,7 @@ export async function runAcceptance(options: Options): Promise<AcceptanceResult>
         appendFileSync(transcript, line)
       } catch { writeError = true }
     }
-    store.reset({ status: 'idle', llm: 'openai', approvalGate: true })
+    store.reset({ status: 'idle', llm: providerKind, approvalGate: true })
     record({ type: 'snapshot', snapshot: store.snapshot() })
     const unsubscribe = store.subscribe(record)
     let reason = '', ready = false
@@ -131,7 +155,7 @@ export async function runAcceptance(options: Options): Promise<AcceptanceResult>
         else if (problem) reason = `Healthcheck: ${problem}`
       }
       if (!reason) {
-        store.setRun({ approvalGate: true, llm: 'openai' })
+        store.setRun({ approvalGate: true, llm: providerKind })
         await orchestrator.start()
         while (true) {
           const snapshot = store.snapshot()
@@ -139,6 +163,7 @@ export async function runAcceptance(options: Options): Promise<AcceptanceResult>
           if (options.signal?.aborted) { reason = 'Interrupted'; break }
           if (snapshot.run.status === 'failed') { reason = snapshot.run.error ?? 'Run failed'; break }
           if (snapshot.stats.unreportedRequests > 0) { reason = 'Usage unknown; acceptance cannot establish spend'; break }
+          if (unpriced.size) { reason = 'Usage billed to a model without exact pricing; acceptance cannot establish spend'; break }
           if (store.lifetimeCostUsd() >= config.lifetimeBudgetUsd) { reason = 'Cumulative budget reached'; break }
           if (Date.now() - started >= timeoutMs) { reason = 'Run timeout'; break }
           // A status transition alone is insufficient: wait for all provider calls and their usage.
@@ -163,18 +188,19 @@ export async function runAcceptance(options: Options): Promise<AcceptanceResult>
     }
     const snapshot = store.snapshot()
     const accountingComplete = pending === 0 && snapshot.stats.unreportedRequests === 0
-    const passed = ready && accountingComplete && !writeError && snapshot.stats.costUsd < config.budgetUsd && store.lifetimeCostUsd() < config.lifetimeBudgetUsd
+    const passed = ready && accountingComplete && !unpriced.size && !writeError && snapshot.stats.costUsd < config.budgetUsd && store.lifetimeCostUsd() < config.lifetimeBudgetUsd
     if (!accountingComplete) reason = 'Outstanding requests or missing usage; spend is a lower bound'
+    else if (unpriced.size) reason = 'Usage billed to a model without exact pricing; acceptance cannot establish spend'
     if (writeError) reason = 'Transcript write failed or exceeded 50 MiB'
     const report: RunReport = {
       attempt, runId: snapshot.run.id, passed, reason: redact(reason, options.secrets), status: snapshot.run.status,
       costUsd: snapshot.stats.costUsd, cumulativeCostUsd: store.lifetimeCostUsd(),
-      unreportedRequests: snapshot.stats.unreportedRequests, accountingComplete, elapsedMs: Date.now() - started,
+      unreportedRequests: snapshot.stats.unreportedRequests, unpricedModels: [...unpriced], accountingComplete, elapsedMs: Date.now() - started,
       requests, agents: snapshot.agents.map(a => ({ id: a.id, status: a.status, subtask: a.subtask, toolCalls: a.tools.length })), snapshot,
     }
     result.reports.push(report)
     save(`run-${attempt}.json`, report)
-    const markdown = [`# Acceptance attempt ${attempt}: ${passed ? 'PASS' : 'FAIL'}`, '', `Proof: ${options.proof}; revision: ${options.revision}`, `Run: ${report.runId}`, `Result: ${reason}`, `Reported cost: $${report.costUsd.toFixed(6)}; cumulative: $${report.cumulativeCostUsd.toFixed(6)}`, `Accounting complete: ${accountingComplete}; unknown requests: ${report.unreportedRequests}`, `Elapsed: ${report.elapsedMs} ms`, `Tokens: input ${snapshot.stats.inputTokens}, output ${snapshot.stats.outputTokens}, cache read ${snapshot.stats.cacheReadTokens}, cache write ${snapshot.stats.cacheWriteTokens}`, '', '| Agent | Model requests | Tool calls | State / last task |', '| --- | ---: | ---: | --- |', ...report.agents.map(a => `| ${a.id} | ${requests[a.id]} | ${a.toolCalls} | ${a.status}: ${a.subtask.replace(/[|\r\n]/g, ' ')} |`), '', 'All repository operations are simulated. Reported usage limits can overshoot during concurrent requests. Raw provider request/response objects and reasoning continuation are not recorded.', '']
+    const markdown = [`# Acceptance attempt ${attempt}: ${passed ? 'PASS' : 'FAIL'}`, '', `Proof: ${options.proof}; provider: ${providerKind}; revision: ${options.revision}`, `Run: ${report.runId}`, `Models: ${AGENT_IDS.map(id => `${id}=${config.models[id]}`).join(', ')}; effort ${config.effort}`, `Result: ${reason}`, `Reported cost: $${report.costUsd.toFixed(6)}; cumulative: $${report.cumulativeCostUsd.toFixed(6)}`, `Accounting complete: ${accountingComplete}; unknown requests: ${report.unreportedRequests}; unpriced models: ${report.unpricedModels.join(', ') || 'none'}`, `Elapsed: ${report.elapsedMs} ms`, `Tokens: input ${snapshot.stats.inputTokens}, output ${snapshot.stats.outputTokens}, cache read ${snapshot.stats.cacheReadTokens}, cache write ${snapshot.stats.cacheWriteTokens}`, '', '| Agent | Model requests | Tool calls | State / last task |', '| --- | ---: | ---: | --- |', ...report.agents.map(a => `| ${a.id} | ${requests[a.id]} | ${a.toolCalls} | ${a.status}: ${a.subtask.replace(/[|\r\n]/g, ' ')} |`), '', 'All repository operations are simulated. Reported usage limits can overshoot during concurrent requests. Raw provider request/response objects and reasoning continuation are not recorded.', '']
     writeFileSync(join(directory, `run-${attempt}.md`), redact(markdown.join('\n'), options.secrets), { mode: 0o600 })
     save('result.json', { ...result, state: 'running' })
     if (!passed) break
