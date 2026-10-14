@@ -26,6 +26,27 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Responsive light/dark console | [PR #22](https://github.com/DaveHomeAssist/agent-chat/pull/22), merged Sep 8 as `8419cb9`; 41 Chromium cases and independent presentation review pass |
 | Client command admission, draft protection and bounded refresh | [PR #24](https://github.com/DaveHomeAssist/agent-chat/pull/24), externally merged Sep 10 as `dcf2ff26`; corrected source independently accepted, 209 Node / 49 Chromium product CI passes |
 
+## Anthropic acceptance path: October 14 (branch, not yet merged)
+
+- Branch `m1-anthropic-runner`, product commit `98d0bc604894fe21c160516f6882beda09969fea`, built on `55b465e`.
+  `npm run smoke:real` now requires `LLM_PROVIDER=anthropic` or `openai` plus that
+  provider's own key; Anthropic runs bill the exported `ANTHROPIC_API_KEY` only.
+- `server/llm/pricing.ts` adds Claude Opus 5.5, Sonnet 5.5 and Haiku 5.5 (100k
+  long-prompt tier) with per-model cache-hit multipliers, checked against published
+  rates October 14. Acceptance refuses configured models without exact pricing and
+  fails a run whose usage reports an unpriced served model (for example a fallback).
+- `ANTHROPIC_MODEL` sets the Anthropic default. The application default remains
+  `claude-opus-5`: on Opus 5.5, text between tool calls arrives in thinking blocks
+  that stay empty unless `thinking.display` is set, which would silence console
+  narration. That migration is separate work.
+- Local offline evidence October 14: build/typechecks, 216 Node tests (7 new; the
+  6 affected cases fail against the previous source), 17 queue tests and 42
+  simulator checks. Two local Chromium runs on the branch passed 49 and 47 of 50; an
+  unmodified `55b465e` run in the same environment passed 49 of 50. Failures were
+  different 12–13 second timing cases each run, the client bundle is byte-identical to
+  main and mock-mode models and costs are unchanged, so CI remains the browser gate.
+- No push, CI, merge or paid request has occurred for this branch. M1 stays Partial.
+
 ## Current command delivery — PR #24
 
 - DaveHomeAssist merged [PR #25](https://github.com/DaveHomeAssist/agent-chat/pull/25)
