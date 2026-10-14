@@ -139,6 +139,7 @@ npm start          # one process: serves dist/ and the API on PORT
 | `OPENAI_API_KEY` | — | Server-only OpenAI credentials. |
 | `OPENAI_MODEL` | `gpt-5.6-sol` | Default model only when OpenAI is selected; the sole supported OpenAI profile. |
 | `ANTHROPIC_API_KEY` | — | Credentials. `ANTHROPIC_AUTH_TOKEN` and an `ant auth login` profile also work. |
+| `ANTHROPIC_MODEL` | `claude-opus-5` | Default model only when Anthropic is selected. `AGENT_MODEL_*` still overrides per agent. |
 | `MOCK_LLM` | off | `1`/`true` drives the run with the scripted mock instead of a model. |
 | `RUN_BUDGET_USD` | `5` | Reported-usage limit per run, must be > 0. The run stops (`failed`) when reached; in-flight requests may overshoot. |
 | `LIFETIME_BUDGET_USD` | 4 × `RUN_BUDGET_USD` | Cumulative ceiling across every run of the process, must be > 0. `POST /api/run/start` is refused (403) once reached. |
