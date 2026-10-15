@@ -56,6 +56,13 @@ export interface Config {
    * more turns than any worker; defaults to `maxTurnsPerAgent` when unset.
    */
   maxTurnsOrchestrator: number
+  /**
+   * IDLE_RUN_FAILS_AFTER_MS — a live run whose agents are all idle or blocked with
+   * nothing queued for this long ends as `failed`. 0 (the default) keeps the run
+   * waiting for a human, which the interactive console wants; the headless
+   * acceptance runner has no human and sets it.
+   */
+  idleRunFailsAfterMs: number
   /** Multiplier on the mock driver's artificial delays (1 = designed pacing, 0 = instant). */
   mockSpeed: number
   /** Start the run as soon as the server boots. Default: true in mock, false with a real key. */
