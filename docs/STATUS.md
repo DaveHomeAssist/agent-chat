@@ -26,6 +26,31 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Responsive light/dark console | [PR #22](https://github.com/DaveHomeAssist/agent-chat/pull/22), merged Sep 8 as `8419cb9`; 41 Chromium cases and independent presentation review pass |
 | Client command admission, draft protection and bounded refresh | [PR #24](https://github.com/DaveHomeAssist/agent-chat/pull/24), externally merged Sep 10 as `dcf2ff26`; corrected source independently accepted, 209 Node / 49 Chromium product CI passes |
 
+## First paid M1 run: October 14 (failed)
+
+- Executed by Dave at 19:33 EDT on code `4886bc7` with `LLM_PROVIDER=anthropic`,
+  `ANTHROPIC_MODEL=claude-opus-5-5` (all five agents), effort medium, `RUN_BUDGET_USD=5`,
+  `LIFETIME_BUDGET_USD=12`, a fresh key. Result: **FAIL, 0/2 runs accepted**. Run 1 timed
+  out at 25 minutes with $3.490878 reported, 109 model requests, 187 tool calls,
+  accounting complete, no unreported requests, no unpriced models. Run 2 never started.
+  Reports: `runs/acceptance-lTW5Xf/` (private, untracked). The key should be revoked now that the run is over.
+- The agents worked for 9 min 15 s (ADR written, three simulated pushes `3935ac9`,
+  `8a73489`, `0688dad`, test phase reached) and then every agent sat idle for
+  15 min 44 s until the timeout. Two causes, both in this repository:
+  1. **Atlas wake cap.** `scripts/real-acceptance.ts` sets `MAX_TURNS_PER_AGENT=12`
+     (app default 60). Atlas used its 12 wakes by 19:41:34; Forge's final `done`
+     and two `blocked` reports then queued to an orchestrator that could not run,
+     so the run could never reach review, ship or `needs_approval`.
+  2. **Simulator layout coupling.** `server/workspace.ts` fails all 24 e2e cases with
+     404 unless `services/auth/webauthn/register.ts` and `verify.ts` exist. The agent
+     briefs name the goal, not the layout; Vector's ADR and Forge's code used
+     `services/auth/passkey/*` and `/auth/passkey/*`, so Probe correctly reported the
+     0/24 result as a stale suite and blocked. A green suite was unreachable.
+- Also observed: one Anthropic content refusal on Probe's first code read (Atlas
+  reassigned and continued); Forge hit the 12-calls-per-turn cap once.
+- M1 is **Blocked** until the wake cap and the layout coupling are addressed. The
+  $3.49 is evidence of the failure path and complete accounting, not of acceptance.
+
 ## Anthropic acceptance path: October 14 (merged as PR #29)
 
 - Branch `m1-anthropic-runner`, product commit `98d0bc604894fe21c160516f6882beda09969fea`, built on `55b465e`.

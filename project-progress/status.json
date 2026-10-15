@@ -149,12 +149,12 @@
     {
       "id": "m1",
       "title": "Real model acceptance",
-      "status": "Partial",
+      "status": "Blocked",
       "phase": "M1",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "Runner verified offline and one useful paid proposal completed. Oct 14: the runner also accepts Anthropic at 98d0bc60 (PR #29, merged Oct 14 as d5fff04 with CI validate passing): explicit LLM_PROVIDER and that provider's key, exact pricing for configured and served models, 5.5 rates. Local offline evidence: 216 Node, 17 queue, 42 simulator, build/typechecks; local Chromium runs were timing-flaky on main and branch alike, so CI remains the browser gate. Two consecutive live five-agent passes remain pending explicit budgets.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/4042e3485b0e7a4ed17eedd4a7fcb3f1d80d435d/docs/REAL_MODEL_ACCEPTANCE.md"
+      "notes": "First paid run Oct 14 (Anthropic, claude-opus-5-5 x5, medium, $5/$12 caps) on code 4886bc7 FAILED: run 1 timed out at 25 min after $3.49, 109 requests, 187 tool calls, accounting complete, 0 unpriced models. Agents worked 9 min 15 s (three simulated pushes, test phase reached) then idled 15 min 44 s: Atlas hit the acceptance runner's 12-wake cap at 19:41:34 so later done/blocked reports were never handled, and the simulated e2e suite passes only services/auth/webauthn/{register,verify}.ts while the agents built services/auth/passkey/*, so the suite could not go green. Probe also hit one Anthropic content refusal (recovered by reassignment). Earlier: runner accepts Anthropic at 98d0bc60 (PR #29), 216 Node/17 queue/42 simulator offline. Reports: runs/acceptance-lTW5Xf (private, untracked). Fix needed before the next paid run.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/STATUS.md#first-paid-m1-run-october-14-failed"
     },
     {
       "id": "budget",
