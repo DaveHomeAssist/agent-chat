@@ -20,6 +20,7 @@ function fixture(t: { after(fn: () => void): void }, selected: NodeJS.ProcessEnv
 
 test('acceptance preflight requires explicit credentials and budgets and refuses mock selection', () => {
   assert.throws(() => acceptanceConfig({}), /LLM_PROVIDER, RUN_BUDGET_USD, LIFETIME_BUDGET_USD/)
+  assert.equal(acceptanceConfig({ LLM_PROVIDER: 'openai', OPENAI_API_KEY: 'offline-only', RUN_BUDGET_USD: '1', LIFETIME_BUDGET_USD: '3' }).idleRunFailsAfterMs, 60_000, 'headless runs end instead of waiting for a human')
   assert.throws(() => acceptanceConfig({ OPENAI_API_KEY: 'offline-only', RUN_BUDGET_USD: '1', LIFETIME_BUDGET_USD: '3' }), /LLM_PROVIDER/)
   assert.throws(() => acceptanceConfig({ ...env, MOCK_LLM: '1' }), /refuses MOCK/)
   assert.throws(() => acceptanceConfig({ ...env, LLM_PROVIDER: 'mock' }), /requires LLM_PROVIDER/)

@@ -62,6 +62,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     maxIterationsPerTurn: integer('MAX_ITERATIONS_PER_TURN', env, 24, { min: 1 }),
     maxTurnsPerAgent,
     maxTurnsOrchestrator: integer('MAX_TURNS_ORCHESTRATOR', env, maxTurnsPerAgent, { min: 1 }),
+    idleRunFailsAfterMs: integer('IDLE_RUN_FAILS_AFTER_MS', env, 0, { min: 0 }),
     mockSpeed: number('MOCK_SPEED', env, 1, { min: 0 }),
     autoStart: autoStartFlag ?? llm === 'mock',
     staticDir: staticDir(env),

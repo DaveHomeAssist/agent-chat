@@ -126,6 +126,8 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   let disposed = false
   let runners = new Map<AgentId, Runner>()
   let ticker: NodeJS.Timeout | null = null
+  /** Armed when every agent is idle with nothing queued; fires `failIdle` after the configured grace. */
+  let idleTimer: NodeJS.Timeout | null = null
   const inFlight = new Set<AgentId>()
   let approvedRevision: number | null = null
   let pendingMergeRevision: number | null = null
@@ -229,6 +231,36 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     ticker = null
   }
 
+  function disarmIdle(): void {
+    if (idleTimer) clearTimeout(idleTimer)
+    idleTimer = null
+  }
+
+  /** True when no turn is running and no agent has a wake queued. */
+  const nothingQueued = (): boolean => ![...runners.values()].some((r) => r.busy || r.inbox.length)
+
+  /**
+   * A live run whose agents are all idle or blocked with nothing queued is waiting
+   * for a human. The console can wait; a headless run (IDLE_RUN_FAILS_AFTER_MS > 0)
+   * cannot, so after the grace period it ends as failed, quoting the last thing
+   * Atlas said, which in practice names the escalation.
+   */
+  function armIdle(): void {
+    disarmIdle()
+    if (!config.idleRunFailsAfterMs || disposed || runInfo().status !== 'live' || !nothingQueued()) return
+    const g = gen
+    idleTimer = setTimeout(() => {
+      idleTimer = null
+      if (!fresh(g) || runInfo().status !== 'live' || !nothingQueued()) return
+      const last = [...store.snapshot().thread].reverse().find((i) => i.kind === 'message' && i.who === 'atlas')
+      const said = last && last.kind === 'message' ? ` Last from Atlas: ${JSON.stringify(clip(oneLine(last.body), 240))}` : ''
+      const secs = Math.round(config.idleRunFailsAfterMs / 1000)
+      store.agentLog('atlas', 'FAIL', `run idle · every agent idle or blocked with nothing queued for ${secs}s`)
+      failRun(`Run idle: every agent is idle or blocked with nothing queued for ${secs}s and no human is attending.${said}`)
+    }, config.idleRunFailsAfterMs)
+    idleTimer.unref?.()
+  }
+
   /** Ends the run as failed. Idempotent: a run that has already ended keeps its outcome. */
   function failRun(error: string): void {
     if (runEnded()) return
@@ -240,6 +272,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     abortAll()
     release()
     stopTicker()
+    disarmIdle()
     approvedRevision = null
     pendingMergeRevision = null
     store.setRun({ status, ...(error ? { error } : {}) })
@@ -290,6 +323,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
   function enqueue(id: AgentId, wake: Wake, front = false): void {
     const r = runners.get(id)
     if (!r) return
+    disarmIdle()
     if (!runActive()) {
       if (runEnded()) store.agentLog(id, 'INFO', `run ${runInfo().status} · ${wake.tag} wake dropped`)
       return
@@ -330,7 +364,10 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     } finally {
       r.busy = false
     }
-    if (fresh(g)) checkStalled()
+    if (fresh(g)) {
+      checkStalled()
+      armIdle()
+    }
   }
 
   // ---- wake message ---------------------------------------------------------
@@ -987,6 +1024,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
       abortAll()
       release()
       stopTicker()
+      disarmIdle()
     },
   }
 

@@ -33,6 +33,9 @@ export function acceptanceConfig(env: NodeJS.ProcessEnv): ServerConfig {
     // separate: run 1 on October 14 spent 12 Atlas wakes in 8.5 minutes and then idled.
     MAX_TURNS_ORCHESTRATOR: env.MAX_TURNS_ORCHESTRATOR ?? '48',
     MAX_ITERATIONS_PER_TURN: env.MAX_ITERATIONS_PER_TURN ?? '12',
+    // Headless: nobody answers an escalation. Run 2 on October 15 had every agent idle
+    // for 12 minutes waiting on the operator before the 25-minute timeout.
+    IDLE_RUN_FAILS_AFTER_MS: env.IDLE_RUN_FAILS_AFTER_MS ?? '60000',
   }
   for (const id of AGENT_IDS) selected[`AGENT_MODEL_${id.toUpperCase()}`] = env[`AGENT_MODEL_${id.toUpperCase()}`]
   // Config errors can echo invalid values; report the setting name, never its value.

@@ -55,6 +55,25 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   `0043_webauthn` creating `webauthn_credentials(credential_id BYTEA …)`): 0/24 before,
   24/24 after. Browser CI remains the Chromium gate.
 
+## M1 simulator fidelity and idle-run failure: October 15 (offline evidence)
+
+- Fixes the two causes of the second paid run, offline only; M1 stays **Blocked**
+  until a paid run passes. Product change on this branch:
+  - `server/workspace.ts`: `pnpm e2e` collects every `test()`/`it()` the branch adds in
+    `e2e/` spec files (file, line, describe title, Playwright project), honours `--grep`
+    against those names, seeds per-case durations by the sha under test and tallies
+    the canonical 24 separately for the merge gate (`TestSummary.suite`); `pnpm test`
+    lists only the `*.test.ts` files in the tree with their real case counts.
+  - `server/orchestrator.ts`, `server/config.ts`, `scripts/real-acceptance.ts`:
+    `IDLE_RUN_FAILS_AFTER_MS` (console default 0, acceptance default 60000) ends a
+    live run whose agents are all idle or blocked with nothing queued, with a
+    `Run idle: …` reason quoting Atlas's last message.
+- Offline evidence, local, this commit: build/typechecks; 227 Node tests (5 new:
+  collected specs and `--grep`, step-rule grouping, real vitest listing, idle-run
+  failure on and off; the seed-404 test updated for the collected case); 17 queue
+  tests; 42 simulator selfchecks from source and from the built bundle. CI is the
+  browser gate.
+
 ## Second paid M1 run: October 15 (failed)
 
 - Executed by Dave at 00:38 EDT on `434a304` (main with PR #31) with the same settings

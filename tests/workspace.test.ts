@@ -134,7 +134,69 @@ test('the seed tree and non-passkey routes still fail every case with 404', asyn
   ws.write('services/auth/routes.ts', ws.read('services/auth/routes.ts')! + '\n// TODO: mount passkey routes\n')
   ws.push('notes only')
   const after = await ws.run('pnpm e2e')
-  assert.equal(after.tests?.failed, 24)
+  // The pushed passkey-login spec is collected and judged like the login group: 25 cases, all 404.
+  assert.equal(after.tests?.total, 25)
+  assert.equal(after.tests?.failed, 25)
+  assert.equal(ws.lastTests()?.suite.passed, 0)
+  assert.ok(after.tests?.failures.every((f) => /404 route not mounted/.test(f)), after.tests?.failures.join('\n'))
+})
+
+test('the suite collects the specs the branch pushes, so --grep on their names selects them', async () => {
+  const ws = createWorkspace()
+  buildRun1Layout(ws)
+  const before = await ws.run('pnpm e2e')
+  ws.write('e2e/playwright.config.ts', "export default { projects: [{ name: 'flag-on' }, { name: 'flag-off' }] }\n")
+  ws.write('e2e/passkey-flags.spec.ts', [
+    "import { test, expect } from '@playwright/test'",
+    "test.describe('passkey', () => {",
+    "  test('passkey.flag_off → 404', async () => { expect(1).toBe(1) })",
+    "  test('passkey.counter.zero_zero', async () => { expect(1).toBe(1) })",
+    "})",
+    "test('healthz still answers', async () => {})",
+    '',
+  ].join('\n'))
+  ws.push('probe specs')
+  const grep = await ws.run('pnpm e2e --grep passkey.flag_off')
+  assert.equal(grep.tests?.total, 1, grep.stdout)
+  assert.match(grep.stdout, /\[flag-on\] › e2e\/passkey-flags\.spec\.ts:3:3 › passkey › passkey\.flag_off → 404/)
+  assert.equal((await ws.run('pnpm e2e --grep healthz')).tests?.total, 1)
+  assert.equal((await ws.run('pnpm e2e --grep nothing-like-this')).tests?.total, 0)
+  const full = await ws.run('pnpm e2e')
+  assert.equal(full.tests?.total, 27, full.stdout)
+  assert.equal(full.tests?.failed, 0)
+  assert.deepEqual(ws.lastTests()?.suite, { passed: 24, total: 24 })
+  assert.equal(ws.lastTests()?.fullSuite, true)
+  assert.notEqual(before.stdout.split('\n').slice(4, 8).join('\n'), full.stdout.split('\n').slice(4, 8).join('\n'), 'per-case durations change with the sha under test')
+  ws.pr.review('sentry', 'approve', 'reviewed')
+  assert.equal(ws.pr.merge().ok, true, 'collected specs do not change the gate when the canonical suite is green')
+})
+
+test('a collected passkey spec is judged by the step rules of its group', async () => {
+  const ws = createWorkspace()
+  // Register mounted, login not: the canonical register cases pass, every login case fails 404, including the branch's own.
+  ws.write('services/auth/passkey/register.ts', "export const route = '/auth/passkey/register'\n")
+  assert.equal(ws.migrations.apply('0043_passkeys', 'CREATE TABLE passkeys (credential_id BYTEA);').ok, true)
+  ws.write('e2e/passkey-login.spec.ts', "test('passkey login via windows hello', async () => {})\ntest('healthz', async () => {})\n")
+  ws.push('register only')
+  const run = await ws.run('pnpm e2e')
+  assert.equal(run.tests?.total, 26)
+  assert.ok(run.tests?.failures.includes('passkey login via windows hello → 404 route not mounted'), run.tests?.failures.join('\n'))
+  assert.ok(!run.tests?.failures.some((f) => /^register\./.test(f) || /^healthz/.test(f)), run.tests?.failures.join('\n'))
+  assert.equal(ws.lastTests()?.suite.passed, 12)
+})
+
+test('pnpm test lists only the test files the tree holds and counts their cases', async () => {
+  const ws = createWorkspace()
+  const none = await ws.run('pnpm test')
+  assert.equal(none.exitCode, 0)
+  assert.match(none.stdout, /No test files found/)
+  assert.equal(none.tests?.total, 0)
+  assert.doesNotMatch(none.stdout, /services\/auth\/routes\.test\.ts/, 'no phantom file for a source file without a test')
+  ws.write('services/auth/passkeys/policy.test.ts', "import { it } from 'vitest'\nit('limits', () => {})\nit('ttl', () => {})\ntest.skip('later', () => {})\n")
+  const some = await ws.run('pnpm test')
+  assert.match(some.stdout, /✓ services\/auth\/passkeys\/policy\.test\.ts \(3 tests\)/)
+  assert.equal(some.tests?.total, 3)
+  assert.equal(some.stdout.split('\n').filter((l) => /\.test\.ts/.test(l)).length, 1)
 })
 
 test('replay and credential-id rules follow the pushed layout', async () => {

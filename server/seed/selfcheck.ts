@@ -96,7 +96,7 @@ async function main(): Promise<void> {
   const designed = ['register.reregister → 400 replay', 'login.windowsHello → cred_id mismatch']
   check('>= guard + TEXT column → the 2 designed failures', same(first.tests?.failures ?? [], designed), (first.tests?.failures ?? []).join(' | '))
   check('e2e names the sha it ran against', first.stdout.startsWith(`e2e on ${firstPush.sha}`) && first.stderr === '', first.stdout.split('\n')[0])
-  check('e2e duration reads like the design', /118\.4s/.test(first.stdout), /\(\d+\.\ds\)/.exec(first.stdout)?.[0])
+  check('e2e duration reads like the design', /\(1\d\d\.\ds\)/.test(first.stdout), /\(\d+\.\ds\)/.exec(first.stdout)?.[0])
   const trace = ws.artifact('trace-latest.zip') ?? ''
   check('trace artifact describes both failures', designed.every((f) => trace.includes(f)))
   check('--grep announces substring semantics in stdout', /grep: substring match/.test(first.stdout))

@@ -131,8 +131,12 @@ or model, or add a Codex repository execution adapter.
 October 14 run 1 on `4886bc7` failed (see [STATUS](STATUS.md#first-paid-m1-run-october-14-failed));
 its two causes, the shared Atlas wake cap and the simulator's fixed
 `services/auth/webauthn/*` layout, are fixed on `ce33f8c3` (stalled runs end as
-`failed`; the suite judges the pushed layout). The next paid run needs Dave's
-separate authorization.
+`failed`; the suite judges the pushed layout). October 15 run 2 on `434a304` failed
+(see [STATUS](STATUS.md#second-paid-m1-run-october-15-failed)): the agents judged the
+simulated test output fake and waited for an operator the headless runner lacks. The
+simulated `pnpm e2e`/`pnpm test` now report the branch's own specs and test files with
+per-sha timings, and `smoke:real` ends an all-idle run after `IDLE_RUN_FAILS_AFTER_MS`.
+The next paid run needs Dave's separate authorization.
 
 Provider access was demonstrated by one separately authorized useful request on
 Sep 8. It does not authorize additional calls or replace the following two-run gate.

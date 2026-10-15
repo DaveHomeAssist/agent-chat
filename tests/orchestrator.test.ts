@@ -491,8 +491,36 @@ test('MAX_TURNS_ORCHESTRATOR lets Atlas receive reports after the workers reach 
   assert.equal(h.store.snapshot().run.error, undefined)
 })
 
+test('IDLE_RUN_FAILS_AFTER_MS ends a live run whose agents all wait for a human', async (t) => {
+  // Atlas escalates to the operator and assigns nothing; Forge reports done. Nothing is dropped, every inbox empties.
+  const script = capScript({ atlas: [reply([assign('forge')]), reply([], 0, 'Operator, the test environment returns made-up results; only you can clear this.')], forge: [reply([tool('agent_done', { summary: 'routes pushed', io: [] })])] })
+  const h = harness(t, script, { env: { IDLE_RUN_FAILS_AFTER_MS: '30' } })
+  assert.equal(h.config.idleRunFailsAfterMs, 30)
+  await h.orchestrator.start()
+  await until(() => h.store.snapshot().run.status === 'failed', 'the idle run to fail')
+  const { run, agents } = h.store.snapshot()
+  assert.match(run.error ?? '', /^Run idle: every agent is idle or blocked with nothing queued for 0s and no human is attending\. Last from Atlas: "Operator, the test environment returns made-up results; only you can clear this\."$/)
+  assert.ok(agents.every((a) => a.status === 'idle' || a.status === 'blocked'))
+  const logs = agents.find((a) => a.id === 'atlas')!.log.map((l) => l.msg)
+  assert.ok(logs.some((m) => /run idle · every agent idle or blocked/.test(m)), logs.join('\n'))
+})
+
+test('without IDLE_RUN_FAILS_AFTER_MS the same run stays live waiting for the human', async (t) => {
+  const script = capScript({ atlas: [reply([assign('forge')]), reply([], 0, 'Operator, please check the runner.')], forge: [reply([tool('agent_done', { summary: 'routes pushed', io: [] })])] })
+  const h = harness(t, script)
+  assert.equal(h.config.idleRunFailsAfterMs, 0)
+  await h.orchestrator.start()
+  await until(() => h.requests.filter((r) => r.agent === 'atlas').length === 3, 'the report to reach Atlas')
+  await settle()
+  await new Promise((r) => setTimeout(r, 60))
+  assert.equal(h.store.snapshot().run.status, 'live')
+  assert.equal(h.store.snapshot().run.error, undefined)
+})
+
 test('the orchestrator cap defaults to the per-agent cap', () => {
   assert.equal(loadConfig({ MOCK_LLM: '1', MAX_TURNS_PER_AGENT: '7' }).maxTurnsOrchestrator, 7)
   assert.equal(loadConfig({ MOCK_LLM: '1' }).maxTurnsOrchestrator, 60)
   assert.throws(() => loadConfig({ MOCK_LLM: '1', MAX_TURNS_ORCHESTRATOR: '0' }), /MAX_TURNS_ORCHESTRATOR/)
+  assert.equal(loadConfig({ MOCK_LLM: '1' }).idleRunFailsAfterMs, 0, 'the console waits for a human by default')
+  assert.throws(() => loadConfig({ MOCK_LLM: '1', IDLE_RUN_FAILS_AFTER_MS: '-1' }), /IDLE_RUN_FAILS_AFTER_MS/)
 })

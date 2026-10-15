@@ -16,13 +16,24 @@
  *                 identifier that is never mentioned again in its file.
  *                 Duration = fileCount × 1.9s.
  * pnpm lint       The same unused-import heuristic as eslint warnings; exit 0.
- * pnpm test       Vitest-style unit run; passes iff typecheck passes.
- * pnpm e2e        The 24-case suite in seed/e2e.ts, run against the LAST
+ * pnpm test       Vitest-style unit run over the *.test.ts files that exist in
+ *                 the working tree (e2e/ excluded), counting their test()/it()
+ *                 calls; passes iff typecheck passes. No test files → 0 tests,
+ *                 exit 0 (passWithNoTests), never a file that is not there.
+ * pnpm e2e        The 24-case suite in seed/e2e.ts PLUS every test()/it() the
+ *                 branch adds or changes in any e2e/ *.spec.ts file, run against the LAST
  *                 PUSHED tree (the seed before any push) — never the working
  *                 tree, so Probe cannot report green on edits Forge has not
  *                 pushed. stdout opens with "e2e on <sha>"; when the working
  *                 tree differs, stderr carries one line
- *                 "note: N unpushed change(s) not included". The suite judges
+ *                 "note: N unpushed change(s) not included". Collected cases
+ *                 keep their own file, line and describe title, so --grep on a
+ *                 name the agents wrote selects it (0/0 only when nothing on the
+ *                 branch matches); a collected passkey case is judged by the
+ *                 same step rules as the canonical case of its group, any other
+ *                 collected case passes. Per-case durations are seeded by the
+ *                 sha under test, so two commits never print identical logs.
+ *                 The suite judges
  *                 what was pushed, not a fixed layout: a passkey route file is
  *                 any non-test .ts file whose path or text mentions WebAuthn,
  *                 passkeys or FIDO and that either is named for the step
@@ -64,7 +75,8 @@ import type { CommandResult, DiffStat, PrComment, PrState, SecFinding, Workspace
 import { E2E_CASES, E2E_SUITE_FILE, type E2eCase } from './seed/e2e.js'
 import { SEED_BRANCH, SEED_FILES, SEED_REPO } from './seed/repo.js'
 
-export type TestSummary = NonNullable<CommandResult['tests']> & { revision: number; sha: string | null; fullSuite: boolean }
+/** `suite` tallies the canonical 24 cases alone; `passed`/`failed`/`total` include the branch's own collected specs. */
+export type TestSummary = NonNullable<CommandResult['tests']> & { revision: number; sha: string | null; fullSuite: boolean; suite: { passed: number; total: number } }
 
 /** The concrete workspace also remembers the last e2e result for `run.read_status`. */
 export interface WorkspaceWithHistory extends Workspace {
@@ -102,6 +114,23 @@ interface E2eFailure {
   /** Longer trace explanation. */
   trace: string[]
 }
+
+/** A test()/it() the branch added to e2e/, reported beside the canonical suite. */
+interface CollectedCase {
+  /** `describe › title` when nested, else the title. */
+  name: string
+  file: string
+  line: number
+  /** Playwright project the file's config declares, else chromium. */
+  project: string
+  /** Passkey cases are judged by the step rules; null means an unrelated case that passes. */
+  group: E2eCase['group'] | null
+}
+
+const SPEC_FILE = /(^|\/)e2e\/.*\.(spec|test)\.ts$/
+/** test('title'…), it('title'…), test.describe('title'…) and their .only/.skip/.serial variants. */
+const SPEC_CALL = /\b(test|it)(?:\.(?:describe(?:\.(?:serial|parallel|only|skip))?|only|skip|fixme))?\s*\(\s*(['"`])((?:(?!\2)[^\\]|\\.)*)\2/g
+const PROJECT_NAME = /\bname\s*:\s*(['"`])([^'"`]+)\1/g
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -432,33 +461,81 @@ export function createWorkspace(): WorkspaceWithHistory {
     return { exitCode: 0, stdout: out.join('\n'), stderr: '', durationMs }
   }
 
+  /** Count the test()/it() calls in a source file (describe blocks are containers, not tests). */
+  function countTests(src: string): number {
+    let n = 0
+    for (const m of src.matchAll(SPEC_CALL)) if (!/describe/.test(m[0])) n++
+    return n
+  }
+
+  /** Playwright project names declared in e2e/playwright.config.ts of tree `t`, else chromium. */
+  function specProjects(t: Tree): string[] {
+    const cfg = t.get('e2e/playwright.config.ts') ?? ''
+    const names = [...cfg.matchAll(PROJECT_NAME)].map((m) => m[2]).filter((n) => !/^(@|\.)/.test(n))
+    return names.length ? [...new Set(names)] : ['chromium']
+  }
+
+  /**
+   * The test()/it() cases the branch adds to e2e/: every spec file in tree `t`
+   * that the seed does not already carry byte-identical (the seed's own
+   * login.spec.ts is part of the canonical suite). Describe titles prefix the
+   * name, as Playwright prints them, so --grep on either part selects the case.
+   */
+  function collectSpecs(t: Tree): CollectedCase[] {
+    const cases: CollectedCase[] = []
+    const projects = specProjects(t)
+    for (const file of [...t.keys()].filter((p) => SPEC_FILE.test(p) && SEED_FILES[p] !== t.get(p)).sort()) {
+      const src = t.get(file) ?? ''
+      let describe: string | null = null
+      let i = 0
+      for (const m of src.matchAll(SPEC_CALL)) {
+        const title = m[3].replace(/\\(.)/g, '$1')
+        if (/describe/.test(m[0])) {
+          describe = title
+          continue
+        }
+        const name = describe ? `${describe} › ${title}` : title
+        const line = src.slice(0, m.index ?? 0).split('\n').length
+        // A case is a passkey case when its own title says so, or when it names a step inside a passkey spec
+        // file; an unrelated title (healthz) in a passkey file is not judged by the passkey rules.
+        const nameStep = stepOf(name)
+        const group: CollectedCase['group'] = nameStep && (PASSKEY_WORDS.test(name) || PASSKEY_WORDS.test(file))
+          ? nameStep
+          : PASSKEY_WORDS.test(name) ? (stepOf(file) ?? 'login') : null
+        cases.push({ name, file, line, project: projects[i++ % projects.length], group })
+      }
+    }
+    return cases
+  }
+
   function runUnitTests(): CommandResult {
     const { errors } = typecheckReport()
-    const units = tsFiles().filter((p) => p.startsWith('services/') && !p.endsWith('.spec.ts'))
-    const durationMs = units.length * 900 + 1200
+    // Only files that exist run; vitest never reports a file the tree does not hold.
+    const files = tsFiles().filter((p) => /\.test\.ts$/.test(p) && !/^e2e\//.test(p))
+    const counts = files.map((p) => countTests(tree.get(p) ?? ''))
+    const durationMs = files.length * 900 + 1200
     const out: string[] = ['> @helios/api@3.14.0 test', '> vitest run', '']
     if (errors.length) {
-      out.push(...units.map((p) => ` ❯ ${p.replace(/\.ts$/, '.test.ts')} (0 tests)`), '')
+      out.push(...files.map((p) => ` ❯ ${p} (0 tests)`), '')
       out.push(...errors.map((e) => `   ${e}`), '')
-      out.push(` Test Files  ${units.length} failed (${units.length})`, `      Tests  no tests`, `   Duration  ${seconds(durationMs)}`)
+      out.push(` Test Files  ${files.length} failed (${files.length})`, `      Tests  no tests`, `   Duration  ${seconds(durationMs)}`)
       return { exitCode: 1, stdout: out.join('\n'), stderr: 'Error: build failed — fix typecheck errors first', durationMs }
     }
-    const perFile = 3
-    for (const p of units) {
-      const ms = 80 + (parseInt(sha7(p), 16) % 240)
-      out.push(` ✓ ${p.replace(/\.ts$/, '.test.ts')} (${perFile} tests) ${ms}ms`)
+    if (!files.length) {
+      out.push('No test files found (passWithNoTests)', '', ` Test Files  0 passed (0)`, `      Tests  0 passed (0)`, `   Duration  ${seconds(durationMs)}`)
+      return { exitCode: 0, stdout: out.join('\n'), stderr: '', durationMs, tests: { passed: 0, failed: 0, total: 0, failures: [] } }
     }
+    const sha = commits.at(-1) ?? 'seed'
+    files.forEach((p, i) => {
+      const ms = 80 + (parseInt(sha7(p, sha), 16) % 240)
+      out.push(` ✓ ${p} (${counts[i]} test${counts[i] === 1 ? '' : 's'}) ${ms}ms`)
+    })
+    const total = counts.reduce((a, b) => a + b, 0)
     out.push('')
-    out.push(` Test Files  ${units.length} passed (${units.length})`)
-    out.push(`      Tests  ${units.length * perFile} passed (${units.length * perFile})`)
+    out.push(` Test Files  ${files.length} passed (${files.length})`)
+    out.push(`      Tests  ${total} passed (${total})`)
     out.push(`   Duration  ${seconds(durationMs)}`)
-    return {
-      exitCode: 0,
-      stdout: out.join('\n'),
-      stderr: '',
-      durationMs,
-      tests: { passed: units.length * perFile, failed: 0, total: units.length * perFile, failures: [] },
-    }
+    return { exitCode: 0, stdout: out.join('\n'), stderr: '', durationMs, tests: { passed: total, failed: 0, total, failures: [] } }
   }
 
   /** Where the credentials migration stands in tree `t`: absent, or its latest credential-id column type. */
@@ -565,36 +642,44 @@ export function createWorkspace(): WorkspaceWithHistory {
     return null
   }
 
-  function caseDuration(tc: E2eCase): string {
-    return `${(2 + (parseInt(sha7(tc.name), 16) % 30) / 10).toFixed(1)}s`
+  /** Seeded by the sha under test as well as the case, so two commits never print the same times. */
+  function caseDuration(name: string, sha: string): string {
+    return `${(2 + (parseInt(sha7(name, sha), 16) % 30) / 10).toFixed(1)}s`
   }
 
   function runE2e(grep: string | null): CommandResult {
-    let selected: E2eCase[] = [...E2E_CASES]
-    if (grep) {
-      // Model-supplied text is never compiled as a RegExp: a pathological
-      // pattern would block the event loop in this synchronous filter.
-      const needle = grep.toLowerCase()
-      selected = selected.filter((tc) => `passkey › ${tc.name}`.toLowerCase().includes(needle))
-    }
     // The suite runs against the last push (the seed before any), not the
     // working tree — only what is on the branch is under test.
     const pushed = base
     const sha = commits[commits.length - 1]
+    const seed = sha ?? 'seed'
+    type Row = { title: string; file: string; line: number; project: string; judge: E2eCase | null; canonical: boolean }
+    const rows: Row[] = [
+      ...E2E_CASES.map((tc): Row => ({ title: `passkey › ${tc.name}`, file: E2E_SUITE_FILE, line: 12 + E2E_CASES.indexOf(tc) * 7, project: tc.browser, judge: tc, canonical: true })),
+      ...collectSpecs(pushed).map((c): Row => ({ title: c.name, file: c.file, line: c.line, project: c.project, judge: c.group ? { name: c.name, group: c.group, browser: 'chromium' } : null, canonical: false })),
+    ]
+    let selected = rows
+    if (grep) {
+      // Model-supplied text is never compiled as a RegExp: a pathological
+      // pattern would block the event loop in this synchronous filter.
+      const needle = grep.toLowerCase()
+      selected = rows.filter((r) => `${r.file} › ${r.title}`.toLowerCase().includes(needle))
+    }
     const unpushed = diff().files
-    const durationMs = selected.length * 4900 + 800
+    const durationMs = selected.length * 4900 + 800 + (sha ? parseInt(sha7(sha), 16) % 1900 : 0)
     const failures: E2eFailure[] = []
+    let suitePassed = 0
     const out: string[] = [
       sha ? `e2e on ${sha}` : `e2e on seed (nothing pushed to ${SEED_BRANCH} yet)`,
       `Running ${selected.length} test${selected.length === 1 ? '' : 's'} using 4 workers`,
       ...(grep ? [`grep: substring match, case-insensitive · ${JSON.stringify(grep)}`] : []),
       '',
     ]
-    selected.forEach((tc, i) => {
-      const failure = e2eFailure(tc, pushed)
+    selected.forEach((r, i) => {
+      const failure = r.judge ? e2eFailure(r.judge, pushed) : null
       if (failure) failures.push(failure)
-      const line = 12 + E2E_CASES.indexOf(tc) * 7
-      out.push(`  ${failure ? '✘' : '✓'} ${String(i + 1).padStart(3)} [${tc.browser}] › ${E2E_SUITE_FILE}:${line}:3 › passkey › ${tc.name} (${caseDuration(tc)})`)
+      else if (r.canonical) suitePassed++
+      out.push(`  ${failure ? '✘' : '✓'} ${String(i + 1).padStart(3)} [${r.project}] › ${r.file}:${r.line}:3 › ${r.title} (${caseDuration(r.title, seed)})`)
     })
     if (failures.length) {
       out.push('')
@@ -613,7 +698,8 @@ export function createWorkspace(): WorkspaceWithHistory {
     const tests: TestSummary = {
       revision,
       sha: sha ?? null,
-      fullSuite: selected.length === E2E_CASES.length,
+      fullSuite: selected.filter((r) => r.canonical).length === E2E_CASES.length,
+      suite: { passed: suitePassed, total: E2E_CASES.length },
       passed: selected.length - failures.length,
       failed: failures.length,
       total: selected.length,
@@ -729,7 +815,7 @@ export function createWorkspace(): WorkspaceWithHistory {
       return { ok: false, reason: 'positive review required for the current revision' }
     }
     if (!lastTests || lastTests.revision !== revision || lastTests.sha !== sha || !lastTests.fullSuite ||
-      lastTests.failed !== 0 || lastTests.passed !== E2E_CASES.length) {
+      lastTests.failed !== 0 || lastTests.suite.passed !== E2E_CASES.length) {
       return { ok: false, reason: 'passing full e2e coverage required for the current pushed revision' }
     }
     return { ok: true }

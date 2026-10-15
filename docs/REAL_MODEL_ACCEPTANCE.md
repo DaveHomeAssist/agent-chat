@@ -48,7 +48,23 @@ every worker report wakes it: on October 14 a shared cap of 12 ran out after 8.5
 minutes and the workers' final reports were never delivered. A run in which no agent
 can be woken (every inbox empty, nothing in flight, and at least one wake discarded at
 a turn cap) now ends as `failed` with a `Run stalled: …` reason naming the capped
-agent and the dropped wakes, instead of idling until the timeout.
+agent and the dropped wakes, instead of idling until the timeout. A run whose agents
+are all idle or blocked with nothing queued is waiting for a human; the acceptance
+runner has none, so after `IDLE_RUN_FAILS_AFTER_MS` (default 60000 for `smoke:real`,
+0 = wait forever in the interactive console) it ends as `failed` with a `Run idle: …`
+reason that quotes Atlas's last message. On October 15 the agents escalated to the
+operator and idled 12 minutes to the timeout; this ends that run in about a minute.
+
+The simulated test commands report what the branch holds. `pnpm e2e` runs the
+canonical 24-case passkey suite plus every `test()`/`it()` the branch adds in `e2e/`
+spec files, with their own file, line, describe title and Playwright project, so
+`--grep` on a name the agents wrote selects it; per-case durations are seeded by the
+sha under test, so two commits never print identical logs. Collected passkey cases
+are judged by the step rules of their group; unrelated cases pass; the merge gate
+still requires the canonical 24 green. `pnpm test` lists only the `*.test.ts` files in
+the tree with their real case counts (no test files: 0 tests, exit 0). On October 15
+the agents correctly distrusted a suite that replayed fixed names and times and listed
+files not in the tree, and refused to request merge.
 
 The simulated e2e suite judges what the agents push, not a directory layout: any
 non-test `.ts` file that mentions WebAuthn, passkeys or FIDO and either is named for
