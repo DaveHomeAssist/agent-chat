@@ -73,6 +73,8 @@ interface Runner {
   busy: boolean
   taskId: string | null
   capWarned: boolean
+  /** Wakes discarded at the turn cap, as tag lines, so a stalled run can say what it lost. */
+  dropped: string[]
 }
 
 /**
@@ -183,7 +185,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     return new Map(
       deps.personas.map((p) => [
         p.id,
-        { id: p.id, persona: p, inbox: [], history: [], lastSeenSeq: seq, abort: null, turns: 0, busy: false, taskId: null, capWarned: false },
+        { id: p.id, persona: p, inbox: [], history: [], lastSeenSeq: seq, abort: null, turns: 0, busy: false, taskId: null, capWarned: false, dropped: [] },
       ]),
     )
   }
@@ -262,6 +264,28 @@ export function createOrchestrator(deps: Deps): Orchestrator {
 
   // ---- wake queue -----------------------------------------------------------
 
+  /** Atlas is woken by every report, so it has its own cap; workers share `maxTurnsPerAgent`. */
+  const capFor = (r: Runner): number => (r.id === 'atlas' ? config.maxTurnsOrchestrator : config.maxTurnsPerAgent)
+
+  /**
+   * A run with nothing left to deliver cannot recover: when no turn is running,
+   * every inbox is empty and at least one wake was discarded at a turn cap, the
+   * agents will sit idle until the operator's timeout. End it now with the reason.
+   * A live run that is merely waiting for a human (nothing dropped) stays live.
+   */
+  function checkStalled(): void {
+    if (disposed || runInfo().status !== 'live') return
+    const all = [...runners.values()]
+    if (all.some((r) => r.busy || r.inbox.length)) return
+    const capped = all.filter((r) => r.dropped.length)
+    if (!capped.length) return
+    const detail = capped
+      .map((r) => `${nameOf(r.id)} reached its turn cap ${capFor(r)} with ${r.dropped.length} undelivered wake${r.dropped.length === 1 ? '' : 's'} (${r.dropped.join(', ')})`)
+      .join('; ')
+    store.agentLog('atlas', 'FAIL', `run stalled · ${clip(detail, 200)}`)
+    failRun(`Run stalled: no agent can be woken — ${detail}`)
+  }
+
   /** `front` puts human-originated wakes ahead of agent traffic, behind earlier ones so arrival order holds. */
   function enqueue(id: AgentId, wake: Wake, front = false): void {
     const r = runners.get(id)
@@ -289,9 +313,12 @@ export function createOrchestrator(deps: Deps): Orchestrator {
           break
         }
         const wake = r.inbox.shift()!
-        if (r.turns >= config.maxTurnsPerAgent) {
-          if (!r.capWarned) store.agentLog(r.id, 'WARN', `turn cap ${config.maxTurnsPerAgent} reached · no further wakes`)
+        const cap = capFor(r)
+        if (r.turns >= cap) {
+          if (!r.capWarned) store.agentLog(r.id, 'WARN', `turn cap ${cap} reached · no further wakes`)
           r.capWarned = true
+          r.dropped.push(`[${wake.tag}${wake.attrs ?? ''}]`)
+          store.agentLog(r.id, 'WARN', `wake dropped at turn cap · ${r.dropped[r.dropped.length - 1]}`)
           continue
         }
         try {
@@ -303,6 +330,7 @@ export function createOrchestrator(deps: Deps): Orchestrator {
     } finally {
       r.busy = false
     }
+    if (fresh(g)) checkStalled()
   }
 
   // ---- wake message ---------------------------------------------------------

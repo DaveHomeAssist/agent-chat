@@ -49,8 +49,13 @@ export interface Config {
   budgetUsd: number
   /** Cap on model calls per agent per wake; guards against tool loops. */
   maxIterationsPerTurn: number
-  /** Cap on wakes per agent per run. */
+  /** Cap on wakes per worker agent per run. */
   maxTurnsPerAgent: number
+  /**
+   * Cap on Atlas's wakes per run. Atlas is woken by every report, so it needs
+   * more turns than any worker; defaults to `maxTurnsPerAgent` when unset.
+   */
+  maxTurnsOrchestrator: number
   /** Multiplier on the mock driver's artificial delays (1 = designed pacing, 0 = instant). */
   mockSpeed: number
   /** Start the run as soon as the server boots. Default: true in mock, false with a real key. */

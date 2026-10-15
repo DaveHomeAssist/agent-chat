@@ -41,8 +41,23 @@ This flag initiates billable requests. It makes metadata healthchecks for each
 configured model, then performs two sequential runs with no failure retries. It
 stops on the first failed run. The per-run timeout defaults to 25 minutes;
 `SMOKE_TIMEOUT_MS` can reduce it (1000–1500000 ms). Defaults are medium effort,
-12 wakes per agent and 12 model calls per wake. Existing `EFFORT`,
-`MAX_TURNS_PER_AGENT` and `MAX_ITERATIONS_PER_TURN` settings can override these.
+12 wakes per worker agent, 48 wakes for Atlas and 12 model calls per wake. Existing
+`EFFORT`, `MAX_TURNS_PER_AGENT`, `MAX_TURNS_ORCHESTRATOR` and
+`MAX_ITERATIONS_PER_TURN` settings can override these. Atlas has its own cap because
+every worker report wakes it: on October 14 a shared cap of 12 ran out after 8.5
+minutes and the workers' final reports were never delivered. A run in which no agent
+can be woken (every inbox empty, nothing in flight, and at least one wake discarded at
+a turn cap) now ends as `failed` with a `Run stalled: …` reason naming the capped
+agent and the dropped wakes, instead of idling until the timeout.
+
+The simulated e2e suite judges what the agents push, not a directory layout: any
+non-test `.ts` file that mentions WebAuthn, passkeys or FIDO and either is named for
+the step (`register`/`attestation`, `login`/`verify`/`assertion`/`authenticate`) or
+contains a passkey route literal for it (`/auth/passkey/register`, `/webauthn/login`)
+mounts that step, and any migration creating a table whose name contains
+`credential`, `passkey` or `webauthn` counts as the credentials migration. The replay
+and credential-id rules follow the same files. The flag guard is not checked by the
+suite; Sentry's review covers it.
 The timeout includes the metadata healthcheck. SIGINT/SIGTERM cancel model work
 and produce a failed report; interrupted runs cannot count as acceptance.
 

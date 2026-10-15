@@ -49,6 +49,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   }
   const autoStartFlag = flag('AUTO_START', env)
   const budgetUsd = number('RUN_BUDGET_USD', env, 5, { minExclusive: 0 })
+  const maxTurnsPerAgent = integer('MAX_TURNS_PER_AGENT', env, 60, { min: 1 })
   return {
     port: integer('PORT', env, 8787, { min: 1, max: 65535 }),
     host: auth.bindHost,
@@ -59,7 +60,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     budgetUsd,
     lifetimeBudgetUsd: number('LIFETIME_BUDGET_USD', env, budgetUsd * 4, { minExclusive: 0 }),
     maxIterationsPerTurn: integer('MAX_ITERATIONS_PER_TURN', env, 24, { min: 1 }),
-    maxTurnsPerAgent: integer('MAX_TURNS_PER_AGENT', env, 60, { min: 1 }),
+    maxTurnsPerAgent,
+    maxTurnsOrchestrator: integer('MAX_TURNS_ORCHESTRATOR', env, maxTurnsPerAgent, { min: 1 }),
     mockSpeed: number('MOCK_SPEED', env, 1, { min: 0 }),
     autoStart: autoStartFlag ?? llm === 'mock',
     staticDir: staticDir(env),

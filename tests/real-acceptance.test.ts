@@ -26,6 +26,10 @@ test('acceptance preflight requires explicit credentials and budgets and refuses
   assert.throws(() => acceptanceConfig({ ...env, RUN_BUDGET_USD: 'NaN-secret' }), error => error instanceof Error && !error.message.includes('NaN-secret'))
   assert.throws(() => acceptanceConfig({ ...env, LIFETIME_BUDGET_USD: '0.5' }), /at least/)
   assert.equal(acceptanceConfig(env).autoStart, false)
+  // October 14 run 1: Atlas spent the shared 12-wake cap and stranded the workers' reports.
+  assert.equal(acceptanceConfig(env).maxTurnsPerAgent, 12)
+  assert.equal(acceptanceConfig(env).maxTurnsOrchestrator, 48)
+  assert.equal(acceptanceConfig({ ...env, MAX_TURNS_ORCHESTRATOR: '20' }).maxTurnsOrchestrator, 20)
 })
 
 test('two offline SDK stories reach a held gate with artifacts and cumulative usage', async t => {
