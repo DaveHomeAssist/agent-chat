@@ -55,6 +55,31 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
   `0043_webauthn` creating `webauthn_credentials(credential_id BYTEA …)`): 0/24 before,
   24/24 after. Browser CI remains the Chromium gate.
 
+## Second paid M1 run: October 15 (failed)
+
+- Executed by Dave at 00:38 EDT on `434a304` (main with PR #31) with the same settings
+  as the first run (Anthropic, `claude-opus-5-5` for all five agents, effort medium,
+  $5 run / $12 lifetime, fresh key verified with a 200 from `/v1/models`). Result:
+  **FAIL, 0/2 runs accepted**. Run 1 timed out at 25 minutes with $4.602010 reported,
+  151 model requests, 249 tool calls, accounting complete, no unreported requests, no
+  unpriced models. Reports: `runs/acceptance-vL6VkK/` (private, untracked).
+- PR #31 held. No agent reached a wake cap and nothing was dropped. The simulated
+  `pnpm e2e` reported 24/24 on the first push `de2708b`, whose layout was
+  `services/auth/passkeys/*` with `/auth/passkeys/*` routes, so the layout coupling is gone.
+- New blocker, simulator fidelity. The agents distrusted the green result and were
+  right to: the suite replays the same 24 case names and durations on every commit,
+  `pnpm e2e --grep <their own spec name>` returns 0/0, and `pnpm test` lists test files
+  that are not in the tree. Atlas escalated to the operator four times ("only you can
+  clear it"), refused to request merge on unverified results, and at 04:51:24Z every
+  agent went idle waiting for a human. The headless runner has no human, and the
+  stall detector added in PR #31 only fires on dropped wakes, so the run idled 12
+  minutes to the timeout.
+- Also seen: `repo_read` truncates files near 6 KB, which cost Vector (run 1) and Sentry
+  (run 2) extra turns; Probe has no push tool and routes every spec through Forge.
+- M1 stays **Blocked**. Next fix: derive e2e and vitest output from the pushed tree
+  (the agents' own spec and test files, varying durations), and end a headless run
+  as failed when every agent is idle with nothing queued. Paid spend to date: $8.09.
+
 ## First paid M1 run: October 14 (failed)
 
 - Executed by Dave at 19:33 EDT on code `4886bc7` with `LLM_PROVIDER=anthropic`,
