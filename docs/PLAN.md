@@ -128,6 +128,12 @@ run must name `LLM_PROVIDER` and that provider's key, and every configured or se
 model must have exact pricing. It does not change the application's default provider
 or model, or add a Codex repository execution adapter.
 
+October 14 run 1 on `4886bc7` failed (see [STATUS](STATUS.md#first-paid-m1-run-october-14-failed));
+its two causes, the shared Atlas wake cap and the simulator's fixed
+`services/auth/webauthn/*` layout, are fixed on `ce33f8c3` (stalled runs end as
+`failed`; the suite judges the pushed layout). The next paid run needs Dave's
+separate authorization.
+
 Provider access was demonstrated by one separately authorized useful request on
 Sep 8. It does not authorize additional calls or replace the following two-run gate.
 

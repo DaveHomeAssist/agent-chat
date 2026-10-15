@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-09-14T22:08:35-04:00",
-  "verifiedLabel": "Sep 14, 2026 · 10:08 PM ET",
-  "codeRevision": "dcf2ff26ece5837131121b6c82e23f147cca0a20",
+  "verifiedAt": "2026-10-14T20:43:25-04:00",
+  "verifiedLabel": "Oct 14, 2026 · 8:43 PM ET",
+  "codeRevision": "ce33f8c3aa675f07c8e94e376e5ca1b4dbcc9155",
   "overall": "Partial",
-  "summary": "PR #24 command safety and PR #26 browser-test correction are delivered; runtime product remains dcf2ff26. Sep 14 main CI at ac893045 passed 209 Node, 17 queue, 42 simulator and 50 Chromium checks; this later closeout verifies design-review readback and status rendering separately. Reassign proposal 018 passed frontend review but failed backend review; all 56 proposed cases are UNEXECUTED. Reassign, tool approval and recovery are held at exhausted correction limits. Fidelity stays Partial. Foundation runtime paths await a decision; M1 budget/runner, M3 real tools and M4 hosting remain incomplete.",
+  "summary": "M1 deadlock fixes on branch fix/m1-deadlock-wake-cap-layout at ce33f8c3 (Oct 14): Atlas gets its own wake cap (MAX_TURNS_ORCHESTRATOR, 48 in the acceptance runner) and a run with nothing to deliver ends as failed with a 'Run stalled' reason; the simulated e2e suite judges the pushed passkey layout instead of services/auth/webauthn/*. Offline: build/typechecks, 222 Node (6 new, 5 reproduce the Oct 14 failures), 17 queue, 42 simulator pass locally; browser CI pending on the PR. M1 stays Blocked: the first paid run on 4886bc7 failed and no further paid run is authorized. PR #24 command safety and PR #26 browser-test correction are delivered; runtime product remains dcf2ff26. Sep 14 main CI at ac893045 passed 209 Node, 17 queue, 42 simulator and 50 Chromium checks; this later closeout verifies design-review readback and status rendering separately. Reassign proposal 018 passed frontend review but failed backend review; all 56 proposed cases are UNEXECUTED. Reassign, tool approval and recovery are held at exhausted correction limits. Fidelity stays Partial. Foundation runtime paths await a decision; M1 budget/runner, M3 real tools and M4 hosting remain incomplete.",
   "items": [
     {
       "id": "console",
@@ -153,8 +153,8 @@
       "phase": "M1",
       "plannedDate": null,
       "dateLabel": "Unscheduled",
-      "notes": "First paid run Oct 14 (Anthropic, claude-opus-5-5 x5, medium, $5/$12 caps) on code 4886bc7 FAILED: run 1 timed out at 25 min after $3.49, 109 requests, 187 tool calls, accounting complete, 0 unpriced models. Agents worked 9 min 15 s (three simulated pushes, test phase reached) then idled 15 min 44 s: Atlas hit the acceptance runner's 12-wake cap at 19:41:34 so later done/blocked reports were never handled, and the simulated e2e suite passes only services/auth/webauthn/{register,verify}.ts while the agents built services/auth/passkey/*, so the suite could not go green. Probe also hit one Anthropic content refusal (recovered by reassignment). Earlier: runner accepts Anthropic at 98d0bc60 (PR #29), 216 Node/17 queue/42 simulator offline. Reports: runs/acceptance-lTW5Xf (private, untracked). Fix needed before the next paid run.",
-      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/STATUS.md#first-paid-m1-run-october-14-failed"
+      "notes": "Fixes for both causes landed on branch fix/m1-deadlock-wake-cap-layout at ce33f8c3 (Oct 14, offline only: 222 Node / 17 queue / 42 simulator pass; 5 new tests fail on the previous source): Atlas has its own wake cap (MAX_TURNS_ORCHESTRATOR=48 in the runner), a run with empty inboxes, nothing in flight and a dropped wake ends as failed with a 'Run stalled' reason, and the simulated e2e suite now mounts register/login from any pushed passkey file plus any credentials-like table. Still Blocked: no paid run has passed and none is authorized. First paid run Oct 14 (Anthropic, claude-opus-5-5 x5, medium, $5/$12 caps) on code 4886bc7 FAILED: run 1 timed out at 25 min after $3.49, 109 requests, 187 tool calls, accounting complete, 0 unpriced models. Agents worked 9 min 15 s (three simulated pushes, test phase reached) then idled 15 min 44 s: Atlas hit the acceptance runner's 12-wake cap at 19:41:34 so later done/blocked reports were never handled, and the simulated e2e suite passes only services/auth/webauthn/{register,verify}.ts while the agents built services/auth/passkey/*, so the suite could not go green. Probe also hit one Anthropic content refusal (recovered by reassignment). Earlier: runner accepts Anthropic at 98d0bc60 (PR #29), 216 Node/17 queue/42 simulator offline. Reports: runs/acceptance-lTW5Xf (private, untracked). Fix needed before the next paid run.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/STATUS.md#m1-deadlock-fixes-october-14-branch-fixm1-deadlock-wake-cap-layout"
     },
     {
       "id": "budget",

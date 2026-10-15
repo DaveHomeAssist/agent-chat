@@ -84,3 +84,67 @@ test('an unpushed fix cannot green the last pushed revision', async () => {
   ws.pr.review('sentry', 'approve', 'review new revision')
   assert.equal(ws.pr.merge().ok, true)
 })
+
+// First paid M1 run, October 14: Opus 5.5 built services/auth/passkey/* with
+// /auth/passkey/* routes and a webauthn_credentials table. The suite then failed all
+// 24 cases with 404 because it looked only for services/auth/webauthn/{register,verify}.ts.
+function buildRun1Layout(ws: ReturnType<typeof createWorkspace>, options: { replayGuard?: '>' | '>='; credIdType?: 'BYTEA' | 'TEXT' } = {}) {
+  ws.write('services/auth/passkey/register.ts', [
+    "import type { FastifyInstance } from 'fastify'",
+    "import { flag } from '../../../config/flags'",
+    'export async function passkeyRegisterRoutes(app: FastifyInstance): Promise<void> {',
+    "  if (!flag('auth.passkeys')) return",
+    "  app.post('/auth/passkey/register/options', async () => ({ challenge: 'c' }))",
+    "  app.post('/auth/passkey/register', async () => ({ ok: true }))",
+    '}',
+    '',
+  ].join('\n'))
+  ws.write('services/auth/passkey/login.ts', [
+    "import type { FastifyInstance } from 'fastify'",
+    "import { flag } from '../../../config/flags'",
+    "import { counterAdvanced } from './counter'",
+    'export async function passkeyLoginRoutes(app: FastifyInstance): Promise<void> {',
+    "  if (!flag('auth.passkeys')) return",
+    "  app.post('/auth/passkey/login', async () => ({ ok: counterAdvanced(1, 0) }))",
+    '}',
+    '',
+  ].join('\n'))
+  ws.write('services/auth/passkey/counter.ts', `// WebAuthn sign counter guard\nexport const counterAdvanced = (signCount: number, stored: number) => signCount ${options.replayGuard ?? '>'} stored\n`)
+  assert.equal(ws.migrations.apply('0043_webauthn', `CREATE TABLE IF NOT EXISTS webauthn_credentials (credential_id ${options.credIdType ?? 'BYTEA'} PRIMARY KEY, sign_count INTEGER NOT NULL);`).ok, true)
+  ws.push('feat(auth): passkey register/login behind auth.passkeys')
+}
+
+test('the e2e suite judges the pushed passkey layout, not a fixed webauthn directory', async () => {
+  const ws = createWorkspace()
+  buildRun1Layout(ws)
+  const result = await ws.run('pnpm e2e')
+  assert.equal(result.tests?.passed, 24, result.stdout)
+  assert.equal(result.tests?.failed, 0)
+  ws.pr.review('sentry', 'approve', 'reviewed the passkey layout')
+  assert.equal(ws.pr.merge().ok, true)
+})
+
+test('the seed tree and non-passkey routes still fail every case with 404', async () => {
+  const ws = createWorkspace()
+  const seed = await ws.run('pnpm e2e')
+  assert.equal(seed.tests?.failed, 24)
+  assert.ok(seed.tests?.failures.every((f) => /404 route not mounted/.test(f)), seed.tests?.failures.join('\n'))
+  // The seed's own /auth/login and /auth/otp/verify routes, and a login spec, carry no passkey word.
+  ws.write('e2e/passkey-login.spec.ts', "test('passkey login', () => fetch('/auth/passkey/login'))\n")
+  ws.write('services/auth/routes.ts', ws.read('services/auth/routes.ts')! + '\n// TODO: mount passkey routes\n')
+  ws.push('notes only')
+  const after = await ws.run('pnpm e2e')
+  assert.equal(after.tests?.failed, 24)
+})
+
+test('replay and credential-id rules follow the pushed layout', async () => {
+  const replay = createWorkspace()
+  buildRun1Layout(replay, { replayGuard: '>=' })
+  const result = await replay.run('pnpm e2e')
+  assert.deepEqual(result.tests?.failures.map((f) => f.split(' ')[0]).sort(), ['login.windowsHello', 'register.reregister'])
+  assert.match(replay.artifact('trace-latest.zip') ?? '', /services\/auth\/passkey\/counter\.ts: sign counter guard/)
+  const textId = createWorkspace()
+  buildRun1Layout(textId, { credIdType: 'TEXT' })
+  assert.deepEqual((await textId.run('pnpm e2e')).tests?.failures.map((f) => f.split(' ')[0]), ['login.windowsHello'])
+  assert.ok(textId.secScan().some((f) => f.level === 'RISK' && /credential_id stored as text/.test(f.msg)))
+})

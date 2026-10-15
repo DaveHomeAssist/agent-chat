@@ -29,6 +29,9 @@ export function acceptanceConfig(env: NodeJS.ProcessEnv): ServerConfig {
     RUN_BUDGET_USD: env.RUN_BUDGET_USD, LIFETIME_BUDGET_USD: env.LIFETIME_BUDGET_USD,
     OPENAI_MODEL: env.OPENAI_MODEL, ANTHROPIC_MODEL: env.ANTHROPIC_MODEL, EFFORT: env.EFFORT ?? 'medium',
     MAX_TURNS_PER_AGENT: env.MAX_TURNS_PER_AGENT ?? '12',
+    // Atlas is woken by every worker report, handoff reply and gate event, so its cap is
+    // separate: run 1 on October 14 spent 12 Atlas wakes in 8.5 minutes and then idled.
+    MAX_TURNS_ORCHESTRATOR: env.MAX_TURNS_ORCHESTRATOR ?? '48',
     MAX_ITERATIONS_PER_TURN: env.MAX_ITERATIONS_PER_TURN ?? '12',
   }
   for (const id of AGENT_IDS) selected[`AGENT_MODEL_${id.toUpperCase()}`] = env[`AGENT_MODEL_${id.toUpperCase()}`]

@@ -22,17 +22,26 @@
  *                 tree, so Probe cannot report green on edits Forge has not
  *                 pushed. stdout opens with "e2e on <sha>"; when the working
  *                 tree differs, stderr carries one line
- *                 "note: N unpushed change(s) not included". Per case, the
- *                 first rule that matches decides:
- *                   register.* fail  if services/auth/webauthn/register.ts is missing
- *                   login.*    fail  if services/auth/webauthn/verify.ts is missing
- *                   register.* fail  "relation credentials does not exist" if no
- *                                    migration creates a `credentials` table
- *                   replay guard     verify.ts comparing the sign counter with >=
- *                                    (signCount >= | sign_count >= | counter >=)
- *                                    fails register.reregister (400 replay) and
- *                                    login.windowsHello (cred_id mismatch)
- *                   cred_id column   the latest migration declaring cred_id as
+ *                 "note: N unpushed change(s) not included". The suite judges
+ *                 what was pushed, not a fixed layout: a passkey route file is
+ *                 any non-test .ts file whose path or text mentions WebAuthn,
+ *                 passkeys or FIDO and that either is named for the step
+ *                 (register/attestation; login/verify/assertion/authenticate)
+ *                 or contains a route path literal for it (for example
+ *                 '/auth/passkey/register' or '/webauthn/login'). Per case,
+ *                 the first rule that matches decides:
+ *                   register.* fail  if no file mounts the passkey register step
+ *                   login.*    fail  if no file mounts the passkey login step
+ *                   register.* fail  "relation ... does not exist" if no migration
+ *                                    creates a credentials table (any table whose
+ *                                    name contains credential, passkey or webauthn)
+ *                   replay guard     any passkey file comparing the sign counter
+ *                                    with >= (signCount >= | sign_count >= |
+ *                                    counter >=) fails register.reregister
+ *                                    (400 replay) and login.windowsHello
+ *                                    (cred_id mismatch)
+ *                   cred_id column   the latest migration declaring the credential
+ *                                    id column (cred_id / credential_id) as
  *                                    text/varchar fails login.windowsHello
  *                                    (cred_id mismatch); bytea passes
  *                   everything else passes.
@@ -64,9 +73,20 @@ export interface WorkspaceWithHistory extends Workspace {
 
 const PR_NUMBER = 482
 const PR_TITLE = 'feat(auth): passkey sign-in behind auth.passkeys'
+/** The layout the seed ADR template suggests; any other layout that mounts the steps also passes. */
 const REGISTER_PATH = 'services/auth/webauthn/register.ts'
 const VERIFY_PATH = 'services/auth/webauthn/verify.ts'
 const MIGRATIONS_DIR = 'db/migrations/'
+/** A file is passkey code when its path or text mentions the feature. */
+const PASSKEY_WORDS = /webauthn|passkey|fido|navigator\.credentials/i
+const REGISTER_WORDS = /regist|attestation|enrol/i
+const LOGIN_WORDS = /login|sign-?in|verify|assert|authenticat/i
+/** Route path literals such as '/auth/passkey/register' or `/webauthn/login/options`. */
+const ROUTE_LITERAL = /['"`](\/[A-Za-z0-9_./:-]*)['"`]/g
+const TEST_FILE = /(^|\/)(e2e|tests?|__tests__)\/|\.(spec|test)\.ts$/i
+/** The credentials table: `credentials`, `webauthn_credentials`, `passkeys`, ... */
+const CREDENTIALS_TABLE = /create\s+table\s+(?:if\s+not\s+exists\s+)?"?(?:\w+\.)?"?(\w*(?:credential|passkey|webauthn)\w*)\b/i
+const CRED_ID_COLUMN = /\b(cred_id|credential_id|credentialid)\b[^,;\n]*?\b(text|varchar|character\s+varying|bytea)\b/gi
 const DOCS_DIR = 'docs/'
 /** Column the diff-stat count starts at — matches the design's card. */
 const DIFF_PATH_COLUMN = 34
@@ -441,25 +461,68 @@ export function createWorkspace(): WorkspaceWithHistory {
     }
   }
 
-  /** Where the credentials migration stands in tree `t`: absent, or its latest cred_id column type. */
-  function credentialsMigration(t: Tree = tree): { present: boolean; credIdType: 'text' | 'bytea' | 'unknown'; path: string | null } {
+  /** Where the credentials migration stands in tree `t`: absent, or its latest credential-id column type. */
+  function credentialsMigration(t: Tree = tree): { present: boolean; table: string | null; credIdType: 'text' | 'bytea' | 'unknown'; credIdColumn: string; path: string | null } {
     let present = false
+    let table: string | null = null
     let credIdType: 'text' | 'bytea' | 'unknown' = 'unknown'
+    let credIdColumn = 'cred_id'
     let path: string | null = null
     for (const p of migrationPaths(t)) {
       const sql = t.get(p) ?? ''
-      if (/create\s+table\s+(?:if\s+not\s+exists\s+)?"?(?:\w+\.)?"?credentials\b/i.test(sql)) present = true
-      for (const m of sql.matchAll(/\bcred_id\b[^,;\n]*?\b(text|varchar|character\s+varying|bytea)\b/gi)) {
-        credIdType = m[1].toLowerCase() === 'bytea' ? 'bytea' : 'text'
+      const created = CREDENTIALS_TABLE.exec(sql)
+      if (created) {
+        present = true
+        table = created[1]
+      }
+      for (const m of sql.matchAll(CRED_ID_COLUMN)) {
+        credIdColumn = m[1]
+        credIdType = m[2].toLowerCase() === 'bytea' ? 'bytea' : 'text'
         path = p
       }
     }
-    return { present, credIdType, path }
+    return { present, table, credIdType, credIdColumn, path }
   }
 
-  function replayGuardOffByOne(t: Tree): boolean {
-    const src = t.get(VERIFY_PATH)
-    return !!src && /\b(?:signCount|sign_count|counter)\s*>=/.test(src)
+  /** Non-test .ts files whose path or text marks them as passkey code. */
+  function passkeyFiles(t: Tree): string[] {
+    return [...t.keys()]
+      .filter((p) => p.endsWith('.ts') && !TEST_FILE.test(p) && (PASSKEY_WORDS.test(p) || PASSKEY_WORDS.test(t.get(p) ?? '')))
+      .sort()
+  }
+
+  /** Which passkey step a route path or a file name serves; registration wins when both words appear. */
+  function stepOf(text: string): 'register' | 'login' | null {
+    if (REGISTER_WORDS.test(text)) return 'register'
+    if (LOGIN_WORDS.test(text)) return 'login'
+    return null
+  }
+
+  /**
+   * The file mounting `step`, whatever the layout: the agents are told the goal
+   * (passkey sign-in behind auth.passkeys), not a directory, so the suite must
+   * judge what they pushed. A file counts when its base name names the step or
+   * when it contains a passkey route literal for it. The seed's own
+   * '/auth/login' and '/auth/otp/verify' routes carry no passkey word and never
+   * match. The suggested layout (webauthn/register.ts, webauthn/verify.ts) wins
+   * ties so its traces stay stable.
+   */
+  function routeFile(step: 'register' | 'login', t: Tree): string | null {
+    const preferred = step === 'register' ? REGISTER_PATH : VERIFY_PATH
+    const candidates = passkeyFiles(t).filter((p) => {
+      const base = p.slice(p.lastIndexOf('/') + 1).replace(/\.ts$/, '')
+      if (stepOf(base) === step) return true
+      const src = t.get(p) ?? ''
+      for (const m of src.matchAll(ROUTE_LITERAL)) if (PASSKEY_WORDS.test(m[1]) && stepOf(m[1]) === step) return true
+      return false
+    })
+    return candidates.includes(preferred) ? preferred : (candidates[0] ?? null)
+  }
+
+  /** The passkey file (if any) whose sign-counter guard uses >= instead of >. */
+  function replayGuardOffByOne(t: Tree): string | null {
+    for (const p of passkeyFiles(t)) if (/\b(?:signCount|sign_count|counter)\s*>=/.test(t.get(p) ?? '')) return p
+    return null
   }
 
   /** Outcome of one e2e case against tree `t` (the last pushed tree). */
@@ -467,17 +530,19 @@ export function createWorkspace(): WorkspaceWithHistory {
     const migration = credentialsMigration(t)
     const replay = replayGuardOffByOne(t)
     const textCredId = migration.credIdType === 'text'
-    if (tc.group === 'register' && !t.has(REGISTER_PATH)) {
-      return { name: tc.name, detail: '404 route not mounted', trace: [`POST /webauthn/register → 404`, `${REGISTER_PATH} does not exist`] }
+    const registerFile = routeFile('register', t)
+    const loginFile = routeFile('login', t)
+    if (tc.group === 'register' && !registerFile) {
+      return { name: tc.name, detail: '404 route not mounted', trace: [`POST /webauthn/register → 404`, `no pushed file mounts the passkey register step (for example ${REGISTER_PATH})`] }
     }
-    if (tc.group === 'login' && !t.has(VERIFY_PATH)) {
-      return { name: tc.name, detail: '404 route not mounted', trace: [`POST /webauthn/login → 404`, `${VERIFY_PATH} does not exist`] }
+    if (tc.group === 'login' && !loginFile) {
+      return { name: tc.name, detail: '404 route not mounted', trace: [`POST /webauthn/login → 404`, `no pushed file mounts the passkey login step (for example ${VERIFY_PATH})`] }
     }
     if (tc.group === 'register' && !migration.present) {
       return {
         name: tc.name,
         detail: 'relation "credentials" does not exist',
-        trace: ['POST /webauthn/register → 500', 'PrismaClientKnownRequestError: relation "credentials" does not exist', 'no migration under db/migrations creates the credentials table'],
+        trace: ['POST /webauthn/register → 500', 'PrismaClientKnownRequestError: relation "credentials" does not exist', 'no migration under db/migrations creates a credentials table'],
       }
     }
     if (tc.name === 'register.reregister' && replay) {
@@ -487,14 +552,14 @@ export function createWorkspace(): WorkspaceWithHistory {
         trace: [
           'second registration of the same authenticator (excludeCredentials empty, counter reset to 0)',
           'expected 201, received 400 {"error":"replay"}',
-          `${VERIFY_PATH}: sign counter guard rejects newCount == storedCount — comparison uses >= where the spec wants >`,
+          `${replay}: sign counter guard rejects newCount == storedCount — comparison uses >= where the spec wants >`,
         ],
       }
     }
     if (tc.name === 'login.windowsHello' && (replay || textCredId)) {
       const trace = ['assertion from the Windows Hello virtual authenticator', 'expected 200, received 401 {"error":"cred_id mismatch"}']
-      if (replay) trace.push(`${VERIFY_PATH}: Windows Hello reports signCount 0 on every assertion; guard with >= treats 0 vs 0 as a replay and the lookup falls through`)
-      if (textCredId) trace.push(`${migration.path}: cred_id is ${migration.credIdType} — base64 stored at registration, base64url on lookup; store raw bytes (bytea)`)
+      if (replay) trace.push(`${replay}: Windows Hello reports signCount 0 on every assertion; guard with >= treats 0 vs 0 as a replay and the lookup falls through`)
+      if (textCredId) trace.push(`${migration.path}: ${migration.credIdColumn} is ${migration.credIdType} — base64 stored at registration, base64url on lookup; store raw bytes (bytea)`)
       return { name: tc.name, detail: 'cred_id mismatch', trace }
     }
     return null
@@ -702,7 +767,7 @@ export function createWorkspace(): WorkspaceWithHistory {
     const findings: SecFinding[] = []
     const migration = credentialsMigration()
     if (migration.credIdType === 'text' && migration.path) {
-      findings.push({ level: 'RISK', path: migration.path, msg: 'cred_id stored as text — base64 round-trip' })
+      findings.push({ level: 'RISK', path: migration.path, msg: `${migration.credIdColumn} stored as text — base64 round-trip` })
     }
     for (const p of tsFiles()) {
       const src = tree.get(p) ?? ''

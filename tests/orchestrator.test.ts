@@ -448,3 +448,51 @@ test('dispose cancels work and does not allow a later start to resurrect request
   assert.deepEqual(h.store.snapshot().thread, before.thread)
   assert.equal(h.store.lifetimeCostUsd(), 0.001)
 })
+
+// First paid M1 run, October 14: Atlas spent its 12 wakes and the workers' final
+// done/blocked reports queued to an orchestrator that could never run again, so the
+// run idled for 16 minutes until the runner's timeout. The run must end itself.
+function capScript(perAgent: Record<string, LLMResult[]>) {
+  const calls: Record<string, number> = {}
+  return async (req: { agent: string }): Promise<LLMResult> => {
+    const n = calls[req.agent] ?? 0
+    calls[req.agent] = n + 1
+    return perAgent[req.agent]?.[n] ?? reply()
+  }
+}
+
+test('a report no capped Atlas can receive fails the run with the reason instead of idling', async (t) => {
+  const script = capScript({ atlas: [reply([assign('forge')])], forge: [reply([tool('agent_done', { summary: 'passkey routes pushed', io: [] })])] })
+  const h = harness(t, script, { env: { MAX_TURNS_PER_AGENT: '1' } })
+  await h.orchestrator.start()
+  await until(() => h.store.snapshot().run.status === 'failed', 'the stalled run to fail')
+  const { run, agents } = h.store.snapshot()
+  assert.match(run.error ?? '', /^Run stalled: no agent can be woken — Atlas reached its turn cap 1 with 1 undelivered wake \(\[REPORT from=forge kind=done\]\)$/)
+  assert.equal(h.requests.filter((r) => r.agent === 'atlas').length, 2, 'Atlas had exactly its one wake: the assignment call and the closing call')
+  assert.equal(h.requests.filter((r) => r.agent === 'forge').length, 2)
+  assert.ok(agents.every((a) => a.status === 'idle' || a.status === 'blocked'))
+  assert.deepEqual(h.store.snapshot().typing, [])
+  const logs = h.store.snapshot().agents.find((a) => a.id === 'atlas')!.log.map((l) => l.msg)
+  assert.ok(logs.some((m) => /wake dropped at turn cap · \[REPORT from=forge kind=done\]/.test(m)), logs.join('\n'))
+  assert.ok(logs.some((m) => /run stalled/.test(m)), logs.join('\n'))
+})
+
+test('MAX_TURNS_ORCHESTRATOR lets Atlas receive reports after the workers reach MAX_TURNS_PER_AGENT', async (t) => {
+  const script = capScript({ atlas: [reply([assign('forge')]), reply()], forge: [reply([tool('agent_done', { summary: 'done', io: [] })])] })
+  const h = harness(t, script, { env: { MAX_TURNS_PER_AGENT: '1', MAX_TURNS_ORCHESTRATOR: '3' } })
+  assert.equal(h.config.maxTurnsPerAgent, 1)
+  assert.equal(h.config.maxTurnsOrchestrator, 3)
+  await h.orchestrator.start()
+  await until(() => h.requests.filter((r) => r.agent === 'atlas').length === 3, 'the report to reach Atlas')
+  await settle()
+  // The history is shared by reference, so look for the report wake anywhere in Atlas's transcript.
+  assert.match(JSON.stringify(h.requests.filter((r) => r.agent === 'atlas')[2].messages), /\[REPORT from=forge kind=done\] done/)
+  assert.equal(h.store.snapshot().run.status, 'live', 'nothing was dropped, so the run waits for Atlas or the human as before')
+  assert.equal(h.store.snapshot().run.error, undefined)
+})
+
+test('the orchestrator cap defaults to the per-agent cap', () => {
+  assert.equal(loadConfig({ MOCK_LLM: '1', MAX_TURNS_PER_AGENT: '7' }).maxTurnsOrchestrator, 7)
+  assert.equal(loadConfig({ MOCK_LLM: '1' }).maxTurnsOrchestrator, 60)
+  assert.throws(() => loadConfig({ MOCK_LLM: '1', MAX_TURNS_ORCHESTRATOR: '0' }), /MAX_TURNS_ORCHESTRATOR/)
+})

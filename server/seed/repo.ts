@@ -1,8 +1,10 @@
 /**
  * Seed tree for the virtual `helios/api` repository: a small Fastify + Prisma
  * auth service with password login and an SMS OTP fallback, and no passkey
- * support yet. The feature the agents ship adds `services/auth/webauthn/*`,
- * migration `0043_credentials` and removes `legacy/otp.ts`.
+ * support yet. The feature the agents ship adds passkey register and login
+ * routes (the ADR template suggests `services/auth/webauthn/*`, but the
+ * simulated e2e suite accepts any layout that mounts both steps), a
+ * credentials migration, and removes `legacy/otp.ts`.
  *
  * Every file here must pass the simulated `pnpm typecheck` clean (balanced
  * braces, every import used) so the first run starts from green.
