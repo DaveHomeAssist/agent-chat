@@ -26,6 +26,35 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
 | Responsive light/dark console | [PR #22](https://github.com/DaveHomeAssist/agent-chat/pull/22), merged Sep 8 as `8419cb9`; 41 Chromium cases and independent presentation review pass |
 | Client command admission, draft protection and bounded refresh | [PR #24](https://github.com/DaveHomeAssist/agent-chat/pull/24), externally merged Sep 10 as `dcf2ff26`; corrected source independently accepted, 209 Node / 49 Chromium product CI passes |
 
+## M1 deadlock fixes: October 14 (branch `fix/m1-deadlock-wake-cap-layout`)
+
+- Product commit `ce33f8c3aa675f07c8e94e376e5ca1b4dbcc9155`, built on `f08b4e2`, fixes
+  both causes of the failed run below. No paid request was made; M1 stays **Blocked**
+  until a paid run passes.
+- **Wake cap.** `MAX_TURNS_ORCHESTRATOR` gives Atlas its own cap (app default: the
+  per-agent cap; `scripts/real-acceptance.ts` sets 48 next to the workers' 12). A run
+  with nothing in flight, every inbox empty and at least one wake discarded at a turn
+  cap now ends as `failed` with `Run stalled: no agent can be woken — <agent> reached
+  its turn cap N with K undelivered wakes ([REPORT from=forge kind=done], …)` instead
+  of idling to the runner's timeout. A live run that is merely waiting for a human
+  (nothing dropped) is unchanged.
+- **Layout coupling.** `server/workspace.ts` now derives the register and login steps
+  from what was pushed: any non-test `.ts` file that mentions WebAuthn/passkey/FIDO
+  and is either named for the step or contains a passkey route literal
+  (`/auth/passkey/register`, `/webauthn/login`) mounts it; any migration creating a
+  table whose name contains `credential`, `passkey` or `webauthn` is the credentials
+  migration; the replay-guard and credential-id rules follow those files. The seed's
+  own `/auth/login` and `/auth/otp/verify` routes still fail every case with 404.
+  Documented in [REAL_MODEL_ACCEPTANCE.md](REAL_MODEL_ACCEPTANCE.md).
+- Offline evidence October 14 on this Mac: build/typechecks, **222 Node tests (6 new:
+  5 fail against the previous source, the seed-404 guard passes on both), 17 queue
+  tests and 42 simulator checks** pass. The new orchestrator test reproduces run 1
+  (Atlas capped at 1, Forge's `agent_done` dropped): the previous source stays `live`
+  until the test's 3-second timeout; the fix ends it `failed` with the reason. The new
+  workspace test pushes run 1's layout (`services/auth/passkey/{register,login,counter}.ts`,
+  `0043_webauthn` creating `webauthn_credentials(credential_id BYTEA …)`): 0/24 before,
+  24/24 after. Browser CI remains the Chromium gate.
+
 ## First paid M1 run: October 14 (failed)
 
 - Executed by Dave at 19:33 EDT on code `4886bc7` with `LLM_PROVIDER=anthropic`,
@@ -48,8 +77,9 @@ The historical Phase 0 refresh in PR #4 is superseded by this reconciliation.
      0/24 result as a stale suite and blocked. A green suite was unreachable.
 - Also observed: one Anthropic content refusal on Probe's first code read (Atlas
   reassigned and continued); Forge hit the 12-calls-per-turn cap once.
-- M1 is **Blocked** until the wake cap and the layout coupling are addressed. The
-  $3.49 is evidence of the failure path and complete accounting, not of acceptance.
+- M1 is **Blocked** until a paid run passes. Both causes are fixed on
+  `ce33f8c3` (section above); the $3.49 is evidence of the failure path and complete
+  accounting, not of acceptance.
 
 ## Anthropic acceptance path: October 14 (merged as PR #29)
 
