@@ -1,10 +1,10 @@
 {
   "project": "Agent Chatroom",
-  "verifiedAt": "2026-10-14T20:43:25-04:00",
-  "verifiedLabel": "Oct 14, 2026 · 8:43 PM ET",
-  "codeRevision": "ce33f8c3aa675f07c8e94e376e5ca1b4dbcc9155",
+  "verifiedAt": "2026-11-23T13:56:58.763Z",
+  "verifiedLabel": "Nov 23, 2026, 8:56 AM EST",
+  "codeRevision": "c5330664e47d7b4d2b273430608dd9aa5dbb2a05",
   "overall": "Partial",
-  "summary": "M1 deadlock fixes on branch fix/m1-deadlock-wake-cap-layout at ce33f8c3 (Oct 14): Atlas gets its own wake cap (MAX_TURNS_ORCHESTRATOR, 48 in the acceptance runner) and a run with nothing to deliver ends as failed with a 'Run stalled' reason; the simulated e2e suite judges the pushed passkey layout instead of services/auth/webauthn/*. Offline: build/typechecks, 222 Node (6 new, 5 reproduce the Oct 14 failures), 17 queue, 42 simulator pass locally; browser CI pending on the PR. M1 stays Blocked: the first paid run on 4886bc7 failed and no further paid run is authorized. PR #24 command safety and PR #26 browser-test correction are delivered; runtime product remains dcf2ff26. Sep 14 main CI at ac893045 passed 209 Node, 17 queue, 42 simulator and 50 Chromium checks; this later closeout verifies design-review readback and status rendering separately. Reassign proposal 018 passed frontend review but failed backend review; all 56 proposed cases are UNEXECUTED. Reassign, tool approval and recovery are held at exhausted correction limits. Fidelity stays Partial. Foundation runtime paths await a decision; M1 budget/runner, M3 real tools and M4 hosting remain incomplete.",
+  "summary": "Nov 23 dependency verification covers the shell-quote and Vite patch only. The clean npm audit, 227 offline Node tests and production build passed locally. CI and deployment for this patch are unverified. Prior roadmap snapshot (Oct 14, 2026 · 8:43 PM ET): M1 deadlock fixes on branch fix/m1-deadlock-wake-cap-layout at ce33f8c3 (Oct 14): Atlas gets its own wake cap (MAX_TURNS_ORCHESTRATOR, 48 in the acceptance runner) and a run with nothing to deliver ends as failed with a 'Run stalled' reason; the simulated e2e suite judges the pushed passkey layout instead of services/auth/webauthn/*. Offline: build/typechecks, 222 Node (6 new, 5 reproduce the Oct 14 failures), 17 queue, 42 simulator pass locally; browser CI pending on the PR. M1 stays Blocked: the first paid run on 4886bc7 failed and no further paid run is authorized. PR #24 command safety and PR #26 browser-test correction are delivered; runtime product remains dcf2ff26. Sep 14 main CI at ac893045 passed 209 Node, 17 queue, 42 simulator and 50 Chromium checks; this later closeout verifies design-review readback and status rendering separately. Reassign proposal 018 passed frontend review but failed backend review; all 56 proposed cases are UNEXECUTED. Reassign, tool approval and recovery are held at exhausted correction limits. Fidelity stays Partial. Foundation runtime paths await a decision; M1 budget/runner, M3 real tools and M4 hosting remain incomplete.",
   "items": [
     {
       "id": "console",
@@ -255,6 +255,16 @@
       "dateLabel": "Unscheduled",
       "notes": "Verify authenticated deployed dashboard, mock and budgeted real runs; document deployment.",
       "evidence": "https://github.com/DaveHomeAssist/agent-chat/blob/main/docs/PLAN.md"
+    },
+    {
+      "id": "dependency-security-2026-11-23",
+      "title": "Patch shell-quote and Vite dependencies",
+      "status": "Partial",
+      "phase": "Maintenance",
+      "actualDate": null,
+      "dateLabel": "Unscheduled",
+      "notes": "Compatible dependency resolutions pass the npm audit, 227 offline Node tests and production build. CI and alert closure are pending.",
+      "evidence": "https://github.com/DaveHomeAssist/agent-chat/commit/c5330664e47d7b4d2b273430608dd9aa5dbb2a05"
     }
   ]
 }
